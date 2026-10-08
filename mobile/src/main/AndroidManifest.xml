@@ -18,6 +18,13 @@
             android:name="android.allow_multiple_resumed_activities"
             android:value="true" />
 
+        <meta-data android:name="Group" android:value="GROUP CARPLAY" />
+        <meta-data android:name="Domain" android:value="DOMAIN CARPLAY" />
+        <meta-data
+            android:name="Ability"
+            android:value="com.shilapi.xcertplay.DiPlayActivity" />
+        <meta-data android:name="MoreApp" android:value="true" />
+
         <receiver
             android:name="com.shilapi.xcertplay.BootReceiver"
             android:enabled="true"
