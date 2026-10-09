@@ -28,6 +28,8 @@ import android.widget.ProgressBar
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
+import com.shilapi.xcertplay.hud.HongqiClusterDisplay
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 
 /**
  * Shows CarPlay's instrument-cluster stream on a BYD cluster projection display.
@@ -209,17 +211,31 @@ internal class ClusterMapPresentation(
             if (name == null) {
                 // Never replace a missing 5.1 side layer with a full-screen display.
                 if (DiLink51ClusterLayout.supported()) return null
-                return displays.firstOrNull { display ->
+                displays.firstOrNull { display ->
                     val size = sizeOf(display)
                     DiLink4ClusterDisplay.accepts(display.name, size.x, size.y)
-                }
+                }?.let { return it }
+                return pickHongqiCluster(context, displays)
             }
-            return displays.firstOrNull { it.name == name }?.takeIf {
+            val byd = displays.firstOrNull { it.name == name }?.takeIf {
                 if (!DiLink51ClusterLayout.supported()) true else {
                     val size = sizeOf(it)
                     DiLink51ClusterLayout.plan(size.x, size.y, theme) != null
                 }
             }
+            if (byd != null) return byd
+            return pickHongqiCluster(context, displays)
+        }
+
+        private fun pickHongqiCluster(context: Context, displays: Array<Display>): Display? {
+            if (!HongqiHeadUnit.isHeadUnit(context) &&
+                !HongqiHeadUnit.hasClusterPresentation(context) &&
+                !HongqiHeadUnit.showsHongqiNavigationBranding(context)
+            ) {
+                return null
+            }
+            val mainId = context.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+            return HongqiClusterDisplay.pick(displays, mainId)
         }
 
         fun describeDisplays(context: Context): String =
@@ -232,6 +248,8 @@ internal class ClusterMapPresentation(
         fun diagnosticReport(context: Context): String = buildString {
             appendLine("clusterEnabled=${AirPlayPersistence.loadClusterMapEnabled(context)}")
             appendLine("navigationReceiverAvailable=${com.shilapi.xcertplay.hud.BydOutputSettings.navigationAvailable(context)}")
+            appendLine("gaodePackage=${com.shilapi.xcertplay.hud.BydOutputSettings.resolvedGaodePackage(context)}")
+            appendLine("hongqiClusterPresentation=${HongqiHeadUnit.hasClusterPresentation(context)}")
             appendLine("allDisplays=${describeDisplays(context)}")
             val presentations = context.getSystemService(DisplayManager::class.java)
                 ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION).orEmpty()

@@ -182,7 +182,9 @@ object BydOutputSettings {
 
     /** Whether the head unit has a BYD navigation receiver or is a BYD head unit, so settings can show navigation/map options. */
     fun available(context: Context): Boolean =
-        navigationAvailable(context) ||
+        HongqiHeadUnit.isHeadUnit(context) ||
+            stockGaodeNavigationSettings(context) ||
+            navigationAvailable(context) ||
             installed(context, "com.byd.carsettings") ||
             installed(context, "com.byd.appmgr") ||
             installed(context, "com.byd.deviceinfo") ||
@@ -192,6 +194,31 @@ object BydOutputSettings {
             android.os.Build.MANUFACTURER.contains("BYD", ignoreCase = true) ||
             android.os.Build.PRODUCT.contains("BYD", ignoreCase = true) ||
             android.os.Build.DEVICE.contains("BYD", ignoreCase = true)
+
+    /** Non-BYD head units with a visible stock Gaode package still get HUD / cluster navigation settings. */
+    private fun stockGaodeNavigationSettings(context: Context): Boolean =
+        !HongqiHeadUnit.isBydHeadUnit(context) && HongqiAmapAdapter.resolvedPackage(context) != null
+
+    /** Hongqi HS5 and related FAW units with a stock Gaode navigator (experimental). */
+    fun hongqiNavigationAvailable(context: Context): Boolean =
+        HongqiHeadUnit.showsHongqiNavigationBranding(context) &&
+            (HongqiAmapAdapter.resolvedPackage(context) != null ||
+                HongqiAmapAdapter.scanCandidatePackages(context).isNotEmpty())
+
+    fun resolvedGaodePackage(context: Context): String? = HongqiAmapAdapter.resolvedPackage(context)
+
+    fun gaodeBroadcastReceivers(context: Context): String =
+        HongqiAmapAdapter.packagesFromAutonaviBroadcast(context).joinToString().ifBlank { "none" }
+
+    fun gaodeMapCandidates(context: Context): String =
+        HongqiAmapAdapter.scanCandidatePackages(context).take(12).joinToString().ifBlank { "none" }
+
+    fun navigationOutputPackages(context: Context): String =
+        HongqiAmapAdapter.navigationOutputPackages(context).joinToString().ifBlank { "none" }
+
+    fun isQisiNavigationStack(context: Context): Boolean = HongqiAmapAdapter.isQisiStack(context)
+
+    fun headUnitIdentificationTags(context: Context): String = HongqiHeadUnit.headUnitTags(context)
 
     private fun installed(context: Context, pkg: String): Boolean =
         runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
