@@ -524,13 +524,25 @@ class AdaptiveSettingsUiTest {
             .performClick()
 
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_advanced_caution_title) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.advanced_vehicle_data) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.automatic_connection) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.display_and_performance) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.audio_routing) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.location) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.diagnostics) })
+    }
+
+    @Test fun navigationContainsClusterMap() {
+        val screen = openSettings()
+        descendants(screen.window.decorView)
+            .single { candidate ->
+                candidate.contentDescription == screen.getString(
+                    R.string.settings_open_category,
+                    screen.getString(R.string.settings_navigation),
+                )
+            }
+            .performClick()
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
     }
 
     @Test fun displayOpensPictureAdjustments() {

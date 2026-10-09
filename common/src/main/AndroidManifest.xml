@@ -22,6 +22,11 @@
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
         <package android:name="com.byd.carsettings" />
+        <package android:name="com.autonavi.amapauto" />
+        <package android:name="com.autonavi.amapauto.custom" />
+        <package android:name="com.faw.navi" />
+        <package android:name="com.faw.hongqi" />
+        <package android:name="com.juyou.app" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />

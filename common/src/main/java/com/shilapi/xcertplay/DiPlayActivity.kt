@@ -136,7 +136,11 @@ internal object SettingsInformationArchitecture {
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
-        SettingsCategory.NAVIGATION to setOf(SettingsSection.LOCATION, SettingsSection.BYD_NAVIGATION),
+        SettingsCategory.NAVIGATION to setOf(
+            SettingsSection.LOCATION,
+            SettingsSection.BYD_NAVIGATION,
+            SettingsSection.CLUSTER_MAP,
+        ),
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
             SettingsSection.WHEEL_KEYS,
@@ -144,7 +148,6 @@ internal object SettingsInformationArchitecture {
         ),
         SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
         SettingsCategory.ADVANCED to setOf(
-            SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
@@ -186,6 +189,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var initialLaunch = true
     private var notificationTransport = true
     private var exportInProgress = false
+    private var viewReportButton: Button? = null
     private var usbPermissionOperation: UsbPermissionSetup.Operation? = null
     private var usbPermissionDialog: AlertDialog? = null
     internal var usbPermissionOperationFactory: (Context) -> UsbPermissionSetup.Operation = {
@@ -1587,8 +1591,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.DIAGNOSTICS,
             getString(R.string.diagnostics), R.drawable.ic_dp_diagnostics) { card ->
+            viewReportButton = button(
+                if (exportInProgress) getString(R.string.generating_diagnostic_report) else getString(R.string.view_diagnostic_report),
+                false,
+                ::openDiagnosticReportViewer,
+            ).apply { isEnabled = !exportInProgress }
+            card.addView(viewReportButton, matchButton(10, 60))
             exportButton = button(if (exportInProgress) getString(R.string.saving_report) else getString(R.string.save_diagnostic_report), false) {
-                saveReportToDownloads()
+                // Android 9 head units often ship a file picker that cannot complete CreateDocument.
+                exportDiagnostics()
             }.apply { isEnabled = !exportInProgress }
             card.addView(exportButton, matchButton(10, 60))
             card.addView(button(getString(R.string.choose_save_location), false) { chooseReportDestination() }, matchButton(10, 60))
@@ -1922,11 +1933,26 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // Cluster video does not require a BYD navigation broadcast receiver.
         filteredSection(content, SettingsSection.CLUSTER_MAP,
             getString(R.string.carplay_map_on_instrument_cluster_experimental), R.drawable.ic_dp_dashboard) { card ->
-            reconnectingToggle(card, getString(R.string.adb_cluster_activity_mode),
-                getString(R.string.adb_cluster_activity_description), AirPlayPersistence.loadAdbClusterEnabled(this)) {
-                AirPlayPersistence.saveAdbClusterEnabled(this, it)
-                ClusterActivityOutput.stopForSettings()
-                render()
+            indexClusterMapSearchAliases()
+            val clusterDisplay = ClusterMapPresentation.findDisplay(this)
+            val adbCluster = AdbClusterRouter.enabled(this)
+            val clusterSize = clusterDisplay?.let { ClusterMapPresentation.sizeOf(it) }
+            val diLink4 = adbCluster || (clusterDisplay != null && clusterSize != null &&
+                DiLink4ClusterDisplay.matches(clusterDisplay.name, clusterSize.x, clusterSize.y))
+            val preferPrimaryToggleFirst = com.shilapi.xcertplay.hud.HongqiHeadUnit.hasClusterPresentation(this) ||
+                com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this)
+            val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
+            if (preferPrimaryToggleFirst) {
+                clusterMapPrimaryToggle(card, clusterDisplay, adbCluster)
+                clusterDisplayStatusLabel(card, clusterDisplay)
+            }
+            if (!preferPrimaryToggleFirst || AdbClusterRouter.enabled(this)) {
+                reconnectingToggle(card, getString(R.string.adb_cluster_activity_mode),
+                    getString(R.string.adb_cluster_activity_description), AirPlayPersistence.loadAdbClusterEnabled(this)) {
+                    AirPlayPersistence.saveAdbClusterEnabled(this, it)
+                    ClusterActivityOutput.stopForSettings()
+                    render()
+                }
             }
             reconnectingToggle(card, getString(R.string.platform21_cluster_mode),
                 getString(R.string.platform21_cluster_description), AirPlayPersistence.loadLegacyClusterEnabled(this)) {
@@ -1934,7 +1960,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 ClusterActivityOutput.stopForSettings()
                 render()
             }
-            val adbCluster = AdbClusterRouter.enabled(this)
             if (adbCluster) {
                 card.addView(button(getString(R.string.adb_cluster_authorize), false) { authorizeClusterRouting() }, matchButton(10, 56))
                 card.addView(button(getString(R.string.adb_cluster_open), false) { ClusterActivityOutput.retry(force = true) }, matchButton(10, 56))
@@ -1949,17 +1974,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     markReconnectNeeded()
                 }
             }
-            val clusterDisplay = ClusterMapPresentation.findDisplay(this)
-            val clusterSize = clusterDisplay?.let { ClusterMapPresentation.sizeOf(it) }
-            val diLink4 = adbCluster || (clusterDisplay != null && clusterSize != null &&
-                DiLink4ClusterDisplay.matches(clusterDisplay.name, clusterSize.x, clusterSize.y))
-            val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
-            reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
-                if (clusterDisplay != null || adbCluster) getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c)
-                else getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
-                clusterMapEnabled) {
-                AirPlayPersistence.saveClusterMapEnabled(this, it)
-                render()
+            if (!preferPrimaryToggleFirst) {
+                clusterMapPrimaryToggle(card, clusterDisplay, adbCluster)
+                clusterDisplayStatusLabel(card, clusterDisplay)
             }
             if (clusterMapEnabled) {
                 clusterSpeedometerControls(card)
@@ -2219,10 +2236,32 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // FCE head units show this card for their cluster's navigation view, which has its own opt-in.
         val bydNavigation = BydOutputSettings.available(this)
         if (bydNavigation || BydOutputSettings.fceClusterAvailable()) filteredSection(content, SettingsSection.BYD_NAVIGATION,
-            getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
+            if (com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this)) {
+                getString(R.string.settings_hongqi_navigation)
+            } else getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
                 getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
                 com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) { com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it) }
+            if (com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this)) {
+                if (com.shilapi.xcertplay.hud.HongqiHeadUnit.hasClusterPresentation(this)) {
+                    clusterMapPrimaryToggle(
+                        card,
+                        ClusterMapPresentation.findDisplay(this),
+                        AdbClusterRouter.enabled(this),
+                    )
+                }
+                val hint = when {
+                    BydOutputSettings.hongqiNavigationAvailable(this) &&
+                        BydOutputSettings.isQisiNavigationStack(this) ->
+                        R.string.settings_hongqi_qisi_navigation_hint
+                    BydOutputSettings.hongqiNavigationAvailable(this) ->
+                        R.string.settings_hongqi_navigation_hint
+                    else -> R.string.settings_hongqi_amap_missing_hint
+                }
+                card.addView(label(getString(hint), 14, MUTED).apply {
+                    setPadding(0, dp(6), 0, dp(4))
+                })
+            }
             if (BydOutputSettings.fceClusterAvailable()) {
                 toggle(card, getString(R.string.settings_fce_cluster_guidance),
                     getString(R.string.settings_fce_cluster_guidance_description),
@@ -2546,11 +2585,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun userAgent() = "DiPlay/${version()}"
 
-    // An opted-in connection prepares the hotspot in the controller instead of stopping at this reminder.
+    // Wireless connect prepares the link in CarPlayController when automatic startup is possible.
     private fun carHotspotOff(): Boolean =
         AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
             com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this) == false &&
-            !(CarHotspotSettings.enabled(this) && CarHotspotTethering.permitted(this))
+            !CarHotspotTethering.permitted(this)
 
     private fun bydAdbSettings(parent: LinearLayout) {
         if (AirPlayPersistence.loadWirelessHotspotMode(this) != WirelessHotspotMode.MANUAL) return
@@ -5134,93 +5173,141 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         runCatching { export.launch(reportFileName()) }.onFailure { exportDiagnostics() }
     }
 
+    private fun setDiagnosticReportBusy(busy: Boolean, saving: Boolean) {
+        exportInProgress = busy
+        val viewLabel = if (busy && !saving) getString(R.string.generating_diagnostic_report)
+        else getString(R.string.view_diagnostic_report)
+        val saveLabel = if (busy && saving) getString(R.string.saving_report)
+        else getString(R.string.save_diagnostic_report)
+        viewReportButton?.apply { isEnabled = !busy; text = viewLabel }
+        exportButton?.apply { isEnabled = !busy; text = saveLabel }
+    }
+
+    private fun openDiagnosticReportViewer() {
+        if (exportInProgress) return
+        setDiagnosticReportBusy(busy = true, saving = false)
+        val appContext = applicationContext
+        Thread({
+            val result = runCatching { buildDiagnosticReport(appContext) }
+            runOnUiThread {
+                setDiagnosticReportBusy(busy = false, saving = false)
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.fold(
+                    onSuccess = { showDiagnosticReport(it) },
+                    onFailure = {
+                        appDialogBuilder().setTitle(getString(R.string.could_not_save_the_report))
+                            .setMessage(getString(R.string.check_that_storage_is_available_or_choose_another_save_loc))
+                            .setPositiveButton(getString(R.string.close), null).show()
+                    },
+                )
+            }
+        }, "diplay-report-view").start()
+    }
+
+    private fun buildDiagnosticReport(appContext: Context): String = buildString {
+        appendLine("DiPlay ${version()} · private beta diagnostic report")
+        appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
+        appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
+        appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")
+        AirPlayPersistence.loadUsbChargingCurrent(appContext).let {
+            appendLine("USB charging offer: ${it.key} (${it.milliAmps} mA)")
+        }
+        appendLine("Authentication: local experimental beta identity; no remote fallback")
+        appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
+        appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
+        appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
+        appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
+        appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
+        appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
+        appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
+        appendLine(PhoneWakeDiagnostics.report(appContext))
+        appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
+        appendLine()
+        appendLine("--- Current cluster display diagnostics (even when disabled) ---")
+        appendLine(ClusterMapPresentation.diagnosticReport(appContext))
+        appendLine()
+        appendLine("--- ADB cluster activity routing ---")
+        appendLine("adbClusterActivityEnabled=${AirPlayPersistence.loadAdbClusterEnabled(appContext)}")
+        appendLine("clusterActivityMainTask=${ClusterActivityOutput.mainTaskId} surfaceValid=${ClusterActivityOutput.surface?.isValid}")
+        AdbClusterRouter.report(appContext).lineSequence().forEach { line ->
+            DiagnosticRedactor.redact(line)?.let { appendLine(it) }
+        }
+        appendLine()
+        appendLine("--- Standalone HUD compatibility ---")
+        appendLine(BydOutputSettings.standaloneHudDiagnosticReport(appContext))
+        appendLine()
+        appendLine("--- Hongqi / Gaode navigation output ---")
+        appendLine(
+            "hongqiHeadUnit=${com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(appContext)} " +
+                "hongqiBranding=${com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(appContext)} " +
+                "gaodePackage=${BydOutputSettings.resolvedGaodePackage(appContext)} " +
+                "gaodeBroadcastReceivers=${BydOutputSettings.gaodeBroadcastReceivers(appContext)} " +
+                "gaodeMapCandidates=${BydOutputSettings.gaodeMapCandidates(appContext)} " +
+                "navigationOutputs=${BydOutputSettings.navigationOutputPackages(appContext)} " +
+                "qisiNavi=${BydOutputSettings.isQisiNavigationStack(appContext)} " +
+                "clusterDisplay=${com.shilapi.xcertplay.hud.HongqiHeadUnit.clusterDisplaySummary(appContext)} " +
+                "androidSdk=${android.os.Build.VERSION.SDK_INT} " +
+                "clusterPresentation=${com.shilapi.xcertplay.hud.HongqiHeadUnit.hasClusterPresentation(appContext)} " +
+                "navigationSettings=${BydOutputSettings.available(appContext)}",
+        )
+        appendLine(BydOutputSettings.headUnitIdentificationTags(appContext))
+        appendLine()
+        appendLine("--- BYD vehicle-data probe ---")
+        appendLine(
+            "mode=${if (BydOutputSettings.legacyVehicleProbe(appContext)) "legacy-probe" else "default"} " +
+                "switches location=${AirPlayPersistence.loadLocationReportingEnabled(appContext)} " +
+                "battery=${BydOutputSettings.batteryToIphone(appContext)} " +
+                "wheelSpeed=${BydOutputSettings.wheelSpeedToIphone(appContext)} " +
+                "parkedVideo=${BydOutputSettings.videoWhileParked(appContext)}",
+        )
+        val bydCapabilities = BydVehicleFieldStore.load(appContext)
+        if (bydCapabilities == null) {
+            appendLine("no saved successful probe")
+        } else {
+            appendLine(
+                "catalog=${bydCapabilities.catalogAvailable} detectedAt=${bydCapabilities.detectedAtMillis} " +
+                    "savedFirmware=${bydCapabilities.firmwareKey} " +
+                    "currentFirmware=${BydVehicleFieldStore.firmwareKey()}",
+            )
+            for (field in BydVehicleField.entries) {
+                val probe = bydCapabilities.result(field)
+                appendLine("${field.name}: supported=${probe.supported} " +
+                    (probe.address?.let { "tx=${it.transaction} dev=${it.device} fid=${it.fid} source=${it.source}" }
+                        ?: "address=none"))
+            }
+        }
+        appendLine()
+        appendLine("--- Last display negotiation (timestamps distinguish it from current settings) ---")
+        appendLine(DisplayDiagnosticSnapshot.report(appContext))
+        appendLine()
+        appendLine("--- Last received boot and app-launch result ---")
+        appendLine(StartupDiagnosticSnapshot.report(appContext))
+        appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
+            "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
+        appendLine(WheelKeyService.report(appContext))
+        appendLine()
+        appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
+        appendLine()
+        appendLine("--- Recent own-app process exits (Android 11+) ---")
+        appendLine(ProcessExitDiagnostics.report(appContext))
+        appendLine()
+        for (name in SessionLogFile.REPORT_NAMES) {
+            val file = File(appContext.filesDir, "logs/$name")
+            if (file.isFile) {
+                appendLine("--- $name ---")
+                file.useLines { lines -> lines.forEach { line -> DiagnosticRedactor.redact(line)?.let { appendLine(it) } } }
+            }
+        }
+    }
+
     private fun exportDiagnostics(uri: Uri? = null) {
         if (exportInProgress) return
-        exportInProgress = true
-        exportButton?.apply { isEnabled = false; text = getString(R.string.saving_report) }
+        setDiagnosticReportBusy(busy = true, saving = true)
         val appContext = applicationContext
         val fileName = reportFileName()
         Thread({
             val result = runCatching {
-                val report = buildString {
-                    appendLine("DiPlay ${version()} · private beta diagnostic report")
-                    appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
-                    appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
-                    appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")
-                    AirPlayPersistence.loadUsbChargingCurrent(appContext).let {
-                        appendLine("USB charging offer: ${it.key} (${it.milliAmps} mA)")
-                    }
-                    appendLine("Authentication: local experimental beta identity; no remote fallback")
-                    appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
-                    appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
-                    appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
-                    appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
-                    appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
-                    appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
-                    appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
-                    appendLine(PhoneWakeDiagnostics.report(appContext))
-                    appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
-                    appendLine()
-                    appendLine("--- Current cluster display diagnostics (even when disabled) ---")
-                    appendLine(ClusterMapPresentation.diagnosticReport(appContext))
-                    appendLine()
-                    appendLine("--- ADB cluster activity routing ---")
-                    appendLine("adbClusterActivityEnabled=${AirPlayPersistence.loadAdbClusterEnabled(appContext)}")
-                    appendLine("clusterActivityMainTask=${ClusterActivityOutput.mainTaskId} surfaceValid=${ClusterActivityOutput.surface?.isValid}")
-                    AdbClusterRouter.report(appContext).lineSequence().forEach { line ->
-                        DiagnosticRedactor.redact(line)?.let { appendLine(it) }
-                    }
-                    appendLine()
-                    appendLine("--- Standalone HUD compatibility ---")
-                    appendLine(BydOutputSettings.standaloneHudDiagnosticReport(appContext))
-                    appendLine()
-                    appendLine("--- BYD vehicle-data probe ---")
-                    appendLine(
-                        "mode=${if (BydOutputSettings.legacyVehicleProbe(appContext)) "legacy-probe" else "default"} " +
-                            "switches location=${AirPlayPersistence.loadLocationReportingEnabled(appContext)} " +
-                            "battery=${BydOutputSettings.batteryToIphone(appContext)} " +
-                            "wheelSpeed=${BydOutputSettings.wheelSpeedToIphone(appContext)} " +
-                            "parkedVideo=${BydOutputSettings.videoWhileParked(appContext)}",
-                    )
-                    val bydCapabilities = BydVehicleFieldStore.load(appContext)
-                    if (bydCapabilities == null) {
-                        appendLine("no saved successful probe")
-                    } else {
-                        appendLine(
-                            "catalog=${bydCapabilities.catalogAvailable} detectedAt=${bydCapabilities.detectedAtMillis} " +
-                                "savedFirmware=${bydCapabilities.firmwareKey} " +
-                                "currentFirmware=${BydVehicleFieldStore.firmwareKey()}",
-                        )
-                        for (field in BydVehicleField.entries) {
-                            val probe = bydCapabilities.result(field)
-                            appendLine("${field.name}: supported=${probe.supported} " +
-                                (probe.address?.let { "tx=${it.transaction} dev=${it.device} fid=${it.fid} source=${it.source}" }
-                                    ?: "address=none"))
-                        }
-                    }
-                    appendLine()
-                    appendLine("--- Last display negotiation (timestamps distinguish it from current settings) ---")
-                    appendLine(DisplayDiagnosticSnapshot.report(appContext))
-                    appendLine()
-                    appendLine("--- Last received boot and app-launch result ---")
-                    appendLine(StartupDiagnosticSnapshot.report(appContext))
-                    appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
-                        "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
-                    appendLine(WheelKeyService.report(appContext))
-                    appendLine()
-                    appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
-                    appendLine()
-                    appendLine("--- Recent own-app process exits (Android 11+) ---")
-                    appendLine(ProcessExitDiagnostics.report(appContext))
-                    appendLine()
-                    for (name in SessionLogFile.REPORT_NAMES) {
-                        val file = File(appContext.filesDir, "logs/$name")
-                        if (file.isFile) {
-                            appendLine("--- $name ---")
-                            file.useLines { lines -> lines.forEach { line -> DiagnosticRedactor.redact(line)?.let { appendLine(it) } } }
-                        }
-                    }
-                }
+                val report = buildDiagnosticReport(appContext)
                 val savedReport = if (uri != null) {
                     DiagnosticExportStore.write(appContext.contentResolver, uri, report)
                     DiagnosticExportStore.SavedReport(uri)
@@ -5228,49 +5315,75 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 savedReport to report
             }
             runOnUiThread {
-                exportInProgress = false
+                setDiagnosticReportBusy(busy = false, saving = false)
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                exportButton?.apply { isEnabled = true; text = getString(R.string.save_diagnostic_report) }
                 if (result.isSuccess) {
                     val (savedReport, report) = result.getOrThrow()
-                    appDialogBuilder().setTitle(getString(R.string.diagnostic_report_saved))
-                        .setMessage(when {
-                            savedReport.savedInApp -> getString(R.string.diagnostic_report_saved_in_app)
-                            savedReport.savedPath != null -> getString(R.string.diagnostic_report_saved_to_path, savedReport.savedPath)
-                            uri == null -> "Downloads/DiPlay/$fileName"
-                            else -> getString(R.string.your_report_was_saved_to_the_selected_location)
-                        })
-                        .setPositiveButton(getString(R.string.view_diagnostic_report)) { _, _ -> showDiagnosticReport(report) }
-                        .setNegativeButton(getString(R.string.done), null)
-                        .setNeutralButton(getString(R.string.share)) { _, _ ->
-                            runCatching {
-                                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"; putExtra(Intent.EXTRA_STREAM, savedReport.uri)
-                                    clipData = android.content.ClipData.newRawUri(getString(R.string.report_clip_label), savedReport.uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }, getString(R.string.share_diagnostic_report)))
-                            }.onFailure { showDiagnosticReport(report) }
-                        }.show()
+                    toast(getString(R.string.diagnostic_report_saved))
+                    showDiagnosticReport(report, savedReport.uri)
                 } else {
                     appDialogBuilder().setTitle(getString(R.string.could_not_save_the_report))
                         .setMessage(getString(R.string.check_that_storage_is_available_or_choose_another_save_loc))
-                        .setPositiveButton(getString(R.string.choose_location)) { _, _ -> chooseReportDestination() }
+                        .setPositiveButton(getString(R.string.save_diagnostic_report)) { _, _ -> exportDiagnostics() }
+                        .setNeutralButton(getString(R.string.choose_location)) { _, _ -> chooseReportDestination() }
                         .setNegativeButton(getString(R.string.close), null).show()
                 }
             }
         }, "diplay-export").start()
     }
 
-    private fun showDiagnosticReport(report: String) {
-        val body = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
-        body.addView(label(getString(R.string.diagnostic_report_copy_hint), 14, MUTED))
-        body.addView(label(report, 13, TEXT).apply {
+    private fun showDiagnosticReport(report: String, shareUri: Uri? = null) {
+        val dialogContext = appDialogContext()
+        val screenHeight = resources.displayMetrics.heightPixels
+        val scrollHeight = (screenHeight * 0.72f).roundToInt().coerceIn(dp(200), screenHeight - dp(120))
+        val body = LinearLayout(dialogContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(4), dp(16), dp(12))
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        body.addView(TextView(dialogContext).apply {
+            text = getString(R.string.diagnostic_report_copy_hint)
+            textSize = 14f
+            setTextColor(MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+        })
+        body.addView(TextView(dialogContext).apply {
+            text = report
+            textSize = 12f
+            setTextColor(TEXT)
             typeface = Typeface.MONOSPACE
             setTextIsSelectable(true)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(10), 0, 0)
         })
-        appDialogBuilder().setTitle(getString(R.string.view_diagnostic_report))
-            .setView(ScrollView(appDialogContext()).apply { addView(body) })
-            .setPositiveButton(getString(R.string.close), null).show()
+        val scroll = ScrollView(dialogContext).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, scrollHeight)
+            isFillViewport = false
+            isVerticalScrollBarEnabled = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(body)
+        }
+        val builder = appDialogBuilder().setTitle(getString(R.string.view_diagnostic_report)).setView(scroll)
+        builder.setPositiveButton(getString(R.string.close), null)
+        builder.setNegativeButton(getString(R.string.copy_report)) { _, _ ->
+            getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(
+                android.content.ClipData.newPlainText(getString(R.string.report_clip_label), report),
+            )
+            toast(getString(R.string.copied_report_to_clipboard))
+        }
+        if (shareUri != null) {
+            builder.setNeutralButton(getString(R.string.share)) { _, _ ->
+                runCatching {
+                    startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, shareUri)
+                        clipData = android.content.ClipData.newRawUri(getString(R.string.report_clip_label), shareUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }, getString(R.string.share_diagnostic_report)))
+                }.onFailure { toast(getString(R.string.diagnostic_report_copy_hint)) }
+            }
+        }
+        builder.show()
     }
     private fun permissionHelp(title: String, body: String) {
         appDialogBuilder().setTitle(title).setMessage(body).setPositiveButton(getString(R.string.app_settings)) { _, _ ->
@@ -5424,6 +5537,42 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     ) {
         if (settingsSectionFilter?.contains(key) == false) return
         section(parent, title, icon, build)
+    }
+
+    private fun indexClusterMapSearchAliases() {
+        getString(R.string.settings_cluster_map_search_aliases).split(',').map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .forEach { searchIndexSink?.add(it) }
+    }
+
+    private fun clusterDisplayStatusLabel(parent: LinearLayout, clusterDisplay: android.view.Display?) {
+        val summary = clusterDisplay?.let { "${it.name}#${it.displayId}" }
+            ?: com.shilapi.xcertplay.hud.HongqiHeadUnit.clusterDisplaySummary(this)
+        val text = if (summary != null) {
+            getString(R.string.settings_cluster_display_detected, summary.substringBefore("#"), summary.substringAfter("#"))
+        } else {
+            getString(R.string.settings_cluster_display_missing)
+        }
+        parent.addView(label(text, 14, if (summary != null) MUTED else WARNING).apply {
+            setPadding(0, dp(6), 0, dp(4))
+        })
+    }
+
+    private fun clusterMapPrimaryToggle(
+        parent: LinearLayout,
+        clusterDisplay: android.view.Display?,
+        adbCluster: Boolean,
+    ) {
+        reconnectingToggle(parent, getString(R.string.carplay_map_on_instrument_cluster_experimental),
+            if (clusterDisplay != null || adbCluster) {
+                getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c)
+            } else {
+                getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description)
+            },
+            AirPlayPersistence.loadClusterMapEnabled(this)) {
+            AirPlayPersistence.saveClusterMapEnabled(this, it)
+            render()
+        }
     }
     // Routing changes affect the live cluster surface as soon as the host resumes.
     // Ask before saving them instead of promising to defer only part of the change.

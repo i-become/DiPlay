@@ -2198,26 +2198,14 @@ class CarPlayController(
     private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
         val readyDeadline = System.nanoTime() + WirelessStartupPolicy.HOTSPOT_READY_MILLIS * 1_000_000
         val hotspotMode = config.wirelessHotspotMode
-        if (com.shilapi.xcertplay.network.CarHotspotSettings.shouldEnable(
-                appContext, config.transport == CarPlayTransport.WIRELESS, hotspotMode,
-            )
-        ) {
-            val result = com.shilapi.xcertplay.network.CarHotspotTethering.enable(
+        if (config.transport == CarPlayTransport.WIRELESS) {
+            com.shilapi.xcertplay.network.WirelessLinkPrepare.prepare(
                 appContext,
-                isCancelled = { isStaleWirelessRun(generation) ||
-                    !com.shilapi.xcertplay.network.CarHotspotSettings.enabled(appContext) },
+                hotspotMode,
+                isCancelled = { isStaleWirelessRun(generation) },
                 timeoutMillis = ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1),
-                log = { debugLog("generation=$generation atNs=${System.nanoTime()} $it; awaiting hotspot interface") },
+                log = { debugLog("generation=$generation atNs=${System.nanoTime()} $it; awaiting wireless link") },
             )
-            val manualFallback = result == com.shilapi.xcertplay.network.CarHotspotTethering.Result.UNSUPPORTED &&
-                com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == null
-            if (result != com.shilapi.xcertplay.network.CarHotspotTethering.Result.READY && !manualFallback) {
-                throw WirelessStartupException(
-                    if (result == com.shilapi.xcertplay.network.CarHotspotTethering.Result.TIMED_OUT ||
-                        result == com.shilapi.xcertplay.network.CarHotspotTethering.Result.FAILED)
-                        WirelessStartupFailure.HOTSPOT_NOT_READY else WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                    "${result.diagnostic}. Open the car hotspot settings and connect again.")
-            }
         }
         if (hotspotMode == WirelessHotspotMode.MANUAL &&
             com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == false

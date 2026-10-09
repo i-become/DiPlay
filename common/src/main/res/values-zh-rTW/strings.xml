@@ -137,7 +137,8 @@
     <string name="carplay_control_running">CarPlay 控制通道執行中</string>
     <string name="carplay_control_window_ended">CarPlay 控制工作階段已結束</string>
     <string name="carplay_icon">CarPlay 圖示</string>
-    <string name="carplay_map_on_instrument_cluster_experimental">儀表板上的 CarPlay 地圖（實驗性）</string>
+    <string name="carplay_map_on_instrument_cluster_experimental">CarPlay 地圖到儀表（實驗性）</string>
+    <string name="settings_cluster_map_search_aliases">飛屏,儀表地圖,地圖到儀表,儀表板地圖</string>
     <string name="carplay_service_already_running">CarPlay 服務已在執行</string>
     <string name="carplay_session_already_running">CarPlay 工作階段已在執行</string>
     <string name="carplay_session_ended_reconnecting">CarPlay 工作階段已結束；正在重新連線</string>
@@ -154,7 +155,7 @@
     <string name="choose_iphone">選擇 iPhone</string>
     <string name="choose_location">選擇位置</string>
     <string name="choose_save_location">選擇儲存位置</string>
-    <string name="choose_where_to_save_your_report">選擇報告的儲存位置。</string>
+    <string name="choose_where_to_save_your_report">儲存時會在 DiPlay 內寫入報告，無需檔案管理器。點「查看報告」可閱讀或長按複製全文，或用「分享」傳送。「選擇儲存位置」僅在車機檔案管理器可用時使用。\u0020</string>
     <string name="choose_your_iphone">選擇 iPhone</string>
     <string name="close">關閉</string>
     <string name="cluster_map_size">儀表板地圖大小</string>
@@ -589,6 +590,12 @@
     <string name="settings_gesture_fingers_label">快捷選單 · 向下滑動手指數</string>
     <string name="settings_gesture_fingers_option">%1$d 指</string>
     <string name="settings_gesture_fingers_hint">選擇車機尚未使用的手指數。比亞迪的三指向下滑動會開啟空調面板，建議改用 2 指。</string>
+    <string name="settings_hongqi_navigation">紅旗導航（實驗性）</string>
+    <string name="settings_hongqi_navigation_hint">紅旗（實驗性）：將 CarPlay 導航資訊送給原車高德，以便 HUD 與儀表同步顯示。變更後請重新連接 CarPlay。若無顯示，可能韌體協定不同，請提交診斷報告。</string>
+    <string name="settings_hongqi_amap_missing_hint">未偵測到原車高德車機版，HUD 轉向引導需要系統地圖應用。下方的「CarPlay 地圖到儀表」在偵測到儀表螢幕後仍可使用。</string>
+    <string name="settings_hongqi_qisi_navigation_hint">本車導航為啟思（ltd.qisi.navi），不是獨立高德 APK。DiPlay 會以高德相容廣播嘗試轉發 CarPlay 轉向資訊；若無顯示，可能需紅旗專有協定。儀表飛屏請開啟「CarPlay 地圖到儀表（實驗性）」、重新連接 CarPlay，並在 iPhone 上進入導航。</string>
+    <string name="settings_cluster_display_detected">已偵測到儀表副屏：%1$s（displayId %2$s）。開啟上方開關並重連 CarPlay 後，在 iPhone 上開始導航。</string>
+    <string name="settings_cluster_display_missing">目前未偵測到儀表副屏（Cluster-Display）。若工廠模式可看到 Cluster-Display，請在 CarPlay 連線後回到此頁重新整理，或提交診斷報告。</string>
     <string name="auto_car_hotspot_title">自動開啟熱點</string>
     <string name="auto_car_hotspot_description">DiPlay 啟動時開啟車機熱點。開啟開關會自動透過 ADB 申請所需權限，請允許車機上的授權提示。配合“車輛啟動後開啟”可隨開機啟動。保留熱點名稱和密碼，不會自動關閉熱點。</string>
     <string name="hotspot_control_missing">缺少熱點控制權限。請透過 ADB 授權，或在車機設定中手動開啟熱點。</string>
@@ -603,7 +610,10 @@
     <string name="diagnostic_report_saved_in_app">由於公開儲存位置無法使用，報告已私密儲存到 DiPlay。您可以在此分享或檢視報告。不會自動傳送任何內容。</string>
     <string name="diagnostic_report_saved_to_path">報告已儲存到：\n%1$s\n\n您也可以在此分享或檢視報告。不會自動傳送任何內容。</string>
     <string name="view_diagnostic_report">檢視報告</string>
-    <string name="diagnostic_report_copy_hint">長按報告文本即可選擇並複製。如果沒有可用的分享App，可以使用此方式。</string>
+    <string name="generating_diagnostic_report">正在產生報告…</string>
+    <string name="copy_report">複製報告</string>
+    <string name="copied_report_to_clipboard">報告已複製到剪貼簿。</string>
+    <string name="diagnostic_report_copy_hint">上下滑動閱讀全文。可點「複製報告」，或長按文字選取部分內容。</string>
     <string name="wheel_map_zoom">用方向盤按鍵縮放儀表板地圖</string>
     <string name="wheel_map_zoom_description">儀表板顯示 CarPlay 地圖時，比亞迪自訂按鍵可在音量和儀表板地圖縮放之間切換音量鍵。通話時按鍵始終調整音量。部分車型的中控音量與方向盤傳送相同按鍵，因此縮放模式下它也會縮放地圖。使用 DiPlay 方向盤按鍵服務；儀表板上的提示需要 ADB。</string>
     <string name="wheel_keys_service_on">方向盤按鍵服務：已開啟</string>

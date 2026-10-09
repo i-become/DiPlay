@@ -138,7 +138,8 @@
     <string name="carplay_control_running">CarPlay 控制通道运行中</string>
     <string name="carplay_control_window_ended">CarPlay 控制会话已结束</string>
     <string name="carplay_icon">CarPlay 图标</string>
-    <string name="carplay_map_on_instrument_cluster_experimental">仪表盘上的CarPlay地图（实验性）</string>
+    <string name="carplay_map_on_instrument_cluster_experimental">CarPlay 地图到仪表（实验性）</string>
+    <string name="settings_cluster_map_search_aliases">飞屏,仪表地图,地图到仪表,仪表盘地图</string>
     <string name="carplay_service_already_running">CarPlay 服务已在运行</string>
     <string name="carplay_session_already_running">CarPlay 会话已在运行</string>
     <string name="carplay_session_ended_reconnecting">CarPlay 会话已结束；正在重新连接</string>
@@ -155,7 +156,7 @@
     <string name="choose_iphone">选择 iPhone</string>
     <string name="choose_location">选择位置</string>
     <string name="choose_save_location">选择保存位置</string>
-    <string name="choose_where_to_save_your_report">选择报告的保存位置。如果文件选择器不可用，DiPlay 会在应用内保存报告。\u0020</string>
+    <string name="choose_where_to_save_your_report">保存时会在 DiPlay 内写入报告，无需文件管理器。点「查看报告」可阅读或长按复制全文，或用「分享」发送。「选择保存位置」仅在车机文件管理器可用时使用。\u0020</string>
     <string name="choose_your_iphone">选择 iPhone</string>
     <string name="close">关闭</string>
     <string name="cluster_map_size">仪表盘地图大小</string>
@@ -606,6 +607,12 @@
     <string name="settings_gesture_fingers_label">快捷菜单 · 下滑手指数</string>
     <string name="settings_gesture_fingers_option">%1$d 指</string>
     <string name="settings_gesture_fingers_hint">选择车机没有占用的手指数。比亚迪的三指下滑是空调面板，建议改用 2 指。</string>
+    <string name="settings_hongqi_navigation">红旗导航（实验性）</string>
+    <string name="settings_hongqi_navigation_hint">红旗（实验性）：将 CarPlay 导航信息发给原车高德，以便 HUD 和仪表同步显示。更改后请重新连接 CarPlay。若无显示，可能固件协议不同，请提交诊断报告。</string>
+    <string name="settings_hongqi_amap_missing_hint">未检测到原车高德车机版，HUD 转向引导需要系统地图应用。仪表飞屏请打开本卡片或上方「CarPlay 地图到仪表（实验性）」开关（与导航页另一张卡片为同一设置）。</string>
+    <string name="settings_hongqi_qisi_navigation_hint">本车导航为启思（ltd.qisi.navi），不是独立高德 APK。DiPlay 会以高德兼容广播尝试把 CarPlay 转向信息转发给原车导航/HUD；若无显示，可能需红旗专有协议。仪表飞屏与地图包无关：请打开「CarPlay 地图到仪表（实验性）」、重新连接 CarPlay，并在 iPhone 上进入导航。</string>
+    <string name="settings_cluster_display_detected">已检测到仪表副屏：%1$s（displayId %2$s）。打开上方开关并重连 CarPlay 后，在 iPhone 上开始导航。</string>
+    <string name="settings_cluster_display_missing">当前未检测到仪表副屏（Cluster-Display）。若你在工厂模式里能看到 Cluster-Display，请在 CarPlay 连接后回到此页刷新，或提交诊断报告。</string>
     <string name="auto_car_hotspot_title">自动开启热点</string>
     <string name="auto_car_hotspot_description">DiPlay 启动时开启车机热点。打开开关会自动通过 ADB 申请所需权限，请允许车机上的授权提示。配合“车辆启动后打开”可随开机启动。保留热点名称和密码，不会自动关闭热点。</string>
     <string name="hotspot_control_missing">缺少热点控制权限。请通过 ADB 授权，或在车机设置中手动开启热点。</string>
@@ -620,7 +627,10 @@
     <string name="diagnostic_report_saved_in_app">由于公共保存位置不可用，报告已私密保存到 DiPlay。您可以在此分享或查看报告。不会自动发送任何内容。</string>
     <string name="diagnostic_report_saved_to_path">报告已保存到：\n%1$s\n\n您也可以在此分享或查看报告。不会自动发送任何内容。</string>
     <string name="view_diagnostic_report">查看报告</string>
-    <string name="diagnostic_report_copy_hint">长按报告文本即可选择并复制。如果没有可用的分享应用，可以使用此方式。</string>
+    <string name="generating_diagnostic_report">正在生成报告…</string>
+    <string name="copy_report">复制报告</string>
+    <string name="copied_report_to_clipboard">报告已复制到剪贴板。</string>
+    <string name="diagnostic_report_copy_hint">上下滑动阅读全文。可点「复制报告」，或长按文本选择部分内容。</string>
     <string name="wheel_map_zoom">用方向盘按键缩放仪表盘地图</string>
     <string name="wheel_map_zoom_description">仪表盘显示 CarPlay 地图时，比亚迪自定义按键可在音量和仪表盘地图缩放之间切换音量键。通话时按键始终调节音量。部分车型的中控音量与方向盘发送相同按键，因此缩放模式下它也会缩放地图。使用 DiPlay 方向盘按键服务；仪表盘上的提示需要 ADB。</string>
     <string name="wheel_keys_service_on">方向盘按键服务：已开启</string>

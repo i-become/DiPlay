@@ -140,6 +140,7 @@
     <string name="carplay_control_window_ended">انتهت نافذة التحكم في CarPlay</string>
     <string name="carplay_icon">أيقونة CarPlay</string>
     <string name="carplay_map_on_instrument_cluster_experimental">خريطة CarPlay على لوحة العدادات (تجريبي)</string>
+    <string name="settings_cluster_map_search_aliases">cluster map,dashboard map,instrument cluster map</string>
     <string name="carplay_service_already_running">خدمة CarPlay قيد التشغيل بالفعل</string>
     <string name="carplay_session_already_running">جلسة CarPlay قيد التشغيل بالفعل</string>
     <string name="carplay_session_ended_reconnecting">انتهت جلسة CarPlay؛ إعادة الاتصال</string>
@@ -156,7 +157,7 @@
     <string name="choose_iphone">اختر iPhone</string>
     <string name="choose_location">اختر الموضع</string>
     <string name="choose_save_location">اختر موضع الحفظ</string>
-    <string name="choose_where_to_save_your_report">اختر مكان حفظ التقرير. إذا لم يتوفر منتقي ملفات، يحفظه DiPlay داخل التطبيق.\u0020</string>
+    <string name="choose_where_to_save_your_report">يُحفظ التقرير داخل DiPlay دون منتقي ملفات. اضغط «عرض التقرير» للقراءة أو النسخ، أو «مشاركة» للإرسال. «اختر موضع الحفظ» فقط إذا كان مدير ملفات السيارة يعمل.\u0020</string>
     <string name="choose_your_iphone">اختر iPhone الخاص بك</string>
     <string name="close">إغلاق</string>
     <string name="cluster_map_size">حجم خريطة لوحة العدادات</string>
@@ -562,6 +563,12 @@
     <string name="settings_gesture_fingers_label">القائمة السريعة · عدد أصابع السحب لأسفل</string>
     <string name="settings_gesture_fingers_option">%1$d أصابع</string>
     <string name="settings_gesture_fingers_hint">اختر عددًا من الأصابع لا يستخدمه جهاز السيارة. تأخذ وحدة BYD السحب لأسفل بثلاثة أصابع للوحة التكييف.</string>
+    <string name="settings_hongqi_navigation">Hongqi navigation (experimental)</string>
+    <string name="settings_hongqi_navigation_hint">Hongqi (experimental): sends CarPlay guidance to the stock Gaode app so the HUD and dashboard can mirror it. Reconnect CarPlay after changing this. If nothing appears, your firmware may use a different protocol—send a diagnostic report.</string>
+    <string name="settings_hongqi_amap_missing_hint">Gaode (Amap Auto) was not found on this head unit. HUD guidance needs the car\'s built-in map app. The cluster map option below still works when a cluster display is detected.</string>
+    <string name="settings_hongqi_qisi_navigation_hint">This head unit uses QiSi navigation (ltd.qisi.navi), not a separate Gaode APK. DiPlay forwards CarPlay guidance with Gaode-compatible broadcasts; if nothing appears, the car may need a vendor-specific protocol. Cluster map is separate: enable it, reconnect CarPlay, and start navigation on the iPhone.</string>
+    <string name="settings_cluster_display_detected">Cluster display detected: %1$s (displayId %2$s). Enable the switch above, reconnect CarPlay, and start navigation on the iPhone.</string>
+    <string name="settings_cluster_display_missing">No cluster display detected right now. If dumpsys shows Cluster-Display, reopen this page while CarPlay is connected or send a diagnostic report.</string>
     <string name="auto_car_hotspot_title">تشغيل نقطة اتصال السيارة تلقائيًا</string>
     <string name="auto_car_hotspot_description">يشغّل نقطة اتصال السيارة المحفوظة عند فتح DiPlay. عند تفعيل المفتاح تُطلب الأذونات اللازمة تلقائيًا عبر ADB؛ وافق على شاشة السيارة. فعّل فتح DiPlay بعد تشغيل السيارة للبدء عند الإقلاع. يبقى الاسم وكلمة المرور دون تغيير ولا تُطفأ نقطة الاتصال تلقائيًا.</string>
     <string name="hotspot_control_missing">إذن التحكم بنقطة الاتصال غير متاح. امنحه عبر ADB أو شغّل نقطة الاتصال من إعدادات السيارة.</string>
@@ -576,7 +583,10 @@
     <string name="diagnostic_report_saved_in_app">تم حفظ التقرير بشكل خاص داخل DiPlay لعدم توفر موقع حفظ عام. يمكنك مشاركته أو عرضه هنا. لا يتم إرسال شيء تلقائياً.</string>
     <string name="diagnostic_report_saved_to_path">تم حفظ التقرير في:\n%1$s\n\nيمكنك أيضاً مشاركته أو عرضه هنا. لا يتم إرسال شيء تلقائياً.</string>
     <string name="view_diagnostic_report">عرض التقرير</string>
-    <string name="diagnostic_report_copy_hint">المس نص التقرير مطولاً لتحديده ونسخه. يمكنك استخدام ذلك إذا لم يتوفر تطبيق للمشاركة.</string>
+    <string name="generating_diagnostic_report">جارٍ إنشاء التقرير…</string>
+    <string name="copy_report">نسخ التقرير</string>
+    <string name="copied_report_to_clipboard">تم نسخ التقرير إلى الحافظة.</string>
+    <string name="diagnostic_report_copy_hint">مرّر لقراءة التقرير كاملاً. استخدم «نسخ التقرير»، أو المس النص مطولاً لتحديد جزء منه.</string>
     <string name="wheel_map_zoom">تكبير خريطة لوحة العدادات بأزرار المقود</string>
     <string name="wheel_map_zoom_description">يبدّل زر BYD المخصّص أزرار الصوت بين التحكم في الصوت وتكبير خريطة لوحة العدادات ما دامت لوحة العدادات تعرض خريطة CarPlay. أثناء المكالمة تتحكم الأزرار دائمًا في الصوت. في بعض السيارات يرسل زر الصوت في الكونسول الأزرار نفسها، لذلك يكبّر الخريطة أيضًا أثناء وضع التكبير. يستخدم خدمة أزرار المقود في DiPlay؛ وتحتاج الملاحظة على لوحة العدادات إلى ADB.</string>
     <string name="wheel_keys_service_on">خدمة أزرار المقود: مفعّلة</string>
