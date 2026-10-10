@@ -543,6 +543,21 @@ class CarPlayController(
         dashboardMapEpoch.incrementAndGet()
     }
 
+    /**
+     * After the host shows a cluster surface mid-session, ask the iPhone to draw the dashboard map again
+     * without tearing down CarPlay (showUI + keyframe on stream 111).
+     */
+    fun resumeDashboardMapDrawing() {
+        if (closed || !dashboardMapOutputVisible) return
+        try {
+            touchExecutor.execute {
+                if (!closed && dashboardMapOutputVisible) applyClusterUi(true)
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // Closing the controller also discards the pending resume.
+        }
+    }
+
     /** Immutable stream geometry retained when a new host adopts this background controller. */
     fun configuredClusterSize(): Pair<Int, Int>? = airPlayConfig.cluster?.let { it.widthPixels to it.heightPixels }
 

@@ -144,6 +144,12 @@ class CarPlayHostSettingsTest {
         }
     }
 
+    @Test fun clusterPresentationStaysOffWithoutAnActiveCarPlaySession() {
+        AirPlayPersistence.saveClusterMapEnabled(activity, true)
+        invoke("ensureClusterPresentation")
+        assertNull(field("clusterPresentation"))
+    }
+
     @Test fun threeFingerHorizontalSwipeTogglesClusterMapWhenEnabled() {
         AirPlayPersistence.saveClusterMapEnabled(activity, false)
         AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(activity, true)

@@ -368,6 +368,16 @@ class CarPlayHostActivity : ComponentActivity() {
     private val hideIdleCenterMap = Runnable {
         if (SCREEN_TYPE_ALT !in activeScreenStreamTypes) CenterMapOverlay.hide()
     }
+    private var clusterDashboardPhysicallyPresent = false
+    private val clusterStreamNudge = Runnable {
+        if (isDestroyed || shuttingDown.get()) return@Runnable
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) return@Runnable
+        syncClusterPresentationStreamState()
+        if (SCREEN_TYPE_ALT in activeScreenStreamTypes) return@Runnable
+        appendLog("Cluster map: alt stream still inactive; nudging iPhone redraw")
+        controller?.resumeDashboardMapDrawing()
+        sink?.nudgeVideoKeyframe(SCREEN_TYPE_ALT)
+    }
     private var activeDisplaySize: DisplaySize? = null
     private var pendingDisplaySize: DisplaySize? = null
     private var sessionDisplay: CarPlaySessionDisplay? = null
@@ -1087,8 +1097,11 @@ class CarPlayHostActivity : ComponentActivity() {
         else -> false
     }
 
+    private fun carPlaySessionActive(): Boolean =
+        activeAirPlaySession != null && controller != null && !shuttingDown.get()
+
     private fun ensureClusterPresentation() {
-        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+        if (!AirPlayPersistence.loadClusterMapEnabled(this) || !carPlaySessionActive()) {
             dismissClusterPresentation()
             return
         }
@@ -1218,6 +1231,8 @@ class CarPlayHostActivity : ComponentActivity() {
         presentations.forEach { runCatching { it.dismiss() } }
         com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(false)
         controller?.setDashboardMapOutputVisible(false)
+        clusterDashboardPhysicallyPresent = false
+        mainHandler.removeCallbacks(clusterStreamNudge)
     }
 
     private fun onClusterSurface(surface: Surface?) {
@@ -1236,7 +1251,9 @@ class CarPlayHostActivity : ComponentActivity() {
                 reconnectAfterLoss("DiLink 4 cluster confirmed; requesting its native stream")
             } else sink?.setSurface(SCREEN_TYPE_ALT, surface)
         }
+        syncClusterPresentationStreamState()
         updateClusterMapShown()
+        if (surface != null) nudgeClusterStreamDelivery()
     }
 
     private var adbClusterConfigured = false
@@ -1520,7 +1537,14 @@ class CarPlayHostActivity : ComponentActivity() {
         val presented = surface != null && presentation?.isShowing == true && presentation.mapVisible &&
             presentation.outputSurface === surface
         val direct = surface != null && adbClusterConfigured && ClusterActivityOutput.hasConfirmedRoute()
-        controller?.setDashboardMapOutputVisible(presented || direct)
+        val physicallyPresent = presented || direct
+        controller?.setDashboardMapOutputVisible(physicallyPresent)
+        if (physicallyPresent && !clusterDashboardPhysicallyPresent) {
+            nudgeClusterStreamDelivery()
+        } else if (!physicallyPresent) {
+            mainHandler.removeCallbacks(clusterStreamNudge)
+        }
+        clusterDashboardPhysicallyPresent = physicallyPresent
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -4722,6 +4746,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
+                    ensureClusterPresentation()
                 }
             }
 
@@ -4752,6 +4777,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     activeAirPlaySession = null
                     CarPlayBackgroundSession.active = false
                     callPopupSessionReady = false
+                    dismissClusterPresentation()
                     updateCallPopupGuard()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
@@ -4771,6 +4797,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     callPopupSessionReady = false
                     updateCallPopupGuard()
                     startupRetryBudget.disconnected()
+                    activeAirPlaySession = null
+                    CarPlayBackgroundSession.active = false
+                    dismissClusterPresentation()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
@@ -5378,6 +5407,9 @@ class CarPlayHostActivity : ComponentActivity() {
         startupRetryBudget.disconnected()
         startupRetryButton?.visibility = View.GONE
         appendLog(reason)
+        activeAirPlaySession = null
+        CarPlayBackgroundSession.active = false
+        dismissClusterPresentation()
         activeScreenStreamTypes.clear()
         ClusterActivityOutput.setStreamActive(false)
         setConnectionStage(reason)
@@ -5574,7 +5606,10 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
+        activeAirPlaySession = null
+        CarPlayBackgroundSession.active = false
         callPopupSessionReady = false
+        dismissClusterPresentation()
         updateCallPopupGuard()
         resetSidePanel()
         releaseSidePanelEffects()
@@ -5851,10 +5886,27 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun refreshClusterStreamRoutingAfterToggle() {
         currentSurface?.takeIf { it.isValid }?.let(::attachSurface)
-        val altActive = SCREEN_TYPE_ALT in activeScreenStreamTypes
+        syncClusterPresentationStreamState()
+        updateClusterMapShown()
+        if (AirPlayPersistence.loadClusterMapEnabled(this)) nudgeClusterStreamDelivery()
+    }
+
+    /** Keeps the loading spinner aligned with the sink's live alt-stream state. */
+    private fun syncClusterPresentationStreamState() {
+        val altActive = sink?.activeScreenStreamTypes()?.contains(SCREEN_TYPE_ALT) == true
+        if (altActive) activeScreenStreamTypes.add(SCREEN_TYPE_ALT)
+        else activeScreenStreamTypes.remove(SCREEN_TYPE_ALT)
         clusterPresentation?.setStreamActive(altActive)
         clusterLayers.values.forEach { it.setStreamActive(altActive) }
-        updateClusterMapShown()
+        ClusterActivityOutput.setStreamActive(altActive)
+    }
+
+    private fun nudgeClusterStreamDelivery() {
+        syncClusterPresentationStreamState()
+        controller?.resumeDashboardMapDrawing()
+        sink?.nudgeVideoKeyframe(SCREEN_TYPE_ALT)
+        mainHandler.removeCallbacks(clusterStreamNudge)
+        mainHandler.postDelayed(clusterStreamNudge, CLUSTER_STREAM_NUDGE_MILLIS)
     }
 
     private fun onScreenStreamStateChanged(generation: Int, type: Int, active: Boolean) {
@@ -6071,6 +6123,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // this budget when a codec is still busy.
         const val SINK_RELEASE_WAIT_MILLIS = 2_000L
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
+        private const val CLUSTER_STREAM_NUDGE_MILLIS = 2_500L
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L

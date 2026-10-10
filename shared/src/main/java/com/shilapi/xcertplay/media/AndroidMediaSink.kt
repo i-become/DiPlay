@@ -288,6 +288,11 @@ class AndroidMediaSink(
         } catch (_: java.util.concurrent.RejectedExecutionException) { recoveryPending.set(false) }
     }
 
+    /** Asks the iPhone for a fresh keyframe on an active screen stream (for example after a new cluster surface). */
+    fun nudgeVideoKeyframe(type: Int) = requestVideoRecovery(type)
+
+    fun activeScreenStreamTypes(): Set<Int> = synchronized(screenStateLock) { activeScreenTypes.toSet() }
+
     fun setSurface(type: Int, surface: Surface) {
         synchronized(videoOwnershipLock) {
             if (videoClosed) return
