@@ -9,6 +9,7 @@ class AndroidMediaSinkStateTest {
         sink.onScreenStreamActive(110, true)
         sink.onScreenStreamActive(111, true)
         sink.onScreenStreamActive(111, false)
+        assertEquals(setOf(110), sink.activeScreenStreamTypes())
         val events = mutableListOf<Pair<Int, Boolean>>()
         sink.setScreenStreamActiveChangedListener { type, active -> events.add(type to active) }
         assertEquals(listOf(110 to true), events)
