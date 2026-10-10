@@ -592,14 +592,14 @@
     <string name="settings_gesture_fingers_hint">選擇車機尚未使用的手指數。比亞迪的三指向下滑動會開啟空調面板，建議改用 2 指。</string>
     <string name="settings_hongqi_navigation">紅旗導航（實驗性）</string>
     <string name="settings_navigation_output">車機導航輸出（實驗性）</string>
-    <string name="settings_navigation_output_unrecognized_hint">尚未識別本機導航通道；開關仍會保存，能否在 HUD/儀表顯示取決於實車協定。</string>
+    <string name="settings_navigation_output_unrecognized_hint">未識別本機；能否顯示視實車而定。</string>
     <string name="settings_hongqi_navigation_hint">紅旗（實驗性）：將 CarPlay 導航資訊送給原車高德，以便 HUD 與儀表同步顯示。變更後請重新連接 CarPlay。若無顯示，可能韌體協定不同，請提交診斷報告。</string>
     <string name="settings_hongqi_amap_missing_hint">未偵測到原車高德車機版，HUD 轉向引導需要系統地圖應用。下方的「CarPlay 地圖到儀表」在偵測到儀表螢幕後仍可使用。</string>
     <string name="settings_hongqi_qisi_navigation_hint">本車導航為啟思（ltd.qisi.navi），不是獨立高德 APK。DiPlay 會以高德相容廣播嘗試轉發 CarPlay 轉向資訊；若無顯示，可能需紅旗專有協定。儀表飛屏請開啟「CarPlay 地圖到儀表（實驗性）」、重新連接 CarPlay，並在 iPhone 上進入導航。</string>
     <string name="settings_cluster_display_detected">已偵測到儀表副屏：%1$s（displayId %2$s）。開啟上方開關並重連 CarPlay 後，在 iPhone 上開始導航。</string>
     <string name="settings_cluster_display_missing">目前未偵測到儀表副屏（Cluster-Display）。若工廠模式可看到 Cluster-Display，請在 CarPlay 連線後回到此頁重新整理，或提交診斷報告。</string>
     <string name="settings_cluster_map_horizontal_gesture">三指橫滑飛屏</string>
-    <string name="settings_cluster_map_horizontal_gesture_description">在 CarPlay 畫面：三指向左滑開啟儀表地圖飛屏，向右滑關閉。在保持 CarPlay 連線時立即生效。</string>
+    <string name="settings_cluster_map_horizontal_gesture_description">CarPlay 中三指向左滑開啟飛屏，向右滑關閉，不斷線。</string>
     <string name="auto_car_hotspot_title">自動開啟熱點</string>
     <string name="auto_car_hotspot_description">DiPlay 啟動時開啟車機熱點。開啟開關會自動透過 ADB 申請所需權限，請允許車機上的授權提示。配合“車輛啟動後開啟”可隨開機啟動。保留熱點名稱和密碼，不會自動關閉熱點。</string>
     <string name="hotspot_control_missing">缺少熱點控制權限。請透過 ADB 授權，或在車機設定中手動開啟熱點。</string>

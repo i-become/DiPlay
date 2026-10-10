@@ -141,7 +141,7 @@
     <string name="carplay_map_on_instrument_cluster_experimental">CarPlay 地图到仪表（实验性）</string>
     <string name="settings_cluster_map_search_aliases">飞屏,仪表地图,地图到仪表,仪表盘地图,三指飞屏</string>
     <string name="settings_cluster_map_horizontal_gesture">三指横滑飞屏</string>
-    <string name="settings_cluster_map_horizontal_gesture_description">在 CarPlay 界面：三指向左滑打开仪表地图飞屏，向右滑关闭。在保持 CarPlay 连接时立即生效。</string>
+    <string name="settings_cluster_map_horizontal_gesture_description">CarPlay 中三指左滑开飞屏，右滑关，不断连。</string>
     <string name="carplay_service_already_running">CarPlay 服务已在运行</string>
     <string name="carplay_session_already_running">CarPlay 会话已在运行</string>
     <string name="carplay_session_ended_reconnecting">CarPlay 会话已结束；正在重新连接</string>
@@ -611,7 +611,7 @@
     <string name="settings_gesture_fingers_hint">选择车机没有占用的手指数。比亚迪的三指下滑是空调面板，建议改用 2 指。</string>
     <string name="settings_hongqi_navigation">红旗导航（实验性）</string>
     <string name="settings_navigation_output">车机导航输出（实验性）</string>
-    <string name="settings_navigation_output_unrecognized_hint">尚未识别本机导航通道；开关会保存，能否在 HUD/仪表显示取决于实车协议。</string>
+    <string name="settings_navigation_output_unrecognized_hint">未识别本机；能否显示视实车而定。</string>
     <string name="settings_hongqi_navigation_hint">红旗（实验性）：将 CarPlay 导航信息发给原车高德，以便 HUD 和仪表同步显示。更改后请重新连接 CarPlay。若无显示，可能固件协议不同，请提交诊断报告。</string>
     <string name="settings_hongqi_amap_missing_hint">未检测到原车高德车机版，HUD 转向引导需要系统地图应用。仪表飞屏请打开本卡片或上方「CarPlay 地图到仪表（实验性）」开关（与导航页另一张卡片为同一设置）。</string>
     <string name="settings_hongqi_qisi_navigation_hint">本车导航为启思（ltd.qisi.navi），不是独立高德 APK。DiPlay 会以高德兼容广播尝试把 CarPlay 转向信息转发给原车导航/HUD；若无显示，可能需红旗专有协议。仪表飞屏与地图包无关：请打开「CarPlay 地图到仪表（实验性）」、重新连接 CarPlay，并在 iPhone 上进入导航。</string>
