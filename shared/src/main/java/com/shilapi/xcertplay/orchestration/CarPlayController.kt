@@ -1258,9 +1258,14 @@ class CarPlayController(
                 sample = { hotspotCandidates(hotspotInfo, fallbackToSnapshot = false) },
                 cancelled = { isStaleWirelessRun(generation) },
                 pause = Thread::sleep,
+                pollMillis = WirelessStartupPolicy.interfacePollMillis(appContext),
                 log = { if (!isStaleWirelessRun(generation)) debugLog(it) },
             )
-            val candidates = addressRecovery.awaitCandidates(hotspotCandidates(hotspotInfo), preferredFamily)
+            val candidates = addressRecovery.awaitCandidates(
+                hotspotCandidates(hotspotInfo),
+                preferredFamily,
+                timeoutMillis = WirelessStartupPolicy.hotspotReadyMillis(appContext),
+            )
             val hostAddress = HotspotAddressPolicy.select(candidates, preferredFamily)
                 ?: hotspotInfo.hostAddress
                 ?: throw IOException(
@@ -2211,7 +2216,7 @@ class CarPlayController(
             type.equals("disable-bluetooth", ignoreCase = true)
 
     private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
-        val readyDeadline = System.nanoTime() + WirelessStartupPolicy.HOTSPOT_READY_MILLIS * 1_000_000
+        val readyDeadline = System.nanoTime() + WirelessStartupPolicy.hotspotReadyMillis(appContext) * 1_000_000
         val hotspotMode = config.wirelessHotspotMode
         if (config.transport == CarPlayTransport.WIRELESS) {
             com.shilapi.xcertplay.network.WirelessLinkPrepare.prepare(

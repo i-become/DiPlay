@@ -21,6 +21,13 @@ class HongqiHeadUnitTest {
         ShadowBuild.setModel("HS5")
         ShadowBuild.setManufacturer("FAW")
         assertTrue(HongqiHeadUnit.isHeadUnit(context))
+        assertTrue(HongqiHeadUnit.skipsBackgroundAdb(context))
+    }
+
+    @Test fun bydSkipsBackgroundAdbOnlyOnHongqi() {
+        ShadowBuild.setFingerprint("BYD-AUTO/IVI/IVI:13/release-keys")
+        install("com.byd.carsettings", system = true)
+        assertFalse(HongqiHeadUnit.skipsBackgroundAdb(context))
     }
 
     @Test fun bydFingerprintIsNotHongqi() {

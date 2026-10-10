@@ -512,6 +512,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         pausedForAdbSwitchChange = false
         if (initialLaunch) {
             initialLaunch = false
+            HongqiWirelessPrewarm.schedule(applicationContext)
             startCarHotspotOnLaunch()
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
                 DiPlayPreferences.autoConnect(this) && intent.getStringExtra("page") == null && page != "setup") {
@@ -2739,8 +2740,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (!startupHotspotEligible()) return
         val app = applicationContext
         Thread({
-            val result = CarHotspotTethering.enable(app,
+            val result = CarHotspotTethering.enable(
+                app,
                 isCancelled = { startupHotspotCancelled || !startupHotspotEligible() },
+                timeoutMillis = com.shilapi.xcertplay.network.WirelessStartupPolicy.hotspotReadyMillis(app),
                 log = { Log.i("DiPlay-Hotspot", it) },
             )
             runOnUiThread {

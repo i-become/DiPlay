@@ -768,6 +768,7 @@ class CarPlayHostActivity : ComponentActivity() {
         locationPermissionAvailable = hasFineLocationPermission()
         loadConnectionSettings()
         wirelessPermissionsReady = !wirelessEnabled || hasRequiredWirelessPermissions()
+        if (wirelessEnabled) HongqiWirelessPrewarm.schedule(this)
     }
 
     /**
@@ -5312,7 +5313,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun maybeStartCarPlay() {
         if (shuttingDown.get()) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
-            if (!adoptBackgroundSession()) mainHandler.postDelayed({ maybeStartCarPlay() }, 500)
+            val retryMs = if (com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this)) 150L else 500L
+            if (!adoptBackgroundSession()) mainHandler.postDelayed({ maybeStartCarPlay() }, retryMs)
             return
         }
         if (controller == null && adoptBackgroundSession()) return

@@ -88,6 +88,12 @@ object HongqiHeadUnit {
 
     }
 
+    /**
+     * True when background code must not open local adbd (127.0.0.1:5555).
+     * QiSi / HS5 builds usually keep wireless debugging off; probing adbd would block startup.
+     */
+    fun skipsBackgroundAdb(context: Context): Boolean = isHeadUnit(context)
+
     /** True when a Hongqi-style cluster presentation display is likely available. */
     fun hasClusterPresentation(context: Context): Boolean {
         val manager = context.getSystemService(android.hardware.display.DisplayManager::class.java) ?: return false

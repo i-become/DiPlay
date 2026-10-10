@@ -5,6 +5,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 
 /** Turns on station Wi-Fi when it is off. Used for Wi-Fi Direct and existing Wi-Fi CarPlay links. */
 object WifiClientEnable {
@@ -27,6 +28,7 @@ object WifiClientEnable {
         if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) return Result.READY
 
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
+        val pollMillis = WirelessStartupPolicy.interfacePollMillis(app)
         fun stopped(): Result? = when {
             isCancelled() || Thread.currentThread().isInterrupted -> Result.CANCELLED
             System.nanoTime() >= deadline -> Result.TIMED_OUT
@@ -36,12 +38,12 @@ object WifiClientEnable {
 
         stopped()?.let { return it }
         if (requestEnable(wifi, log)) {
-            waitEnabled(wifi, ::stopped, ::remainingMillis)?.let { return it }
+            waitEnabled(wifi, pollMillis, ::stopped, ::remainingMillis)?.let { return it }
         }
 
         stopped()?.let { return it }
-        if (enableViaAdb(app, log, ::stopped, ::remainingMillis)) {
-            waitEnabled(wifi, ::stopped, ::remainingMillis)?.let { return it }
+        if (!HongqiHeadUnit.skipsBackgroundAdb(app) && enableViaAdb(app, log, ::stopped, ::remainingMillis)) {
+            waitEnabled(wifi, pollMillis, ::stopped, ::remainingMillis)?.let { return it }
         }
 
         return stopped() ?: if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) Result.READY else Result.FAILED
@@ -85,13 +87,14 @@ object WifiClientEnable {
 
     private fun waitEnabled(
         wifi: WifiManager,
+        pollMillis: Long,
         stopped: () -> Result?,
         remainingMillis: () -> Long,
     ): Result? {
         while (true) {
             stopped()?.let { return it }
             if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) return Result.READY
-            val wait = minOf(250L, remainingMillis())
+            val wait = minOf(pollMillis, remainingMillis())
             if (wait <= 0) return Result.TIMED_OUT
             try {
                 Thread.sleep(wait)

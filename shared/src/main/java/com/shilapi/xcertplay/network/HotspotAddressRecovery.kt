@@ -9,6 +9,7 @@ internal class HotspotAddressRecovery(
     private val sample: () -> List<InetAddress>,
     private val cancelled: () -> Boolean,
     private val pause: (Long) -> Unit,
+    private val pollMillis: Long = WirelessStartupPolicy.INTERFACE_POLL_MILLIS,
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 },
     private val log: (String) -> Unit = {},
 ) {
@@ -36,7 +37,7 @@ internal class HotspotAddressRecovery(
                 log("wireless address preference=IPv6 unavailable elapsedMs=${nowMillis() - started}; using available family")
                 return candidates
             }
-            pause(minOf(WirelessStartupPolicy.INTERFACE_POLL_MILLIS, remaining))
+            pause(minOf(pollMillis, remaining))
             checkActive()
             candidates = sample()
             checkActive()
