@@ -1285,12 +1285,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun navigationSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_navigation), getString(R.string.settings_navigation_summary))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.NAVIGATION))
-        // The BYD card is hidden without its receiver; say so instead of leaving a gap.
-        if (!BydOutputSettings.available(this)) {
-            content.addView(label(getString(R.string.settings_byd_navigation_unavailable), 15, MUTED).apply {
-                setPadding(dp(4), 0, dp(4), dp(SETTINGS_BLOCK_GAP_DP))
-            })
-        }
     }
 
     private fun vehicleSettings(content: LinearLayout) {
@@ -1549,7 +1543,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }, matchButton(0, 56))
             if (bydVehicleAdvancedExpanded) {
                 advancedVehicleData(card)
-                if (!BydOutputSettings.available(this)) clusterSongSwitch(card)
             }
         }
     }
@@ -1944,6 +1937,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
             if (preferPrimaryToggleFirst) {
                 clusterMapPrimaryToggle(card, clusterDisplay, adbCluster)
+                clusterMapHorizontalGestureToggle(card)
                 clusterDisplayStatusLabel(card, clusterDisplay)
             }
             if (!preferPrimaryToggleFirst || AdbClusterRouter.enabled(this)) {
@@ -1976,6 +1970,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             if (!preferPrimaryToggleFirst) {
                 clusterMapPrimaryToggle(card, clusterDisplay, adbCluster)
+                clusterMapHorizontalGestureToggle(card)
                 clusterDisplayStatusLabel(card, clusterDisplay)
             }
             if (clusterMapEnabled) {
@@ -2233,22 +2228,30 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }
         }
+<<<<<<< HEAD
         // FCE head units show this card for their cluster's navigation view, which has its own opt-in.
         val bydNavigation = BydOutputSettings.available(this)
         if (bydNavigation || BydOutputSettings.fceClusterAvailable()) filteredSection(content, SettingsSection.BYD_NAVIGATION,
             if (com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this)) {
                 getString(R.string.settings_hongqi_navigation)
             } else getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
+=======
+        filteredSection(content, SettingsSection.BYD_NAVIGATION,
+            navigationOutputSectionTitle(), R.drawable.ic_dp_navigation) { card ->
+>>>>>>> 6432d12c (feat: 红旗hs5HUD和飞屏适配)
             toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
                 getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
-                com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) { com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it) }
-            if (com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this)) {
+                com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) {
+                com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it)
+            }
+            if (usesHongqiNavigationSettingsUi()) {
                 if (com.shilapi.xcertplay.hud.HongqiHeadUnit.hasClusterPresentation(this)) {
                     clusterMapPrimaryToggle(
                         card,
                         ClusterMapPresentation.findDisplay(this),
                         AdbClusterRouter.enabled(this),
                     )
+                    clusterMapHorizontalGestureToggle(card)
                 }
                 val hint = when {
                     BydOutputSettings.hongqiNavigationAvailable(this) &&
@@ -2259,6 +2262,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     else -> R.string.settings_hongqi_amap_missing_hint
                 }
                 card.addView(label(getString(hint), 14, MUTED).apply {
+                    setPadding(0, dp(6), 0, dp(4))
+                })
+            } else if (!BydOutputSettings.available(this)) {
+                card.addView(label(getString(R.string.settings_navigation_output_unrecognized_hint), 14, MUTED).apply {
                     setPadding(0, dp(6), 0, dp(4))
                 })
             }
@@ -2960,11 +2967,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     ClusterActivityOutput.stopForSettings()
                     render()
                 }
-                SetupGuide.Feature.BYD_NAVIGATION -> if (BydOutputSettings.available(this)) {
-                    toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
-                        getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
-                        BydOutputSettings.enabled(this)) { BydOutputSettings.setEnabled(this, it) }
-                }
+                SetupGuide.Feature.BYD_NAVIGATION -> toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
+                    getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
+                    BydOutputSettings.enabled(this)) { BydOutputSettings.setEnabled(this, it) }
                 SetupGuide.Feature.CALLS_ON_DASHBOARD -> toggle(card, getString(R.string.carplay_calls_on_dashboard),
                     getString(R.string.carplay_calls_on_dashboard_description),
                     BydOutputSettings.carPlayCalls(this), enabled = !adbSwitchChangePending) { applyCarPlayCalls(it) }
@@ -5558,6 +5563,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         })
     }
 
+    private fun usesHongqiNavigationSettingsUi(): Boolean =
+        com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this) ||
+            com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this) ||
+            com.shilapi.xcertplay.hud.HongqiHeadUnit.hasClusterPresentation(this)
+
+    private fun navigationOutputSectionTitle(): String = when {
+        usesHongqiNavigationSettingsUi() -> getString(R.string.settings_hongqi_navigation)
+        BydOutputSettings.available(this) -> getString(R.string.byd_navigation)
+        else -> getString(R.string.settings_navigation_output)
+    }
+
     private fun clusterMapPrimaryToggle(
         parent: LinearLayout,
         clusterDisplay: android.view.Display?,
@@ -5572,6 +5588,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.loadClusterMapEnabled(this)) {
             AirPlayPersistence.saveClusterMapEnabled(this, it)
             render()
+        }
+    }
+
+    private fun clusterMapHorizontalGestureToggle(parent: LinearLayout) {
+        toggle(
+            parent,
+            getString(R.string.settings_cluster_map_horizontal_gesture),
+            getString(R.string.settings_cluster_map_horizontal_gesture_description),
+            AirPlayPersistence.loadClusterMapHorizontalGestureEnabled(this),
+        ) { enabled ->
+            AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(this, enabled)
         }
     }
     // Routing changes affect the live cluster surface as soon as the host resumes.

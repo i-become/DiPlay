@@ -395,11 +395,15 @@
     <string name="settings_reconnect_now">Reconnect now</string>
     <string name="settings_byd_navigation_unavailable">BYD dashboard and HUD guidance is not available on this head unit.</string>
     <string name="settings_hongqi_navigation">Hongqi navigation (experimental)</string>
+    <string name="settings_navigation_output">Head-unit navigation output (experimental)</string>
+    <string name="settings_navigation_output_unrecognized_hint">This device is not recognized yet. The switch still saves your choice; whether HUD or dashboard guidance appears depends on your car.</string>
     <string name="settings_hongqi_navigation_hint">Hongqi (experimental): sends CarPlay guidance to the stock Gaode app so the HUD and dashboard can mirror it. Reconnect CarPlay after changing this. If nothing appears, your firmware may use a different protocol—send a diagnostic report.</string>
     <string name="settings_hongqi_amap_missing_hint">Gaode (Amap Auto) was not found on this head unit. HUD guidance needs the car\'s built-in map app. The cluster map option below still works when a cluster display is detected.</string>
     <string name="settings_hongqi_qisi_navigation_hint">This head unit uses QiSi navigation (ltd.qisi.navi), not a separate Gaode APK. DiPlay forwards CarPlay guidance with Gaode-compatible broadcasts; if nothing appears, the car may need a vendor-specific protocol. Cluster map is separate: enable it, reconnect CarPlay, and start navigation on the iPhone.</string>
     <string name="settings_cluster_display_detected">Cluster display detected: %1$s (displayId %2$s). Enable the switch above, reconnect CarPlay, and start navigation on the iPhone.</string>
     <string name="settings_cluster_display_missing">No cluster display detected right now. If dumpsys shows Cluster-Display, reopen this page while CarPlay is connected or send a diagnostic report.</string>
+    <string name="settings_cluster_map_horizontal_gesture">Three-finger swipe for cluster map</string>
+    <string name="settings_cluster_map_horizontal_gesture_description">In CarPlay, swipe left with three fingers to turn the dashboard map on; swipe right to turn it off. Applies while CarPlay stays connected.</string>
     <string name="settings_advanced_media">Video and audio</string>
     <string name="settings_wheel_keys">Wheel keys</string>
     <string name="settings_experimental_display">Display (experimental)</string>

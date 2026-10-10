@@ -189,25 +189,17 @@ class BydVehicleDataSettingsTest {
     }
 
     @Test fun clusterSongSwitchStaysInTheBydNavigationSectionOnly() {
-        shadowOf(context.packageManager).installPackage(PackageInfo().apply { packageName = "com.byd.amapservice" })
-        openSettings()
+        openSettingsHome()
         openCategory(R.string.settings_navigation)
-
-        assertTrue(texts().any { it.text == activity.getString(R.string.byd_navigation) })
         assertEquals(1, switches().count { it.contentDescription == activity.getString(R.string.cluster_song) })
-        openCategory(R.string.settings_advanced)
-        texts().single { it.text == activity.getString(R.string.advanced_vehicle_data) }.performClick()
-        assertEquals(0, switches().count { it.contentDescription == activity.getString(R.string.cluster_song) })
     }
 
-    @Test fun withoutBydNavigationTheClusterSongSwitchIsUnderAdvancedVehicleData() {
-        openSettings()
-        assertFalse(texts().any { it.text == activity.getString(R.string.byd_navigation) })
-        assertFalse(switches().any { it.contentDescription == activity.getString(R.string.cluster_song) })
-
-        texts().single { it.text == activity.getString(R.string.advanced_vehicle_data) }.performClick()
-        vehicleSwitch(R.string.cluster_song).performClick()
-
+    @Test fun withoutBydNavigationTheClusterSongSwitchIsInNavigationSettings() {
+        openSettingsHome()
+        openCategory(R.string.settings_navigation)
+        assertTrue(texts().any { it.text == activity.getString(R.string.settings_navigation_output) })
+        assertTrue(switches().any { it.contentDescription == activity.getString(R.string.cluster_song) })
+        switches().single { it.contentDescription == activity.getString(R.string.cluster_song) }.performClick()
         assertTrue(BydOutputSettings.clusterSong(context))
     }
 
@@ -716,11 +708,15 @@ class BydVehicleDataSettingsTest {
         assertEquals(savedY, layoutRoot().scrollY)
     }
 
-    private fun openSettings() {
+    private fun openSettingsHome() {
         controller = Robolectric.buildActivity(
             DiPlayActivity::class.java,
             Intent(context, DiPlayActivity::class.java).putExtra("page", "settings"),
         ).setup()
+    }
+
+    private fun openSettings() {
+        openSettingsHome()
         openCategory(R.string.settings_advanced)
     }
 

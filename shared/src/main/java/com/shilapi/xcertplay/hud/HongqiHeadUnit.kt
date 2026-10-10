@@ -10,7 +10,7 @@ import android.os.Build
 
 
 
-/** Detects FAW Hongqi head units so navigation output can target the stock Amap stack. */
+/** Detects Hongqi-family head units for OEM navigation output. */
 
 object HongqiHeadUnit {
 

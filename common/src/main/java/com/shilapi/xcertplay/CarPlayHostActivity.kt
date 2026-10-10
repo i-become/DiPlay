@@ -479,6 +479,10 @@ class CarPlayHostActivity : ComponentActivity() {
     private var gestureTracking = false
     private var gestureStartX = 0f
     private var gestureStartY = 0f
+    private var clusterGestureSequenceActive = false
+    private var clusterGestureTracking = false
+    private var clusterGestureStartX = 0f
+    private var clusterGestureStartY = 0f
     private var recoveryPendingAfterMenu = false
     private var failurePendingAfterMenu: CarPlayStatus.Failed? = null
     private val shuttingDown = AtomicBoolean(false)
@@ -5685,18 +5689,80 @@ class CarPlayHostActivity : ComponentActivity() {
             MotionEvent.ACTION_DOWN -> {
                 gestureSequenceActive = false
                 gestureTracking = false
+                clusterGestureSequenceActive = false
+                clusterGestureTracking = false
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                if (gestureFingerCount > 0 && event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
-                    gestureSequenceActive = true
-                    gestureTracking = true
-                    gestureStartX = pointerCentroid(event, horizontal = true)
-                    gestureStartY = pointerCentroid(event, horizontal = false)
+                if (clusterMapHorizontalGestureEnabled() &&
+                    event.pointerCount == CLUSTER_GESTURE_FINGERS &&
+                    !clusterGestureSequenceActive
+                ) {
+                    clusterGestureSequenceActive = true
+                    clusterGestureTracking = true
+                    clusterGestureStartX = pointerCentroid(event, horizontal = true)
+                    clusterGestureStartY = pointerCentroid(event, horizontal = false)
                     controller?.sendTouch(emptyList())
-                    appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
+                    appendLog("Cluster map swipe tracking started; fingers=$CLUSTER_GESTURE_FINGERS")
+                }
+                if (gestureFingerCount > 0 && event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
+                    val deferToClusterGesture = clusterMapHorizontalGestureEnabled() &&
+                        gestureFingerCount == CLUSTER_GESTURE_FINGERS &&
+                        clusterGestureSequenceActive
+                    if (!deferToClusterGesture) {
+                        gestureSequenceActive = true
+                        gestureTracking = true
+                        gestureStartX = pointerCentroid(event, horizontal = true)
+                        gestureStartY = pointerCentroid(event, horizontal = false)
+                        controller?.sendTouch(emptyList())
+                        appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
+                        return true
+                    }
+                }
+                if (clusterGestureSequenceActive) return true
+            }
+        }
+
+        if (clusterGestureSequenceActive) {
+            if (event.actionMasked == MotionEvent.ACTION_POINTER_UP ||
+                event.pointerCount != CLUSTER_GESTURE_FINGERS
+            ) {
+                clusterGestureTracking = false
+            }
+            if (!clusterGestureTracking || event.pointerCount != CLUSTER_GESTURE_FINGERS) {
+                if (event.actionMasked == MotionEvent.ACTION_UP ||
+                    event.actionMasked == MotionEvent.ACTION_CANCEL
+                ) {
+                    clusterGestureSequenceActive = false
+                    clusterGestureTracking = false
+                } else if (event.actionMasked == MotionEvent.ACTION_POINTER_UP) {
+                    clusterGestureTracking = false
+                }
+                return true
+            }
+            if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                val deltaX = pointerCentroid(event, horizontal = true) - clusterGestureStartX
+                val deltaY = pointerCentroid(event, horizontal = false) - clusterGestureStartY
+                val absX = kotlin.math.abs(deltaX)
+                val absY = kotlin.math.abs(deltaY)
+                if (gestureFingerCount == CLUSTER_GESTURE_FINGERS &&
+                    deltaY >= dp(SETTINGS_SWIPE_DISTANCE_DP) &&
+                    deltaY >= absX * SETTINGS_SWIPE_DIRECTION_RATIO
+                ) {
+                    clusterGestureSequenceActive = false
+                    clusterGestureTracking = false
+                    openSettingsMenu()
+                    return true
+                }
+                if (absX >= dp(CLUSTER_SWIPE_DISTANCE_DP) &&
+                    absX >= absY * CLUSTER_SWIPE_DIRECTION_RATIO
+                ) {
+                    clusterGestureSequenceActive = false
+                    clusterGestureTracking = false
+                    applyClusterMapFromGesture(enable = deltaX < 0f)
                     return true
                 }
             }
+            return true
         }
 
         if (gestureSequenceActive) {
@@ -5763,6 +5829,32 @@ class CarPlayHostActivity : ComponentActivity() {
             total += if (horizontal) event.getX(index) else event.getY(index)
         }
         return total / event.pointerCount
+    }
+
+    private fun clusterMapHorizontalGestureEnabled(): Boolean =
+        AirPlayPersistence.loadClusterMapHorizontalGestureEnabled(this)
+
+    private fun applyClusterMapFromGesture(enable: Boolean) {
+        val already = AirPlayPersistence.loadClusterMapEnabled(this)
+        if (already == enable) {
+            if (enable) ensureClusterPresentation()
+            appendLog("Cluster map gesture ${if (enable) "on" else "off"} (unchanged)")
+            return
+        }
+        AirPlayPersistence.saveClusterMapEnabled(this, enable)
+        if (!enable) dismissClusterPresentation()
+        else ensureClusterPresentation()
+        refreshClusterStreamRoutingAfterToggle()
+        Log.i(ClusterMapPresentation.TAG, "cluster map gesture enabled=$enable")
+        appendLog("Cluster map gesture ${if (enable) "on" else "off"}")
+    }
+
+    private fun refreshClusterStreamRoutingAfterToggle() {
+        currentSurface?.takeIf { it.isValid }?.let(::attachSurface)
+        val altActive = SCREEN_TYPE_ALT in activeScreenStreamTypes
+        clusterPresentation?.setStreamActive(altActive)
+        clusterLayers.values.forEach { it.setStreamActive(altActive) }
+        updateClusterMapShown()
     }
 
     private fun onScreenStreamStateChanged(generation: Int, type: Int, active: Boolean) {
@@ -5990,6 +6082,9 @@ class CarPlayHostActivity : ComponentActivity() {
         const val PROTOCOL_TRACE_PREFIX = "TRACE "
         const val SETTINGS_SWIPE_DISTANCE_DP = 72
         const val SETTINGS_SWIPE_DIRECTION_RATIO = 1.15f
+        const val CLUSTER_GESTURE_FINGERS = 3
+        const val CLUSTER_SWIPE_DISTANCE_DP = 72
+        const val CLUSTER_SWIPE_DIRECTION_RATIO = 1.15f
         const val MAX_SETTINGS_MENU_WIDTH_DP = 720
         val NO_VIDEO_BACKGROUND = Color.rgb(0x16, 0x16, 0x18)
     }

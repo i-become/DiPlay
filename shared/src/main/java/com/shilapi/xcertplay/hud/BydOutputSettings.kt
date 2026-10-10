@@ -26,6 +26,7 @@ object BydOutputSettings {
     private const val KEY_FCE_CLUSTER = "fce_cluster_guidance_experimental"
     private const val KEY_OEM_CLUSTER_HOLD = "oem_cluster_hold"
     private const val KEY_LEGACY_VEHICLE_PROBE = "legacy_vehicle_probe"
+    private const val KEY_HONGQI_CLUSTER_VISIBLE = "hongqi_cluster_visible"
     const val DEFAULT_LOW_CHARGE_PERCENT = 20
     val lowChargePresets = listOf(10, 15, 20, 25, 30)
 
@@ -199,7 +200,7 @@ object BydOutputSettings {
     private fun stockGaodeNavigationSettings(context: Context): Boolean =
         !HongqiHeadUnit.isBydHeadUnit(context) && HongqiAmapAdapter.resolvedPackage(context) != null
 
-    /** Hongqi HS5 and related FAW units with a stock Gaode navigator (experimental). */
+    /** Hongqi-family head units with a stock Gaode or QiSi navigator (experimental). */
     fun hongqiNavigationAvailable(context: Context): Boolean =
         HongqiHeadUnit.showsHongqiNavigationBranding(context) &&
             (HongqiAmapAdapter.resolvedPackage(context) != null ||
@@ -217,6 +218,13 @@ object BydOutputSettings {
         HongqiAmapAdapter.navigationOutputPackages(context).joinToString().ifBlank { "none" }
 
     fun isQisiNavigationStack(context: Context): Boolean = HongqiAmapAdapter.isQisiStack(context)
+
+    /** When true, QiSi dashboard projection tracks the CarPlay cluster map toggle. */
+    fun hongqiClusterVisible(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_HONGQI_CLUSTER_VISIBLE, true)
+
+    fun setHongqiClusterVisible(context: Context, visible: Boolean) =
+        prefs(context).edit().putBoolean(KEY_HONGQI_CLUSTER_VISIBLE, visible).apply()
 
     fun headUnitIdentificationTags(context: Context): String = HongqiHeadUnit.headUnitTags(context)
 

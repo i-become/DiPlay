@@ -113,6 +113,7 @@ class CarPlayHostSettingsTest {
         }
     }
     @Test fun configuredFingerCountsOpenTheMountedMenuWithoutLeavingCarPlay() {
+        AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(activity, false)
         assertEquals(3, AirPlayPersistence.loadSettingsGestureFingers(activity))
         for (fingers in 2..4) {
             AirPlayPersistence.saveSettingsGestureFingers(activity, fingers)
@@ -141,6 +142,33 @@ class CarPlayHostSettingsTest {
             gesture(configured, y = -500f)
             assertFalse(field("menuOpen") as Boolean)
         }
+    }
+
+    @Test fun threeFingerHorizontalSwipeTogglesClusterMapWhenEnabled() {
+        AirPlayPersistence.saveClusterMapEnabled(activity, false)
+        AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(activity, true)
+        AirPlayPersistence.saveSettingsGestureFingers(activity, 2)
+        invoke("loadPersistedSettings")
+        clusterMapHorizontalSwipe(enable = true)
+        assertTrue(AirPlayPersistence.loadClusterMapEnabled(activity))
+        clusterMapHorizontalSwipe(enable = false)
+        assertFalse(AirPlayPersistence.loadClusterMapEnabled(activity))
+    }
+
+    @Test fun threeFingerHorizontalSwipeIgnoredWhenGestureDisabled() {
+        AirPlayPersistence.saveClusterMapEnabled(activity, false)
+        AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(activity, false)
+        invoke("loadPersistedSettings")
+        clusterMapHorizontalSwipe(enable = true)
+        assertFalse(AirPlayPersistence.loadClusterMapEnabled(activity))
+    }
+
+    @Test fun threeFingerDownwardSwipeStillOpensSettingsWhenClusterGestureEnabled() {
+        AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(activity, true)
+        AirPlayPersistence.saveSettingsGestureFingers(activity, 3)
+        invoke("loadPersistedSettings")
+        gesture(3)
+        assertTrue(field("menuOpen") as Boolean)
     }
 
     @Test fun liftingAFingerCancelsTrackingUntilTheNextGesture() {
@@ -570,6 +598,16 @@ class CarPlayHostSettingsTest {
         for (count in 2..fingers) touch(MotionEvent.ACTION_POINTER_DOWN, count, 100f)
         touch(MotionEvent.ACTION_MOVE, fingers, y, x)
         touch(MotionEvent.ACTION_UP, 1, y, x)
+    }
+
+    private fun clusterMapHorizontalSwipe(enable: Boolean) {
+        val startX = if (enable) 900f else 100f
+        val endX = if (enable) 100f else 900f
+        touch(MotionEvent.ACTION_DOWN, 1, 400f, startX)
+        touch(MotionEvent.ACTION_POINTER_DOWN, 2, 400f, startX)
+        touch(MotionEvent.ACTION_POINTER_DOWN, 3, 400f, startX)
+        touch(MotionEvent.ACTION_MOVE, 3, 400f, endX)
+        touch(MotionEvent.ACTION_UP, 1, 400f, endX)
     }
 
     private fun touch(action: Int, count: Int, y: Float, x: Float = 400f) {

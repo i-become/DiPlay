@@ -39,7 +39,7 @@
         <package android:name="com.ts.car.someip.service" />
         <package android:name="com.byd.amapservice" />
         <package android:name="com.byd.automap" />
-        <!-- Hongqi / FAW and stock Gaode (package visibility on API 30+). -->
+        <!-- Hongqi OEM packages and stock Gaode (package visibility on API 30+). -->
         <package android:name="com.autonavi.amapauto" />
         <package android:name="com.autonavi.amapauto.custom" />
         <package android:name="com.faw.navi" />
@@ -64,6 +64,7 @@
         <package android:name="com.faw.autonavi" />
         <package android:name="com.hongqi.navigation" />
         <package android:name="ltd.qisi.navi" />
+        <package android:name="ltd.qisi.adapterservice" />
         <package android:name="faw.system.viewservice" />
         <package android:name="com.neusoft.carlink" />
         <intent>

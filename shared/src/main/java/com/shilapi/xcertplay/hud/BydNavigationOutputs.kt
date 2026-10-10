@@ -38,6 +38,7 @@ object BydNavigationOutputs {
     fun setClusterMapShown(shown: Boolean) {
         BydClusterMapPause.clusterMapShown = shown
         BydClusterBridge.setMapShown(shown)
+        HongqiNavigationBridge.setClusterMapShown(shown)
     }
 
     /** The running CarPlay session: told every second whether the cluster currently shows the map. */

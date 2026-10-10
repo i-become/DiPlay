@@ -4,7 +4,7 @@ import android.util.DisplayMetrics
 import android.view.Display
 
 /**
- * Heuristic selection of Hongqi / FAW instrument-cluster [Display] instances.
+ * Heuristic selection of Hongqi instrument-cluster [Display] instances.
  *
  * The JiuZhou CarPlay app (com.juyou.app) decodes CarPlay's cluster stream onto a presentation
  * display and can overlay turn-by-turn cards. DiPlay uses the same CarPlay alt-screen path once
