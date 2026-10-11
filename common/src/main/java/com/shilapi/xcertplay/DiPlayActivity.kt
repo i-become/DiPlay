@@ -2229,17 +2229,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }
         }
-<<<<<<< HEAD
         // FCE head units show this card for their cluster's navigation view, which has its own opt-in.
         val bydNavigation = BydOutputSettings.available(this)
         if (bydNavigation || BydOutputSettings.fceClusterAvailable()) filteredSection(content, SettingsSection.BYD_NAVIGATION,
-            if (com.shilapi.xcertplay.hud.HongqiHeadUnit.showsHongqiNavigationBranding(this)) {
-                getString(R.string.settings_hongqi_navigation)
-            } else getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
-=======
-        filteredSection(content, SettingsSection.BYD_NAVIGATION,
             navigationOutputSectionTitle(), R.drawable.ic_dp_navigation) { card ->
->>>>>>> 6432d12c (feat: 红旗hs5HUD和飞屏适配)
             toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
                 getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
                 com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) {
