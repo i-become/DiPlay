@@ -5710,12 +5710,16 @@ class CarPlayHostActivity : ComponentActivity() {
         return if (id != 0) runCatching { resources.getDimensionPixelSize(id) }.getOrDefault(0) else 0
     }
 
-    private fun attachSurface(surface: Surface) {
-        sink?.setSurface(SCREEN_TYPE_MAIN, surface)
+    private fun attachSurface(surface: Surface) = routeVideoSurfaces(surface)
+
+    /** Main CarPlay video always uses [surface]; stream 111 only uses the cluster surface while飞屏 is on. */
+    private fun routeVideoSurfaces(main: Surface) {
+        sink?.setSurface(SCREEN_TYPE_MAIN, main)
         if (AirPlayPersistence.loadClusterMapEnabled(this)) {
             clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }
         } else {
-            sink?.setSurface(SCREEN_TYPE_ALT, surface)
+            clusterSurface?.let { sink?.clearSurface(SCREEN_TYPE_ALT, it) }
+            sink?.clearSurface(SCREEN_TYPE_ALT, main)
         }
     }
 
@@ -5879,8 +5883,11 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         AirPlayPersistence.saveClusterMapEnabled(this, enable)
-        if (!enable) dismissClusterPresentation()
-        else ensureClusterPresentation()
+        if (!enable) {
+            dismissClusterPresentation()
+            mainHandler.removeCallbacks(hideIdleCenterMap)
+            CenterMapOverlay.hide()
+        } else ensureClusterPresentation()
         refreshClusterStreamRoutingAfterToggle()
         Log.i(ClusterMapPresentation.TAG, "cluster map gesture enabled=$enable")
         appendLog("Cluster map gesture ${if (enable) "on" else "off"}")
@@ -5927,7 +5934,11 @@ class CarPlayHostActivity : ComponentActivity() {
                 MapMirrors.setStreamActive(active)
                 if (active) {
                     mainHandler.removeCallbacks(hideIdleCenterMap)
-                    if (!CenterMapOverlay.shown) CenterMapOverlay.scheduleShow()
+                    if (AirPlayPersistence.loadClusterMapEnabled(this)) {
+                        if (!CenterMapOverlay.shown) CenterMapOverlay.scheduleShow()
+                    } else {
+                        currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
+                    }
                 } else {
                     mainHandler.postDelayed(hideIdleCenterMap, CENTER_MAP_IDLE_MILLIS)
                 }

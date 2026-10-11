@@ -19,7 +19,10 @@ class ManualHotspotReadinessTest {
     private var now = 0L
     private fun await(timeout: Long = 1_500, cancel: () -> Boolean = { false },
         sample: () -> HotspotNetworkSnapshot): HotspotSelection = ManualHotspotReadiness(
-        sample, cancel, { now += it }, { now },
+        sample = sample,
+        cancelled = cancel,
+        pause = { now += it },
+        nowMillis = { now },
     ).await(timeout)
 
     @Test fun ethernetFirstWaitsForStableWireless() {

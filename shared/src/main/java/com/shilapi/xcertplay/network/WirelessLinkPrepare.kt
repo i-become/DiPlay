@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.network
 
 import android.content.Context
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /**
@@ -10,6 +11,12 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
  * Wi-Fi on. USB and modes that manage their own AP skip this step.
  */
 object WirelessLinkPrepare {
+    /** Warms AP interface discovery on Hongqi when Wi-Fi and hotspot are already up. */
+    fun prewarmManualHotspotInterface(context: Context) {
+        if (!WirelessStartupPolicy.hongqiFastBringUp(context, WirelessHotspotMode.MANUAL)) return
+        ManualHotspotInterfaces(context.applicationContext).use { it.sample() }
+    }
+
     fun prepare(
         context: Context,
         mode: WirelessHotspotMode,
@@ -31,7 +38,14 @@ object WirelessLinkPrepare {
         timeoutMillis: Long,
         log: (String) -> Unit,
     ) {
-        if (CarHotspotStatus.isEnabled(context) == true) return
+        when (CarHotspotStatus.isEnabled(context)) {
+            true -> return
+            null -> if (HongqiHeadUnit.isHeadUnit(context)) {
+                log("manual hotspot: AP state hidden on Hongqi; skip auto-enable")
+                return
+            }
+            false -> Unit
+        }
         val result = CarHotspotTethering.enable(
             context,
             isCancelled = isCancelled,

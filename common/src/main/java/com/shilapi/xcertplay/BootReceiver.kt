@@ -14,6 +14,7 @@ class BootReceiver : BroadcastReceiver() {
         PhoneAudioRoute.attach(context)
         val launchEnabled = AirPlayPersistence.loadAutoStartOnBoot(context)
         StartupDiagnosticSnapshot.received(context, launchEnabled)
+        HongqiWirelessPrewarm.schedule(context)
         if (!launchEnabled) return
 
         val launch = Intent(context, DiPlayActivity::class.java).apply {

@@ -7,6 +7,7 @@ import android.os.ResultReceiver
 import android.provider.Settings
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -46,18 +47,22 @@ object CarHotspotTethering {
                 Boolean::class.javaPrimitiveType, String::class.java,
             ).invoke(service, 0, receiver, false, context.packageName)
         }
-        val startAdb: () -> Boolean = {
-            val client = AtomicReference<LocalAdb?>()
-            CarHotspotAdbFallback.bounded(deadline, isCancelled,
-                abort = { client.get()?.cancelPendingOperations() }) {
-                val adb = LocalAdb(AdbKeys.load(context))
-                client.set(adb)
-                adb.use {
-                    if (isCancelled() || Thread.currentThread().isInterrupted || System.nanoTime() >= deadline) false
-                    else if (adb.connect(mayAsk = false) != LocalAdb.Access.READY) false
-                    else CarHotspotAdbFallback.start(deadline, isCancelled,
-                        state = { CarHotspotStatus.isEnabled(context) }, shell = adb::shell, log = log)
-                        .also { if (it) observedAdbState.set(true) }
+        val startAdb: (() -> Boolean)? = if (HongqiHeadUnit.skipsBackgroundAdb(context)) {
+            null
+        } else {
+            {
+                val client = AtomicReference<LocalAdb?>()
+                CarHotspotAdbFallback.bounded(deadline, isCancelled,
+                    abort = { client.get()?.cancelPendingOperations() }) {
+                    val adb = LocalAdb(AdbKeys.load(context))
+                    client.set(adb)
+                    adb.use {
+                        if (isCancelled() || Thread.currentThread().isInterrupted || System.nanoTime() >= deadline) false
+                        else if (adb.connect(mayAsk = false) != LocalAdb.Access.READY) false
+                        else CarHotspotAdbFallback.start(deadline, isCancelled,
+                            state = { CarHotspotStatus.isEnabled(context) }, shell = adb::shell, log = log)
+                            .also { if (it) observedAdbState.set(true) }
+                    }
                 }
             }
         }

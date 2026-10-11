@@ -65,6 +65,8 @@ internal class ManualHotspotReadiness(
     private val sample: () -> HotspotNetworkSnapshot,
     private val cancelled: () -> Boolean,
     private val pause: (Long) -> Unit,
+    private val pollMillis: Long = WirelessStartupPolicy.INTERFACE_POLL_MILLIS,
+    private val stableSamples: Int = WirelessStartupPolicy.STABLE_SAMPLES,
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 },
     private val log: (String) -> Unit = {},
 ) {
@@ -81,11 +83,11 @@ internal class ManualHotspotReadiness(
             if (cancelled()) throw InterruptedIOException("Hotspot readiness cancelled")
             stable = if (selected != null && previous?.sameAddress(selected) == true) stable + 1 else 1
             previous = selected
-            if (selected != null && stable >= WirelessStartupPolicy.STABLE_SAMPLES && nowMillis() < deadline) {
+            if (selected != null && stable >= stableSamples && nowMillis() < deadline) {
                 log("hotspot interface confirmed iface=${selected.name} index=${selected.index} atMs=${nowMillis()}")
                 return selected
             }
-            pause(minOf(WirelessStartupPolicy.INTERFACE_POLL_MILLIS, (deadline - nowMillis()).coerceAtLeast(1)))
+            pause(minOf(pollMillis, (deadline - nowMillis()).coerceAtLeast(1)))
         }
     }
 }

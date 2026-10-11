@@ -5,7 +5,11 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.View
+import com.shilapi.xcertplay.media.AndroidMediaSink
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.SeekBar
@@ -148,6 +152,18 @@ class CarPlayHostSettingsTest {
         AirPlayPersistence.saveClusterMapEnabled(activity, true)
         invoke("ensureClusterPresentation")
         assertNull(field("clusterPresentation"))
+    }
+
+    @Test fun clusterMapOffDoesNotMirrorAltStreamOntoMainSurface() {
+        val renderer = mock(AndroidMediaSink::class.java)
+        val mainSurface = mock(Surface::class.java)
+        setField("sink", renderer)
+        AirPlayPersistence.saveClusterMapEnabled(activity, false)
+        activity.javaClass.getDeclaredMethod("attachSurface", Surface::class.java)
+            .apply { isAccessible = true }.invoke(activity, mainSurface)
+        verify(renderer).setSurface(110, mainSurface)
+        verify(renderer).clearSurface(111, mainSurface)
+        verify(renderer, never()).setSurface(111, mainSurface)
     }
 
     @Test fun threeFingerHorizontalSwipeTogglesClusterMapWhenEnabled() {

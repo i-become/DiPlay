@@ -1241,7 +1241,10 @@ class CarPlayController(
             firstTcpWatchdog = watchdog
             val mfi = mfiSession?.client
                 ?: throw IOException("MFi coprocessor client is unavailable")
+            val hotspotBringUpStartedNs = System.nanoTime()
             val hotspotInfo = startWirelessHotspot(generation)
+            val hotspotBringUpElapsedMillis =
+                ((System.nanoTime() - hotspotBringUpStartedNs) / 1_000_000).coerceAtLeast(0)
             if (isStaleWirelessRun(generation)) {
                 return
             }
@@ -1258,13 +1261,17 @@ class CarPlayController(
                 sample = { hotspotCandidates(hotspotInfo, fallbackToSnapshot = false) },
                 cancelled = { isStaleWirelessRun(generation) },
                 pause = Thread::sleep,
-                pollMillis = WirelessStartupPolicy.interfacePollMillis(appContext),
+                pollMillis = WirelessStartupPolicy.interfacePollMillis(appContext, config.wirelessHotspotMode),
                 log = { if (!isStaleWirelessRun(generation)) debugLog(it) },
             )
+            val linkMode = config.wirelessHotspotMode
+            val wirelessBringUpBudgetMillis = WirelessStartupPolicy.hotspotReadyMillis(appContext, linkMode)
+            val addressTimeoutMillis = (wirelessBringUpBudgetMillis - hotspotBringUpElapsedMillis)
+                .coerceIn(200, wirelessBringUpBudgetMillis)
             val candidates = addressRecovery.awaitCandidates(
                 hotspotCandidates(hotspotInfo),
                 preferredFamily,
-                timeoutMillis = WirelessStartupPolicy.hotspotReadyMillis(appContext),
+                timeoutMillis = addressTimeoutMillis,
             )
             val hostAddress = HotspotAddressPolicy.select(candidates, preferredFamily)
                 ?: hotspotInfo.hostAddress
@@ -1326,7 +1333,16 @@ class CarPlayController(
 
             val adapter = bluetoothAdapter
                 ?: throw IOException("Bluetooth adapter is unavailable")
-            val bluetoothRecoveryComplete = BydBluetoothSuspend.resumeAndWait(appContext, adapter)
+            val bluetoothRecoveryTimeoutMillis = if (com.shilapi.xcertplay.hud.HongqiHeadUnit.skipsBackgroundAdb(appContext)) {
+                2_000L
+            } else {
+                8_000L
+            }
+            val bluetoothRecoveryComplete = BydBluetoothSuspend.resumeAndWait(
+                appContext,
+                adapter,
+                bluetoothRecoveryTimeoutMillis,
+            )
             if (!adapter.isEnabled) throw IOException("Bluetooth is not enabled")
             if (!bluetoothRecoveryComplete) throw IOException("Bluetooth recovery did not complete before the handshake")
             val device = selectWirelessBluetoothDevice(adapter)
@@ -2216,14 +2232,18 @@ class CarPlayController(
             type.equals("disable-bluetooth", ignoreCase = true)
 
     private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
-        val readyDeadline = System.nanoTime() + WirelessStartupPolicy.hotspotReadyMillis(appContext) * 1_000_000
         val hotspotMode = config.wirelessHotspotMode
+        val readyDeadline = System.nanoTime() + WirelessStartupPolicy.hotspotReadyMillis(appContext, hotspotMode) * 1_000_000
         if (config.transport == CarPlayTransport.WIRELESS) {
+            val prepareTimeoutMillis = minOf(
+                WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(appContext, hotspotMode),
+                ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1),
+            )
             com.shilapi.xcertplay.network.WirelessLinkPrepare.prepare(
                 appContext,
                 hotspotMode,
                 isCancelled = { isStaleWirelessRun(generation) },
-                timeoutMillis = ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1),
+                timeoutMillis = prepareTimeoutMillis,
                 log = { debugLog("generation=$generation atNs=${System.nanoTime()} $it; awaiting wireless link") },
             )
         }

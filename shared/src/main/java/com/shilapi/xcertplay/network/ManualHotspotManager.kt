@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import com.shilapi.xcertplay.orchestration.ManualHotspotBand
 import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -95,6 +96,8 @@ class ManualHotspotManager(
             },
             cancelled = { closed || isCancelled() },
             pause = { millis -> synchronized(waitLock) { if (!closed && !isCancelled()) waitLock.wait(millis) } },
+            pollMillis = WirelessStartupPolicy.interfacePollMillis(appContext, WirelessHotspotMode.MANUAL),
+            stableSamples = WirelessStartupPolicy.stableSamples(appContext, WirelessHotspotMode.MANUAL),
             log = {},
         ).await(timeoutMillis)
         confirmed = selected
