@@ -2,11 +2,11 @@ package com.shilapi.xcertplay
 
 import android.content.Intent
 import android.os.Bundle
+import com.shilapi.xcertplay.newui.NewUiActivity
+import com.shilapi.xcertplay.newui.NewUiDestination
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.After
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -22,7 +22,7 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [28, 33], manifest = Config.NONE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class LauncherIntentTest {
-    private var controller: ActivityController<DiPlayActivity>? = null
+    private var controller: ActivityController<NewUiActivity>? = null
     private var stops = 0
 
     @Before fun setup() {
@@ -42,16 +42,16 @@ class LauncherIntentTest {
 
     @Test
     fun onlyAPlainLauncherIntentReturnsToCarPlay() {
-        assertTrue(DiPlayActivity.isLauncherIntent(launcher()))
-        assertFalse(DiPlayActivity.isLauncherIntent(launcher().putExtra("page", "settings")))
-        assertFalse(DiPlayActivity.isLauncherIntent(launcher().putExtra("page", null as String?)))
-        assertFalse(DiPlayActivity.isLauncherIntent(launcher().putExtra("page", 123)))
-        assertFalse(DiPlayActivity.isLauncherIntent(Intent(Intent.ACTION_MAIN)))
-        assertFalse(DiPlayActivity.isLauncherIntent(Intent().putExtra("page", "connection")))
+        assertTrue(NewUiActivity.isLauncherIntent(launcher()))
+        assertFalse(NewUiActivity.isLauncherIntent(launcher().putExtra(DiPlayLauncher.EXTRA_PAGE, "settings")))
+        assertFalse(NewUiActivity.isLauncherIntent(launcher().putExtra(DiPlayLauncher.EXTRA_PAGE, null as String?)))
+        assertFalse(NewUiActivity.isLauncherIntent(launcher().putExtra(DiPlayLauncher.EXTRA_PAGE, 123)))
+        assertFalse(NewUiActivity.isLauncherIntent(Intent(Intent.ACTION_MAIN)))
+        assertFalse(NewUiActivity.isLauncherIntent(Intent().putExtra(DiPlayLauncher.EXTRA_PAGE, "connection")))
     }
 
     @Test fun freshLauncherReturnsToTheExistingHostWithoutStoppingTheSession() {
-        controller = Robolectric.buildActivity(DiPlayActivity::class.java, launcher()).create()
+        controller = Robolectric.buildActivity(NewUiActivity::class.java, launcher()).create()
         val activity = controller!!.get()
         assertTrue(activity.isFinishing)
         assertEquals(CarPlayHostActivity::class.java.name,
@@ -61,29 +61,27 @@ class LauncherIntentTest {
     }
 
     @Test fun launcherDeliveredToExistingSettingsOpensProjectionAndClearsReturnNavigation() {
-        controller = Robolectric.buildActivity(DiPlayActivity::class.java,
-            Intent().putExtra("page", "settings")).create()
+        controller = Robolectric.buildActivity(NewUiActivity::class.java,
+            Intent().putExtra(DiPlayLauncher.EXTRA_PAGE, "settings")).create()
         val activity = controller!!.get()
-        ReflectionHelpers.setField(activity, "connectionSettingsReturnCategory", SettingsCategory.ADVANCED)
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onNewIntent",
             ReflectionHelpers.ClassParameter(Intent::class.java, launcher()))
-        assertEquals("home", ReflectionHelpers.getField<String>(activity, "page"))
-        assertNull(ReflectionHelpers.getField<SettingsCategory?>(activity, "connectionSettingsReturnCategory"))
+        assertEquals(NewUiDestination.CONNECTION, activity.currentDestinationForTests)
         assertEquals(CarPlayHostActivity::class.java.name,
             shadowOf(activity).nextStartedActivity?.component?.className)
         assertEquals(0, stops)
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onNewIntent",
-            ReflectionHelpers.ClassParameter(Intent::class.java, launcher().putExtra("page", "settings")))
-        assertEquals("settings", ReflectionHelpers.getField<String>(activity, "page"))
+            ReflectionHelpers.ClassParameter(Intent::class.java, launcher().putExtra(DiPlayLauncher.EXTRA_PAGE, "settings")))
+        assertEquals(NewUiDestination.SETTINGS, activity.currentDestinationForTests)
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
     @Test fun recreationRetainsSettingsInsteadOfRedirectingToProjection() {
-        controller = Robolectric.buildActivity(DiPlayActivity::class.java, launcher())
-            .create(Bundle().apply { putString("page", "settings") })
+        controller = Robolectric.buildActivity(NewUiActivity::class.java, launcher())
+            .create(Bundle().apply { putString(DiPlayLauncher.EXTRA_PAGE, "settings") })
         val activity = controller!!.get()
         assertFalse(activity.isFinishing)
-        assertEquals("settings", ReflectionHelpers.getField<String>(activity, "page"))
+        assertEquals(NewUiDestination.SETTINGS, activity.currentDestinationForTests)
         assertNull(shadowOf(activity).nextStartedActivity)
         assertEquals(0, stops)
     }

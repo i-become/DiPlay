@@ -17,7 +17,7 @@ class BootReceiver : BroadcastReceiver() {
         HongqiWirelessPrewarm.schedule(context)
         if (!launchEnabled) return
 
-        val launch = Intent(context, DiPlayActivity::class.java).apply {
+        val launch = Intent(context, com.shilapi.xcertplay.newui.NewUiActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or

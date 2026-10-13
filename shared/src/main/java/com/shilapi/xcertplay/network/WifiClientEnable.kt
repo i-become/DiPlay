@@ -25,10 +25,19 @@ object WifiClientEnable {
         val app = context.applicationContext
         val wifi = app.getSystemService(WifiManager::class.java)
             ?: return Result.FAILED
-        if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) return Result.READY
+        when (WifiStationReady.ensure(app, isCancelled, timeoutMillis, tryEnable = true, log = log)) {
+            WifiStationReady.Outcome.READY -> return Result.READY
+            WifiStationReady.Outcome.CANCELLED -> return Result.CANCELLED
+            WifiStationReady.Outcome.TIMED_OUT -> return Result.TIMED_OUT
+            WifiStationReady.Outcome.UNAVAILABLE -> return Result.FAILED
+            WifiStationReady.Outcome.NEEDS_USER -> Unit
+        }
+
+        if (HongqiHeadUnit.skipsBackgroundAdb(app)) {
+            return if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) Result.READY else Result.FAILED
+        }
 
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
-        val pollMillis = WirelessStartupPolicy.interfacePollMillis(app)
         fun stopped(): Result? = when {
             isCancelled() || Thread.currentThread().isInterrupted -> Result.CANCELLED
             System.nanoTime() >= deadline -> Result.TIMED_OUT
@@ -37,19 +46,15 @@ object WifiClientEnable {
         fun remainingMillis() = ((deadline - System.nanoTime()) / 1_000_000L).coerceAtLeast(1)
 
         stopped()?.let { return it }
-        if (requestEnable(wifi, log)) {
-            waitEnabled(wifi, pollMillis, ::stopped, ::remainingMillis)?.let { return it }
-        }
-
-        stopped()?.let { return it }
-        if (!HongqiHeadUnit.skipsBackgroundAdb(app) && enableViaAdb(app, log, ::stopped, ::remainingMillis)) {
+        if (enableViaAdb(app, log, ::stopped, ::remainingMillis)) {
+            val pollMillis = WirelessStartupPolicy.interfacePollMillis(app)
             waitEnabled(wifi, pollMillis, ::stopped, ::remainingMillis)?.let { return it }
         }
 
         return stopped() ?: if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) Result.READY else Result.FAILED
     }
 
-    private fun requestEnable(wifi: WifiManager, log: (String) -> Unit): Boolean {
+    internal fun requestEnable(wifi: WifiManager, log: (String) -> Unit): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching {
                 wifi.javaClass.getMethod("setWifiEnabled", Boolean::class.javaPrimitiveType)

@@ -59,8 +59,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/update_apk_paths" />
         </provider>
-        <activity android:name="com.shilapi.xcertplay.DiPlayActivity"
-            android:exported="true" android:launchMode="singleTop"
+        <activity
+            android:name="com.shilapi.xcertplay.newui.NewUiActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:resizeableActivity="true"
             android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:theme="@style/Theme.Xcertplay">
@@ -69,6 +71,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.shilapi.xcertplay.DiPlayActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:theme="@style/Theme.Xcertplay" />
         <service android:name="com.shilapi.xcertplay.DiPlaySessionService"
             android:exported="false" android:foregroundServiceType="connectedDevice|microphone|location" />
 

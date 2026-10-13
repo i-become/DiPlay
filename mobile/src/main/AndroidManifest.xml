@@ -27,7 +27,7 @@
         <meta-data android:name="Domain" android:value="DOMAIN CARPLAY" />
         <meta-data
             android:name="Ability"
-            android:value="com.shilapi.xcertplay.DiPlayActivity" />
+            android:value="com.shilapi.xcertplay.newui.NewUiActivity" />
         <meta-data android:name="MoreApp" android:value="true" />
 
         <receiver

@@ -558,6 +558,17 @@ class CarPlayController(
         }
     }
 
+    /** Applies a persisted CarPlay day/night choice while the host activity is in the background. */
+    fun syncCarPlayNightMode(night: Boolean): Boolean {
+        if (closed) return false
+        val session = activeSession ?: return false
+        return try {
+            session.setNightMode(night)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Immutable stream geometry retained when a new host adopts this background controller. */
     fun configuredClusterSize(): Pair<Int, Int>? = airPlayConfig.cluster?.let { it.widthPixels to it.heightPixels }
 
@@ -2233,76 +2244,100 @@ class CarPlayController(
 
     private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
         val hotspotMode = config.wirelessHotspotMode
-        val readyDeadline = System.nanoTime() + WirelessStartupPolicy.hotspotReadyMillis(appContext, hotspotMode) * 1_000_000
-        if (config.transport == CarPlayTransport.WIRELESS) {
-            val prepareTimeoutMillis = minOf(
-                WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(appContext, hotspotMode),
-                ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1),
-            )
-            com.shilapi.xcertplay.network.WirelessLinkPrepare.prepare(
-                appContext,
-                hotspotMode,
-                isCancelled = { isStaleWirelessRun(generation) },
-                timeoutMillis = prepareTimeoutMillis,
-                log = { debugLog("generation=$generation atNs=${System.nanoTime()} $it; awaiting wireless link") },
-            )
-        }
-        if (hotspotMode == WirelessHotspotMode.MANUAL &&
-            com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == false
-        ) {
-            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                "The car hotspot is off. Turn it on in the car settings and connect again.")
-        }
-        val manager: WirelessHotspotManager = when (hotspotMode) {
-            WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
-                preferredChannel = config.wifiP2pPreferredChannel)
-            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                LocalOnlyHotspotManager(appContext, ::debugLog)
-            } else {
+        var stationWifiFallback = false
+        while (true) {
+            val readyDeadline = System.nanoTime() +
+                WirelessStartupPolicy.hotspotReadyMillis(appContext, hotspotMode) * 1_000_000
+            val assumeStationWifiOn = WirelessStartupPolicy.optimisticStationWifi(appContext, hotspotMode) &&
+                !stationWifiFallback
+            if (config.transport == CarPlayTransport.WIRELESS) {
+                val prepareTimeoutMillis = minOf(
+                    WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(appContext, hotspotMode),
+                    ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(0),
+                )
+                com.shilapi.xcertplay.network.WirelessLinkPrepare.prepare(
+                    appContext,
+                    hotspotMode,
+                    isCancelled = { isStaleWirelessRun(generation) },
+                    timeoutMillis = prepareTimeoutMillis.coerceAtLeast(1),
+                    log = { debugLog("generation=$generation atNs=${System.nanoTime()} $it; awaiting wireless link") },
+                    assumeStationWifiOn = assumeStationWifiOn,
+                )
+            }
+            if (hotspotMode == WirelessHotspotMode.MANUAL &&
+                com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == false
+            ) {
                 throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
+                    "The car hotspot is off. Turn it on in the car settings and connect again.")
             }
-            WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
-                appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
-                onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-            )
-            WirelessHotspotMode.MANUAL -> ManualHotspotManager(
-                context = appContext,
-                ssid = config.manualHotspotSsid
-                    ?: throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION, "Manual hotspot SSID is not configured"),
-                passphrase = config.manualHotspotPassphrase.orEmpty(),
-                band = config.manualHotspotBand,
-                channel = config.manualHotspotChannel,
-                security = config.manualHotspotSecurity,
-                onDiagnostic = { debugLog("generation=$generation $it") },
-                isCancelled = { isStaleWirelessRun(generation) },
-            )
-        }
-        synchronized(wirelessResourceLock) {
-            if (isStaleWirelessRun(generation)) {
-                manager.close()
-                throw java.io.InterruptedIOException("Hotspot startup cancelled")
+            val manager: WirelessHotspotManager = when (hotspotMode) {
+                WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
+                    preferredChannel = config.wifiP2pPreferredChannel)
+                WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    LocalOnlyHotspotManager(appContext, ::debugLog)
+                } else {
+                    throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
+                        "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
+                }
+                WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
+                    appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
+                    onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
+                )
+                WirelessHotspotMode.MANUAL -> ManualHotspotManager(
+                    context = appContext,
+                    ssid = config.manualHotspotSsid
+                        ?: throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION, "Manual hotspot SSID is not configured"),
+                    passphrase = config.manualHotspotPassphrase.orEmpty(),
+                    band = config.manualHotspotBand,
+                    channel = config.manualHotspotChannel,
+                    security = config.manualHotspotSecurity,
+                    onDiagnostic = { debugLog("generation=$generation $it") },
+                    isCancelled = { isStaleWirelessRun(generation) },
+                )
             }
-            hotspot = manager
-        }
-        val timeoutMillis = if (hotspotMode == WirelessHotspotMode.WIFI_P2P) {
-            WIFI_P2P_START_TIMEOUT_MILLIS
-        } else if (hotspotMode == WirelessHotspotMode.MANUAL) {
-            ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1)
-        } else {
-            HOTSPOT_START_TIMEOUT_MILLIS
-        }
-        return try {
-            manager.start(timeoutMillis)
-        } catch (failure: Exception) {
-            if (hotspot === manager) hotspot = null
-            closeBestEffort(hotspotMode.name) { manager.close() }
-            if (isStaleWirelessRun(generation)) throw failure
-            throw IOException(
-                "Could not establish ${hotspotMode.name} hotspot: " +
-                    (failure.message ?: failure.javaClass.simpleName),
-                failure,
-            )
+            synchronized(wirelessResourceLock) {
+                if (isStaleWirelessRun(generation)) {
+                    manager.close()
+                    throw java.io.InterruptedIOException("Hotspot startup cancelled")
+                }
+                hotspot = manager
+            }
+            val timeoutMillis = if (hotspotMode == WirelessHotspotMode.WIFI_P2P) {
+                WirelessStartupPolicy.wifiP2pStartTimeoutMillis(appContext)
+            } else if (hotspotMode == WirelessHotspotMode.MANUAL) {
+                ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1)
+            } else {
+                HOTSPOT_START_TIMEOUT_MILLIS
+            }
+            try {
+                return manager.start(timeoutMillis)
+            } catch (failure: Exception) {
+                if (hotspot === manager) hotspot = null
+                closeBestEffort(hotspotMode.name) { manager.close() }
+                if (isStaleWirelessRun(generation)) throw failure
+                if (!stationWifiFallback &&
+                    WirelessStartupPolicy.optimisticStationWifi(appContext, hotspotMode)
+                ) {
+                    stationWifiFallback = true
+                    debugLog(
+                        "generation=$generation optimistic Wi-Fi link failed " +
+                            "(${failure.message ?: failure.javaClass.simpleName}); enabling station Wi-Fi before retry",
+                    )
+                    com.shilapi.xcertplay.network.WifiStationReady.ensure(
+                        appContext,
+                        isCancelled = { isStaleWirelessRun(generation) },
+                        timeoutMillis = WirelessStartupPolicy.HOTSPOT_READY_MILLIS,
+                        tryEnable = true,
+                        log = { debugLog("generation=$generation $it") },
+                    )
+                    continue
+                }
+                throw IOException(
+                    "Could not establish ${hotspotMode.name} hotspot: " +
+                        (failure.message ?: failure.javaClass.simpleName),
+                    failure,
+                )
+            }
         }
     }
 

@@ -19,6 +19,7 @@ import com.shilapi.xcertplay.orchestration.MfiTarget
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.network.WifiP2pChannels
 import com.shilapi.xcertplay.transport.LockdownPairRecord
+import com.shilapi.xcertplay.host.R
 import java.io.File
 
 /** SharedPreferences persistence for the accessory identity and paired controllers. */
@@ -110,6 +111,7 @@ object AirPlayPersistence {
     private const val KEY_MAIN_DISPLAY_DISABLE_SAFE_AREA = "main_display_disable_safe_area"
     private const val KEY_ADAPT_PIP_RESOLUTION = "adapt_pip_resolution"
     private const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
+    private const val KEY_DIAGNOSTIC_REPORT_DIRECTORY = "diagnostic_report_directory"
     private const val KEY_BT_SUSPEND_DURING_CARPLAY = "bt_suspend_during_carplay"
     private const val KEY_HIDE_BYD_CALL_POPUP = "hide_byd_call_popup"
     private const val KEY_BT_SUSPEND_DELAY = "bt_suspend_delay_seconds"
@@ -208,9 +210,13 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadAdvancedAudioChannelMapping(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
+    fun loadAdvancedAudioChannelMapping(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING)) {
+            return context.resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)
+        }
+        return prefs.getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
+    }
 
     fun saveAdvancedAudioChannelMapping(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -228,9 +234,15 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadAudioFocusEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
+    fun loadAudioFocusEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_AUDIO_FOCUS_ENABLED) &&
+            com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(context)
+        ) {
+            return true
+        }
+        return prefs.getBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
+    }
 
     fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -343,7 +355,7 @@ object AirPlayPersistence {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_WIRELESS_HOTSPOT_MODE, null)
         val mode = WirelessHotspotMode.entries.firstOrNull { it.name == stored }
-            ?: WirelessHotspotMode.MANUAL
+            ?: WirelessHotspotMode.WIFI_P2P
         val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
         if (stored != supported.name) saveWirelessHotspotMode(context, supported)
         return supported
@@ -457,11 +469,27 @@ object AirPlayPersistence {
 
     fun loadAutoStartOnBoot(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUTO_START_ON_BOOT, false)
+            .getBoolean(KEY_AUTO_START_ON_BOOT, true)
 
     fun saveAutoStartOnBoot(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_AUTO_START_ON_BOOT, enabled)
+            .apply()
+    }
+
+    fun loadDiagnosticReportDirectory(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_DIAGNOSTIC_REPORT_DIRECTORY, null)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+    fun saveDiagnosticReportDirectory(context: Context, absolutePath: String?) {
+        val trimmed = absolutePath?.trim().orEmpty()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .apply {
+                if (trimmed.isEmpty()) remove(KEY_DIAGNOSTIC_REPORT_DIRECTORY)
+                else putString(KEY_DIAGNOSTIC_REPORT_DIRECTORY, trimmed)
+            }
             .apply()
     }
 
@@ -604,7 +632,7 @@ object AirPlayPersistence {
 
     fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_FPS, 30),
+            .getInt(KEY_FPS, 60),
     )
 
     fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(
@@ -747,8 +775,13 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadClusterMapEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, false)
+    fun loadClusterMapEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_CLUSTER_MAP)) {
+            return !com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(context)
+        }
+        return prefs.getBoolean(KEY_CLUSTER_MAP, true)
+    }
 
     fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
@@ -772,13 +805,22 @@ object AirPlayPersistence {
     }
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()
+        val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_CLUSTER_MAP, enabled)
+        if (!enabled) {
+            edit.putBoolean(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE, false)
+        }
+        edit.apply()
     }
 
     /** Three-finger horizontal swipe in CarPlay to turn the cluster map on (left) or off (right). */
-    fun loadClusterMapHorizontalGestureEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE, true)
+    fun loadClusterMapHorizontalGestureEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE)) {
+            return !com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(context)
+        }
+        return prefs.getBoolean(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE, true)
+    }
 
     fun saveClusterMapHorizontalGestureEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

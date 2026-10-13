@@ -183,4 +183,9 @@ internal class CarPlayNightModeController(
         night = value
         onNightChanged(value)
     }
+
+    /** Re-sends the current mode to CarPlay after a settings change that did not flip [night]. */
+    fun pushCurrentNight() {
+        onNightChanged(night)
+    }
 }

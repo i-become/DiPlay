@@ -1,9 +1,10 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.shilapi.xcertplay.hud.HongqiHeadUnit
-import com.shilapi.xcertplay.network.WifiClientEnable
+import com.shilapi.xcertplay.network.WifiStationReady
 import com.shilapi.xcertplay.network.WirelessLinkPrepare
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
@@ -19,22 +20,39 @@ internal object HongqiWirelessPrewarm {
         if (!HongqiHeadUnit.isHeadUnit(app)) return
         if (!AirPlayPersistence.loadWirelessEnabled(app)) return
         val mode = AirPlayPersistence.loadWirelessHotspotMode(app)
+        if (WirelessStartupPolicy.optimisticStationWifi(app, mode)) {
+            Log.i(TAG, "prewarm skipped; optimistic station Wi-Fi connects before enabling radio")
+            return
+        }
         if (!running.compareAndSet(false, true)) return
         Thread({
             try {
                 when (mode) {
                     WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI -> {
-                        if (WirelessStartupPolicy.clientWifiEnabled(app)) {
-                            Log.i(TAG, "prewarm skip station Wi-Fi already on")
-                            return@Thread
+                        val afterBoot = SystemClock.elapsedRealtime() < WirelessStartupPolicy.bootGraceMillis(app)
+                        val timeoutMillis = if (afterBoot) {
+                            WirelessStartupPolicy.HOTSPOT_READY_MILLIS
+                        } else {
+                            WirelessStartupPolicy.hotspotReadyMillis(app, mode)
                         }
-                        val result = WifiClientEnable.enable(
-                            app,
-                            isCancelled = { false },
-                            timeoutMillis = WirelessStartupPolicy.hotspotReadyMillis(app, mode),
-                            log = { Log.i(TAG, it) },
-                        )
-                        Log.i(TAG, "prewarm finished result=${result.diagnostic}")
+                        val outcome = if (WirelessStartupPolicy.clientWifiEnabled(app)) {
+                            Log.i(TAG, "prewarm station Wi-Fi reads on; confirming stable")
+                            WifiStationReady.confirmStableWhenOn(
+                                app,
+                                isCancelled = { false },
+                                timeoutMillis = timeoutMillis,
+                                log = { Log.i(TAG, it) },
+                            )
+                        } else {
+                            WifiStationReady.ensure(
+                                app,
+                                isCancelled = { false },
+                                timeoutMillis = timeoutMillis,
+                                tryEnable = true,
+                                log = { Log.i(TAG, it) },
+                            )
+                        }
+                        Log.i(TAG, "prewarm finished outcome=$outcome")
                     }
                     WirelessHotspotMode.MANUAL -> {
                         WirelessLinkPrepare.prewarmManualHotspotInterface(app)

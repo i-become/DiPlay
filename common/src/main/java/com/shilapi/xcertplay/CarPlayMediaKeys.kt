@@ -78,6 +78,7 @@ internal object CarPlayMediaKeys {
         appContext = context.applicationContext
         controller = next
         GeelyWheelKeys.start(context)
+        HongqiWheelKeys.attach(context, next)
         com.shilapi.xcertplay.media.AmbientMusicController.claimPlaybackOwner(next)
         next.playbackListener = { playing ->
             com.shilapi.xcertplay.media.AmbientMusicController.phonePlaybackChanged(next, playing)
@@ -99,6 +100,7 @@ internal object CarPlayMediaKeys {
         expected.nowPlayingListener = null
         expected.artworkListener = null
         controller = null
+        HongqiWheelKeys.detach(expected)
         GeelyWheelKeys.stop()
         releaseLocked()
     }
@@ -382,19 +384,20 @@ internal object CarPlayMediaKeys {
         )
     }
 
-    private fun send(index: Int, source: String) {
+    private fun send(index: Int, source: String): Boolean {
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
         if (CarPlayVideo.onMediaKey(index)) {
             Log.i(TAG, "media key $source -> car video player $index")
-            return
+            return true
         }
         val sent = synchronized(this) { controller }?.sendMediaButton(index) ?: false
         Log.i(TAG, "media key $source -> CarPlay $index sent=$sent")
+        return sent
     }
 
-    /** A steering-wheel media key captured outside the Android key stream (Geely/Lynk). */
-    internal fun onExternalMediaKey(index: Int) = send(index, "geely-wheel")
+    /** A steering-wheel media key captured outside the Android key stream (OEM input services). */
+    internal fun onExternalMediaKey(index: Int, source: String = "external-wheel"): Boolean = send(index, source)
 
     /** The steering-wheel microphone key captured outside the Android key stream (Geely/Lynk). */
     internal fun onExternalSiriKey(): Boolean {
@@ -527,8 +530,19 @@ internal class CarPlayMediaCallback(
         return true
     }
 
-    override fun onPlay() = send(CarPlayMediaButton.PLAY, "play")
-    override fun onPause() = send(CarPlayMediaButton.PAUSE, "pause")
-    override fun onSkipToNext() = send(CarPlayMediaButton.NEXT, "next")
-    override fun onSkipToPrevious() = send(CarPlayMediaButton.PREVIOUS, "previous")
+    override fun onPlay() {
+        send(CarPlayMediaButton.PLAY, "play")
+    }
+
+    override fun onPause() {
+        send(CarPlayMediaButton.PAUSE, "pause")
+    }
+
+    override fun onSkipToNext() {
+        send(CarPlayMediaButton.NEXT, "next")
+    }
+
+    override fun onSkipToPrevious() {
+        send(CarPlayMediaButton.PREVIOUS, "previous")
+    }
 }

@@ -369,6 +369,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (SCREEN_TYPE_ALT !in activeScreenStreamTypes) CenterMapOverlay.hide()
     }
     private var clusterDashboardPhysicallyPresent = false
+    /** Runtime fly-screen visibility; settings keep cluster map enabled while gestures hide the map. */
+    private var clusterFlyScreenVisible = false
     private val clusterStreamNudge = Runnable {
         if (isDestroyed || shuttingDown.get()) return@Runnable
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return@Runnable
@@ -670,9 +672,11 @@ class CarPlayHostActivity : ComponentActivity() {
             AirPlayPersistence.saveWirelessEnabled(this, false)
         }
         if (runCatching { DiPlayBootstrap.ensure(this, AirPlayPersistence.loadMfiTarget(this)) }.isFailure) {
-            startActivity(Intent(this, DiPlayActivity::class.java))
+            startActivity(Intent(this, com.shilapi.xcertplay.newui.NewUiActivity::class.java))
             finish(); return
         }
+        CarPlayHostSettingsBridge.register(this)
+        clusterFlyScreenVisible = AirPlayPersistence.loadClusterMapEnabled(this)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         getSystemService(android.hardware.display.DisplayManager::class.java)
             ?.registerDisplayListener(clusterDisplayListener, mainHandler)
@@ -951,8 +955,49 @@ class CarPlayHostActivity : ComponentActivity() {
         if (AirPlayPersistence.loadFpsCounter(this)) fpsCounter?.start() else fpsCounter?.stop()
     }
 
+    internal fun reloadCarPlayNightModeFromSettings() {
+        if (isDestroyed) return
+        val savedNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
+        val savedThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
+        val savedDelay = AirPlayPersistence.loadAmbientDelaySeconds(this)
+        val savedSchedule = AirPlayPersistence.loadCarPlayNightSchedule(this)
+        val systemNight = nightModeOrNull(resources.configuration.uiMode) ?: false
+        carPlayNightMode = savedNightMode
+        ambientLightThreshold = savedThreshold
+        ambientDelaySeconds = savedDelay
+        nightSchedule = savedSchedule
+        nightModeController.configure(
+            carPlayNightMode,
+            systemNight,
+            ambientLightThreshold,
+            ambientDelaySeconds,
+            nightSchedule,
+        )
+        nightModeController.resume(systemNight)
+        nightModeController.pushCurrentNight()
+        AppAppearanceRuntime.publishHost(this, darkMode)
+        refreshAppAppearance()
+        syncAirPlayDarkMode(ThemeModeDiagnostics.Source.CARPLAY_MODE)
+    }
+
+    internal fun reloadClusterMapFromSettings() {
+        if (isDestroyed) return
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+            clusterFlyScreenVisible = false
+            dismissClusterPresentation()
+            com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(false)
+            controller?.setDashboardMapOutputVisible(false)
+            currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
+        } else {
+            clusterFlyScreenVisible = true
+            ensureClusterPresentation()
+            refreshClusterStreamRoutingAfterToggle()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        HongqiWheelKeys.hostResumed(this)
         WheelKeyService.restoreIfNeeded(this)
         hostAppearanceResumed = true
         updateCallPopupGuard()
@@ -1468,6 +1513,7 @@ class CarPlayHostActivity : ComponentActivity() {
         updateCallPopupGuard()
         AppAppearanceRuntime.clearHost(this)
         nightModeController.pause()
+        HongqiWheelKeys.hostPaused(this)
         super.onPause()
     }
 
@@ -1530,13 +1576,22 @@ class CarPlayHostActivity : ComponentActivity() {
 
     // The dashboard map pause must not stop the stream while a copy of the map is on screen.
     private fun updateClusterMapShown() {
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown((clusterPresentation != null ||
-            (ClusterActivityOutput.hasConfirmedRoute() && clusterSurface != null)) && !MapMirrors.any)
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+            com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(false)
+            controller?.setDashboardMapOutputVisible(false)
+            clusterDashboardPhysicallyPresent = false
+            return
+        }
+        val flyScreenEligible = clusterFlyScreenVisible && !MapMirrors.any
+        com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(
+            flyScreenEligible && (clusterPresentation != null ||
+                (ClusterActivityOutput.hasConfirmedRoute() && clusterSurface != null)),
+        )
         // Wheel zoom needs a physical map; centre-screen copies must not suppress that eligibility.
         val surface = clusterSurface?.takeIf { it.isValid }
         val presentation = clusterPresentation
-        val presented = surface != null && presentation?.isShowing == true && presentation.mapVisible &&
-            presentation.outputSurface === surface
+        val presented = flyScreenEligible && surface != null && presentation?.isShowing == true &&
+            presentation.mapVisible && presentation.outputSurface === surface
         val direct = surface != null && adbClusterConfigured && ClusterActivityOutput.hasConfirmedRoute()
         val physicallyPresent = presented || direct
         controller?.setDashboardMapOutputVisible(physicallyPresent)
@@ -1570,6 +1625,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        CarPlayHostSettingsBridge.unregister(this)
         resetSidePanel()
         releaseSidePanelEffects()
         hostAppearanceResumed = false
@@ -4745,9 +4801,14 @@ class CarPlayHostActivity : ComponentActivity() {
                         requestedSmallWindowForStream != smallWindowActive()) {
                         reconnectAfterLoss("Cluster small-window navi ${if (smallWindowActive()) "on" else "off"}")
                     }
+                    clusterFlyScreenVisible = AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
-                    ensureClusterPresentation()
+                    if (AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) {
+                        ensureClusterPresentation()
+                    } else {
+                        dismissClusterPresentation()
+                    }
                 }
             }
 
@@ -5453,9 +5514,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun showDiPlayHome(page: String = "home") {
         controller?.sendTouch(emptyList())
-        startActivity(Intent(this, DiPlayActivity::class.java)
-            .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        startActivity(Intent(this, com.shilapi.xcertplay.newui.NewUiActivity::class.java)
+            .putExtra(DiPlayLauncher.EXTRA_PAGE, page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
+
+    /** Steering-wheel / multi-finger swipe down: open the new settings shell, not the overlay menu. */
+    private fun openDiPlaySettingsFromGesture() = showDiPlayHome("settings")
 
     /** Keep a timed-out sink visible to surface teardown until its codecs have actually been released. */
     private fun closeRetiringSink(owner: AndroidMediaSink) {
@@ -5715,7 +5779,7 @@ class CarPlayHostActivity : ComponentActivity() {
     /** Main CarPlay video always uses [surface]; stream 111 only uses the cluster surface while飞屏 is on. */
     private fun routeVideoSurfaces(main: Surface) {
         sink?.setSurface(SCREEN_TYPE_MAIN, main)
-        if (AirPlayPersistence.loadClusterMapEnabled(this)) {
+        if (AirPlayPersistence.loadClusterMapEnabled(this) && clusterFlyScreenVisible) {
             clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }
         } else {
             clusterSurface?.let { sink?.clearSurface(SCREEN_TYPE_ALT, it) }
@@ -5735,6 +5799,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (clusterMapHorizontalGestureEnabled() &&
+                    AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity) &&
                     event.pointerCount == CLUSTER_GESTURE_FINGERS &&
                     !clusterGestureSequenceActive
                 ) {
@@ -5791,7 +5856,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 ) {
                     clusterGestureSequenceActive = false
                     clusterGestureTracking = false
-                    openSettingsMenu()
+                    openDiPlaySettingsFromGesture()
                     return true
                 }
                 if (absX >= dp(CLUSTER_SWIPE_DISTANCE_DP) &&
@@ -5799,7 +5864,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 ) {
                     clusterGestureSequenceActive = false
                     clusterGestureTracking = false
-                    applyClusterMapFromGesture(enable = deltaX < 0f)
+                    applyClusterMapFromGesture(show = deltaX < 0f)
                     return true
                 }
             }
@@ -5830,7 +5895,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 ) {
                     gestureSequenceActive = false
                     gestureTracking = false
-                    openSettingsMenu()
+                    openDiPlaySettingsFromGesture()
                     return true
                 }
             }
@@ -5875,22 +5940,25 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun clusterMapHorizontalGestureEnabled(): Boolean =
         AirPlayPersistence.loadClusterMapHorizontalGestureEnabled(this)
 
-    private fun applyClusterMapFromGesture(enable: Boolean) {
-        val already = AirPlayPersistence.loadClusterMapEnabled(this)
-        if (already == enable) {
-            if (enable) ensureClusterPresentation()
-            appendLog("Cluster map gesture ${if (enable) "on" else "off"} (unchanged)")
+    private fun applyClusterMapFromGesture(show: Boolean) {
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) return
+        if (!clusterMapHorizontalGestureEnabled()) return
+        if (clusterFlyScreenVisible == show) {
+            appendLog("Cluster map gesture visible=$show (unchanged)")
             return
         }
-        AirPlayPersistence.saveClusterMapEnabled(this, enable)
-        if (!enable) {
-            dismissClusterPresentation()
-            mainHandler.removeCallbacks(hideIdleCenterMap)
-            CenterMapOverlay.hide()
-        } else ensureClusterPresentation()
-        refreshClusterStreamRoutingAfterToggle()
-        Log.i(ClusterMapPresentation.TAG, "cluster map gesture enabled=$enable")
-        appendLog("Cluster map gesture ${if (enable) "on" else "off"}")
+        clusterFlyScreenVisible = show
+        clusterPresentation?.setMapVisible(show)
+        clusterLayers.values.forEach { it.setMapVisible(show) }
+        if (show) {
+            ensureClusterPresentation()
+            nudgeClusterStreamDelivery()
+        }
+        currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
+        updateClusterMapShown()
+        syncClusterPresentationStreamState()
+        Log.i(ClusterMapPresentation.TAG, "cluster map gesture visible=$show")
+        appendLog("Cluster map gesture visible=$show")
     }
 
     private fun refreshClusterStreamRoutingAfterToggle() {

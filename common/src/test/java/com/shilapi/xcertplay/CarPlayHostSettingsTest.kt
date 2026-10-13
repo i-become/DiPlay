@@ -123,12 +123,10 @@ class CarPlayHostSettingsTest {
             AirPlayPersistence.saveSettingsGestureFingers(activity, fingers)
             invoke("loadPersistedSettings")
             gesture(fingers)
-            assertTrue(field("menuOpen") as Boolean)
-            assertEquals(View.VISIBLE, menu().visibility)
-            assertNotNull(menu().parent)
-            assertEquals(View.GONE, (field("gestureOverlay") as View).visibility)
-            assertNull(shadowOf(activity).nextStartedActivity)
-            invoke("cancelSettingsEdits")
+            assertFalse(field("menuOpen") as Boolean)
+            val intent = shadowOf(activity).nextStartedActivity
+            assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name, intent.component!!.className)
+            assertEquals("settings", intent.getStringExtra("page"))
         }
     }
 
@@ -190,7 +188,8 @@ class CarPlayHostSettingsTest {
         AirPlayPersistence.saveSettingsGestureFingers(activity, 3)
         invoke("loadPersistedSettings")
         gesture(3)
-        assertTrue(field("menuOpen") as Boolean)
+        assertFalse(field("menuOpen") as Boolean)
+        assertEquals("settings", shadowOf(activity).nextStartedActivity.getStringExtra("page"))
     }
 
     @Test fun liftingAFingerCancelsTrackingUntilTheNextGesture() {
@@ -203,7 +202,8 @@ class CarPlayHostSettingsTest {
         assertFalse(field("menuOpen") as Boolean)
         touch(MotionEvent.ACTION_UP, 1, 700f)
         gesture(3)
-        assertTrue(field("menuOpen") as Boolean)
+        assertFalse(field("menuOpen") as Boolean)
+        assertEquals("settings", shadowOf(activity).nextStartedActivity.getStringExtra("page"))
     }
 
     @Test fun fullSettingsShortcutDiscardsPreviewWithoutRestartingTheSession() {
@@ -223,7 +223,7 @@ class CarPlayHostSettingsTest {
         assertSame(controller, field("controller"))
         assertEquals(0, field("restartGeneration"))
         val intent = shadowOf(activity).nextStartedActivity
-        assertEquals(DiPlayActivity::class.java.name, intent.component!!.className)
+        assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name, intent.component!!.className)
         assertEquals("settings", intent.getStringExtra("page"))
     }
 
@@ -233,7 +233,7 @@ class CarPlayHostSettingsTest {
         fullSettingsButton().performClick()
         assertNull(ShadowAlertDialog.getLatestAlertDialog())
         assertFalse(field("menuOpen") as Boolean)
-        assertEquals(DiPlayActivity::class.java.name,
+        assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name,
             shadowOf(activity).nextStartedActivity.component!!.className)
     }
 

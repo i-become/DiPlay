@@ -23,11 +23,12 @@ object WirelessLinkPrepare {
         isCancelled: () -> Boolean,
         timeoutMillis: Long,
         log: (String) -> Unit,
+        assumeStationWifiOn: Boolean = WirelessStartupPolicy.optimisticStationWifi(context, mode),
     ) {
         when (mode) {
             WirelessHotspotMode.MANUAL -> prepareManualHotspot(context, isCancelled, timeoutMillis, log)
             WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI ->
-                prepareWifiClient(context, isCancelled, timeoutMillis, log)
+                prepareWifiClient(context, isCancelled, timeoutMillis, log, assumeStationWifiOn)
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> Unit
         }
     }
@@ -69,15 +70,21 @@ object WirelessLinkPrepare {
         isCancelled: () -> Boolean,
         timeoutMillis: Long,
         log: (String) -> Unit,
+        assumeStationWifiOn: Boolean,
     ) {
+        if (assumeStationWifiOn) {
+            log("optimistic station Wi-Fi: attempting CarPlay link before enabling radio")
+            return
+        }
         val result = WifiClientEnable.enable(context, isCancelled, timeoutMillis, log)
         if (result == WifiClientEnable.Result.READY) return
         throw WirelessStartupException(
             WirelessStartupFailure.HOTSPOT_NOT_READY,
             when (result) {
-                WifiClientEnable.Result.TIMED_OUT -> "Timed out turning Wi-Fi on. Open Wi-Fi settings and connect again."
+                WifiClientEnable.Result.TIMED_OUT ->
+                    WifiStationReady.outcomeMessage(WifiStationReady.Outcome.TIMED_OUT)
                 WifiClientEnable.Result.CANCELLED -> "Wi-Fi startup was cancelled"
-                else -> "Turn on Wi-Fi in the head unit's settings, then reconnect"
+                else -> WifiStationReady.outcomeMessage(WifiStationReady.Outcome.NEEDS_USER)
             },
         )
     }

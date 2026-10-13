@@ -37,6 +37,13 @@ internal object DiagnosticExportStore {
      *  4. Internal app storage, shared through the report viewer.
      */
     fun saveWithoutPicker(context: Context, fileName: String, report: String): SavedReport {
+        preferredReportDirectory(context)?.let { directory ->
+            try {
+                return saveInDirectory(context, directory, fileName, report)
+            } catch (error: Exception) {
+                Log.w(TAG, "Custom diagnostic folder unavailable; using default locations", error)
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 return SavedReport(saveToDownloads(context.contentResolver, fileName, report))
@@ -63,6 +70,18 @@ internal object DiagnosticExportStore {
             // A missing, read-only or full external volume must not prevent export.
         }
         return saveInDirectory(context, File(context.filesDir, "diagnostic-reports"), fileName, report, savedInApp = true)
+    }
+
+    fun preferredReportDirectory(context: Context): File? {
+        val custom = AirPlayPersistence.loadDiagnosticReportDirectory(context) ?: return null
+        val directory = File(custom)
+        if (directory.isDirectory || directory.mkdirs()) return directory
+        return null
+    }
+
+    fun saveToDirectory(context: Context, directoryPath: String, fileName: String, report: String): SavedReport {
+        val directory = File(directoryPath)
+        return saveInDirectory(context, directory, fileName, report)
     }
 
     private fun saveInDirectory(

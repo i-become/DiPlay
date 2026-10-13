@@ -19,6 +19,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.shilapi.xcertplay.compat.closeCompat
 import com.shilapi.xcertplay.compat.isLocationEnabledCompat
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
 import java.io.IOException
 import java.net.Inet4Address
@@ -130,7 +131,7 @@ class WifiP2pGroupManager(
         try {
             val station = readStation()
             val stationFrequency = station.alignmentFrequency
-            checkPrerequisites(station)
+            checkPrerequisites(attempt, station, initialWifiPreflightWaitMillis())
             val remembered = configurationMemory.read()
             val preferred = remembered?.takeIf {
                 preferredChannel == WifiP2pChannels.AUTO && it.stationMHz == stationFrequency
@@ -190,7 +191,14 @@ class WifiP2pGroupManager(
                     // A competing app may have acquired the radio since our rejected request.
                     synchronized(stateLock) { waitNanos(TimeUnit.MILLISECONDS.toNanos(500)) }
                     ensureStartActive(attempt)
-                    checkPrerequisites(readStation())
+                    checkPrerequisites(
+                        attempt,
+                        readStation(),
+                        minOf(
+                            WifiStationReady.preflightWaitMillis(appContext),
+                            TimeUnit.NANOSECONDS.toMillis(remainingNanos(deadlineNanos)).coerceAtLeast(1),
+                        ),
+                    )
                     if (requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true) != null) {
                         throw P2pResetRequiredException()
                     }
@@ -731,10 +739,16 @@ class WifiP2pGroupManager(
         Station(info?.supplicantState, info?.frequency?.takeIf { it > 0 })
     }.getOrDefault(Station(null, null))
 
-    private fun checkPrerequisites(station: Station) {
+    private fun initialWifiPreflightWaitMillis(): Long =
+        if (WirelessStartupPolicy.optimisticStationWifi(appContext, WirelessHotspotMode.WIFI_P2P)) {
+            0L
+        } else {
+            WifiStationReady.preflightWaitMillis(appContext)
+        }
+
+    private fun checkPrerequisites(attempt: StartAttempt, station: Station, wifiWaitMillis: Long) {
         val wifi = appContext.getSystemService(WifiManager::class.java)
         val fiveGhzSupported = runCatching { wifi?.is5GHzBandSupported }.getOrNull()
-        val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
         val locationEnabled = runCatching {
             appContext.getSystemService(LocationManager::class.java)?.isLocationEnabledCompat()
         }.getOrNull()
@@ -745,11 +759,45 @@ class WifiP2pGroupManager(
             appContext.getSystemService(AppOpsManager::class.java)?.unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_FINE_LOCATION, android.os.Process.myUid(), appContext.packageName)
         }.getOrNull() else null
-        diagnostic("Wi-Fi P2P preflight wifiEnabled=$wifiEnabled locationEnabled=$locationEnabled permissionGranted=$granted locationAccessMode=${locationAccessMode ?: "unknown"} stationMHz=${station.alignmentFrequency ?: "unknown"} stationState=${station.state ?: "unknown"} reportedStationMHz=${station.reportedFrequency ?: "unknown"} fiveGhzSupported=${fiveGhzSupported ?: "unknown"}")
         if (!granted) throw IOException(if (Build.VERSION.SDK_INT >= 33)
             "Allow Nearby devices for DiPlay in the head unit's app permissions"
             else "Allow precise Location for DiPlay in the head unit's app permissions")
-        if (wifiEnabled == false) throw IOException("Turn on Wi-Fi in the head unit's settings, then reconnect")
+        val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
+        @Suppress("DEPRECATION")
+        val wifiState = runCatching { wifi?.wifiState }.getOrNull()
+        val optimistic = wifiWaitMillis <= 0L &&
+            WirelessStartupPolicy.optimisticStationWifi(appContext, WirelessHotspotMode.WIFI_P2P)
+        if (optimistic) {
+            diagnostic(
+                "Wi-Fi P2P preflight optimistic=true wifiEnabled=$wifiEnabled wifiState=$wifiState " +
+                    "locationEnabled=$locationEnabled permissionGranted=$granted " +
+                    "locationAccessMode=${locationAccessMode ?: "unknown"} stationMHz=${station.alignmentFrequency ?: "unknown"} " +
+                    "stationState=${station.state ?: "unknown"} reportedStationMHz=${station.reportedFrequency ?: "unknown"} " +
+                    "fiveGhzSupported=${fiveGhzSupported ?: "unknown"}",
+            )
+            return
+        }
+        val wifiOutcome = WifiStationReady.ensure(
+            appContext,
+            isCancelled = {
+                synchronized(stateLock) {
+                    closed || startAttempt !== attempt || attempt.stopped
+                }
+            },
+            timeoutMillis = wifiWaitMillis,
+            tryEnable = true,
+            log = diagnostic,
+        )
+        diagnostic(
+            "Wi-Fi P2P preflight wifiEnabled=$wifiEnabled wifiState=$wifiState wifiWaitMs=$wifiWaitMillis " +
+                "wifiOutcome=$wifiOutcome locationEnabled=$locationEnabled permissionGranted=$granted " +
+                "locationAccessMode=${locationAccessMode ?: "unknown"} stationMHz=${station.alignmentFrequency ?: "unknown"} " +
+                "stationState=${station.state ?: "unknown"} reportedStationMHz=${station.reportedFrequency ?: "unknown"} " +
+                "fiveGhzSupported=${fiveGhzSupported ?: "unknown"}",
+        )
+        if (wifiOutcome != WifiStationReady.Outcome.READY) {
+            throw IOException(WifiStationReady.outcomeMessage(wifiOutcome))
+        }
         // Location mode is diagnostic only: AOSP createGroup does not require it to be on.
         // Do not block firmware where Wi-Fi Direct works with Location services disabled.
     }

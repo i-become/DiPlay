@@ -4,4 +4,6 @@
     <external-files-path name="external_reports" path="diagnostic-reports/" />
     <!-- Only DiPlay's own folder in the public Downloads, never the rest of shared storage. -->
     <external-path name="public_reports" path="Download/DiPlay/" />
+    <!-- Custom diagnostic folders under shared storage (Hongqi file managers). -->
+    <external-path name="external_storage" path="." />
 </paths>
