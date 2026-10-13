@@ -2316,20 +2316,36 @@ class CarPlayController(
                 closeBestEffort(hotspotMode.name) { manager.close() }
                 if (isStaleWirelessRun(generation)) throw failure
                 if (!stationWifiFallback &&
-                    WirelessStartupPolicy.optimisticStationWifi(appContext, hotspotMode)
+                    WirelessStartupPolicy.optimisticStationWifi(appContext, hotspotMode) &&
+                    (hotspotMode == WirelessHotspotMode.EXISTING_WIFI ||
+                        hotspotMode == WirelessHotspotMode.WIFI_P2P)
                 ) {
                     stationWifiFallback = true
                     debugLog(
-                        "generation=$generation optimistic Wi-Fi link failed " +
-                            "(${failure.message ?: failure.javaClass.simpleName}); enabling station Wi-Fi before retry",
+                        "generation=$generation optimistic ${hotspotMode.name} link failed " +
+                            "(${failure.message ?: failure.javaClass.simpleName}); " +
+                            "stabilizing station Wi-Fi before retry",
                     )
-                    com.shilapi.xcertplay.network.WifiStationReady.ensure(
-                        appContext,
-                        isCancelled = { isStaleWirelessRun(generation) },
-                        timeoutMillis = WirelessStartupPolicy.HOTSPOT_READY_MILLIS,
-                        tryEnable = true,
-                        log = { debugLog("generation=$generation $it") },
-                    )
+                    if (hotspotMode == WirelessHotspotMode.WIFI_P2P) {
+                        com.shilapi.xcertplay.network.WifiStationReady.reinitializeWhenAlreadyOn(
+                            appContext,
+                            isCancelled = { isStaleWirelessRun(generation) },
+                            timeoutMillis = WirelessStartupPolicy.hotspotReadyMillis(
+                                appContext,
+                                WirelessHotspotMode.WIFI_P2P,
+                            ),
+                            log = { debugLog("generation=$generation $it") },
+                        )
+                    } else {
+                        com.shilapi.xcertplay.network.WifiStationReady.ensure(
+                            appContext,
+                            isCancelled = { isStaleWirelessRun(generation) },
+                            timeoutMillis = WirelessStartupPolicy.HOTSPOT_READY_MILLIS,
+                            tryEnable = true,
+                            log = { debugLog("generation=$generation $it") },
+                        )
+                    }
+                    if (isStaleWirelessRun(generation)) throw failure
                     continue
                 }
                 throw IOException(

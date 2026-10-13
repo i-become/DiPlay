@@ -723,8 +723,12 @@
     <string name="side_panel_full_screen">⤢ 全屏</string>
     <string name="main_buffered_audio">缓冲音乐（实验性）</string>
     <string name="main_buffered_audio_description">支持此功能的应用（如 Apple Music）会提前发送约两分钟的音乐，因此短暂的 Wi-Fi 中断不会被听到。其他应用保持原样。会重新连接 CarPlay。</string>
-    <string name="settings_car_bluetooth_audio">通过车辆蓝牙播放 CarPlay 音频（实验性）</string>
+    <string name="settings_car_bluetooth_audio">通过车辆蓝牙播放 CarPlay 音频</string>
     <string name="settings_car_bluetooth_audio_description">DiPlay 不向 iPhone 提供 CarPlay 音频，因此音乐、导航和通话应通过 iPhone 与车辆的蓝牙连接传输。请保持 iPhone 与车辆配对，并将车辆音源设为蓝牙。如果声音改从 iPhone 播放，请关闭此选项。会重新连接 CarPlay。</string>
+    <string name="settings_carplay_wheel_media">CarPlay 中方向盘切歌</string>
+    <string name="settings_carplay_wheel_media_description">CarPlay 连接期间，方向盘上一曲/下一曲键在 iPhone 上切歌。关闭时保持车辆原有按键行为。</string>
+    <string name="settings_carplay_wheel_siri">CarPlay 中方向盘唤醒 Siri</string>
+    <string name="settings_carplay_wheel_siri_description">CarPlay 在前台时，方向盘语音键唤醒 iPhone 上的 Siri。关闭时保持车辆原有语音助手键行为。</string>
     <string name="call_echo_cancellation">通话回声消除（实验性）</string>
     <string name="call_echo_cancellation_description">尝试减少 CarPlay 通话中发送给对方的扬声器回声。效果取决于车载主机。下次连接 CarPlay 时生效。</string>
     <string name="call_voice_filter">更清晰的通话人声（实验性）</string>
@@ -961,7 +965,8 @@
     <string name="new_ui_about_sec3_body">本软件为第三方开发的兼容性软件，车主应在充分了解相关风险的前提下，自愿决定是否安装和使用。\n\n安装、运行或使用本软件可能受到车机型号、系统版本、硬件配置及其他第三方软件等因素影响。用户应自行评估并承担因安装或使用本软件可能产生的风险，包括但不限于软件运行异常、功能不兼容、数据异常及车机系统相关问题。\n\n本软件开发者不对因用户自主安装、使用、修改或不当操作所产生的非预期影响承担责任，但法律法规另有规定或依法不得免责的情形除外。涉及车辆行驶安全的操作，请务必在车辆安全停靠后进行，驾驶过程中请勿操作车机软件。</string>
     <string name="new_ui_about_sec4_title">四、更新与交流</string>
     <string name="new_ui_about_sec4_body">欢迎红旗 HS5 车主加入交流群，获取软件最新版本、兼容性适配进展、更新说明及使用交流信息。</string>
-    <string name="new_ui_about_sec4_scan_hint">请使用抖音扫描下方图片中的二维码，进入主页并加入交流群，获取实时更新内容。</string>
+    <string name="new_ui_about_sec4_scan_hint">抖音扫码加群 · 获取版本与适配更新</string>
+    <string name="new_ui_about_payment_caption">自愿打赏，支持开发 · 微信 / 支付宝扫码</string>
     <string name="new_ui_about_qr_placeholder">抖音二维码占位</string>
     <string name="new_ui_about_thanks">感谢每一位车主的支持与反馈！本项目坚持免费分享、持续适配、共同交流。</string>
     <string name="new_ui_update_latest">已是最新版本</string>

@@ -23,6 +23,8 @@ fun NewUiSettingsScreen(
     onPermissions: () -> Unit,
     onLanguage: () -> Unit,
     onCheckUpdate: () -> Unit,
+    onCarPlayWheelMediaChanged: (Boolean) -> Unit,
+    onCarPlayWheelSiriChanged: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     NewUiTabScrollColumn {
@@ -37,10 +39,29 @@ fun NewUiSettingsScreen(
             NewUiToggleRow(
                 iconRes = R.drawable.ic_dp_audio,
                 title = stringResource(R.string.settings_car_bluetooth_audio),
-                subtitle = stringResource(R.string.settings_car_bluetooth_audio_description),
+                subtitle = "",
                 checked = state.carBluetoothAudio,
                 onCheckedChange = onCarBluetoothAudioChanged,
             )
+            if (state.showHongqiWheelKeys) {
+                val wheelKeysEnabled = !state.carBluetoothAudio
+                NewUiToggleRow(
+                    iconRes = R.drawable.ic_dp_audio,
+                    title = stringResource(R.string.settings_carplay_wheel_media),
+                    subtitle = stringResource(R.string.settings_carplay_wheel_media_description),
+                    checked = state.carPlayWheelMedia && wheelKeysEnabled,
+                    enabled = wheelKeysEnabled,
+                    onCheckedChange = onCarPlayWheelMediaChanged,
+                )
+                NewUiToggleRow(
+                    iconRes = R.drawable.ic_dp_audio,
+                    title = stringResource(R.string.settings_carplay_wheel_siri),
+                    subtitle = stringResource(R.string.settings_carplay_wheel_siri_description),
+                    checked = state.carPlayWheelSiri && wheelKeysEnabled,
+                    enabled = wheelKeysEnabled,
+                    onCheckedChange = onCarPlayWheelSiriChanged,
+                )
+            }
             if (state.showLocalAudioRouting) {
                 NewUiToggleRow(
                     iconRes = R.drawable.ic_dp_audio,

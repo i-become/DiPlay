@@ -28,7 +28,13 @@ object WirelessLinkPrepare {
         when (mode) {
             WirelessHotspotMode.MANUAL -> prepareManualHotspot(context, isCancelled, timeoutMillis, log)
             WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI ->
-                prepareWifiClient(context, isCancelled, timeoutMillis, log, assumeStationWifiOn)
+                prepareWifiClient(
+                    context,
+                    isCancelled,
+                    timeoutMillis,
+                    log,
+                    assumeStationWifiOn || WirelessStartupPolicy.skipStationWifiPrepare(mode),
+                )
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> Unit
         }
     }

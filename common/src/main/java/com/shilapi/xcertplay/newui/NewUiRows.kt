@@ -83,12 +83,14 @@ fun NewUiToggleRow(
                     style = NewUiTypography.SettingTitle,
                     color = if (enabled) NewUiColors.TextPrimary else NewUiColors.TextMuted,
                 )
-                Text(
-                    subtitle,
-                    style = NewUiTypography.SettingSubtitle,
-                    color = NewUiColors.TextSecondary,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        style = NewUiTypography.SettingSubtitle,
+                        color = NewUiColors.TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
             NewUiToggle(
                 checked = checked,

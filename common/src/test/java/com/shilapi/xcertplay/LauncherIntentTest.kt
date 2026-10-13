@@ -85,4 +85,5 @@ class LauncherIntentTest {
         assertNull(shadowOf(activity).nextStartedActivity)
         assertEquals(0, stops)
     }
+
 }

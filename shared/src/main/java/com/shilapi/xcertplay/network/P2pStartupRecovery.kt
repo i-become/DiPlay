@@ -30,7 +30,11 @@ internal object P2pStartupRecovery {
     /** A band-only request still needs channel selection, which some BYD drivers cannot do. */
     fun plan(stationFrequency: Int?, preferred: P2pCreationRequest? = null,
              preferredChannel: Int = WifiP2pChannels.AUTO,
-             bandRequests: Boolean = true): List<P2pCreationRequest> = buildList {
+             bandRequests: Boolean = true,
+             systemDefaultFirst: Boolean = false): List<P2pCreationRequest> = buildList {
+        if (systemDefaultFirst && preferredChannel == WifiP2pChannels.AUTO) {
+            add(P2pCreationRequest(P2pCreationMode.SYSTEM_DEFAULT))
+        }
         WifiP2pChannels.frequencyMhz(preferredChannel)?.let {
             add(P2pCreationRequest(P2pCreationMode.PREFERRED_CHANNEL, it))
             return@buildList
@@ -69,7 +73,9 @@ internal object P2pStartupRecovery {
         if (rememberedSwitches) channel(remembered!!.mode, remembered.frequencyMHz!!)
         // Some vendors only implement the default-configuration API. Use it last, after every
         // explicit-frequency option has been rejected, never before the 2.4 GHz attempts.
-        if (none { it.mode == P2pCreationMode.SYSTEM_DEFAULT }) add(P2pCreationRequest(P2pCreationMode.SYSTEM_DEFAULT))
+        if (none { it.mode == P2pCreationMode.SYSTEM_DEFAULT }) {
+            add(P2pCreationRequest(P2pCreationMode.SYSTEM_DEFAULT))
+        }
     }
 
     /**
@@ -96,9 +102,10 @@ internal object P2pStartupRecovery {
         preferred: P2pCreationRequest? = null,
         preferredChannel: Int = WifiP2pChannels.AUTO,
         bandRequests: Boolean = true,
+        systemDefaultFirst: Boolean = false,
         request: (P2pCreationRequest) -> Unit,
     ): P2pCreationRequest {
-        val modes = plan(stationFrequency, preferred, preferredChannel, bandRequests)
+        val modes = plan(stationFrequency, preferred, preferredChannel, bandRequests, systemDefaultFirst)
         var lastRejection: P2pCreateRejected? = null
         for ((index, mode) in modes.withIndex()) {
             var retriedBusy = false

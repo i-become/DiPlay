@@ -138,6 +138,10 @@ class CarPlayHostActivity : ComponentActivity() {
     )
 
     private var connectionPanel: View? = null
+    private var waitingReveal: CarPlayWaitingReveal? = null
+    private var waitingRevealOverlay: FrameLayout? = null
+    private var contentRoot: FrameLayout? = null
+    private var waitingRevealPlayedForSession = false
     private var wifiRecoveryButton: View? = null
     private var reconnectAttempts = 0
     private val siriKey = WheelSiriKey()
@@ -1625,6 +1629,9 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        waitingReveal?.release()
+        waitingReveal = null
+        waitingRevealOverlay = null
         CarPlayHostSettingsBridge.unregister(this)
         resetSidePanel()
         releaseSidePanelEffects()
@@ -1668,6 +1675,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun buildContentView(): View {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        contentRoot = root
         val video = TextureView(this).apply {
             isOpaque = false
             surfaceTextureListener = textureListener
@@ -1679,6 +1687,12 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
+        com.shilapi.xcertplay.newui.NewUiShellBackgroundViews.install(this, root)
+        if (com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this)) {
+            waitingRevealOverlay = FrameLayout(this).also {
+                root.addView(it, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         // Measure the preparation content naturally, then fit it inside the safe viewport.
         val viewport = object : FrameLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -1696,12 +1710,21 @@ class CarPlayHostActivity : ComponentActivity() {
             gravity = Gravity.CENTER
         }
         val icon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_carplay)
-            contentDescription = getString(R.string.carplay)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            background = null
+            setPadding(0, 0, 0, 0)
+            setImageResource(R.drawable.hongqi_carplay_waiting_logo)
+            contentDescription = null
         }
-        panel.addView(icon, LinearLayout.LayoutParams(dp(88), dp(88)))
+        panel.addView(
+            icon,
+            LinearLayout.LayoutParams(dp(WAITING_BRAND_LOGO_WIDTH_DP), dp(WAITING_BRAND_LOGO_HEIGHT_DP)).apply {
+                bottomMargin = dp(12)
+            },
+        )
         val title = TextView(this).apply {
-            text = getString(R.string.diplay)
+            text = getString(R.string.carplay)
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
@@ -1739,8 +1762,8 @@ class CarPlayHostActivity : ComponentActivity() {
             startupRetryButton = this
         }
         panel.addView(retry, LinearLayout.LayoutParams(dp(300), dp(64)).apply { bottomMargin = dp(12) })
-        val back = DiPlayButton(this).apply {
-            text = getString(R.string.back_to_diplay)
+        val back = com.shilapi.xcertplay.newui.NewUiWaitingBackButton(this).apply {
+            setLabel(getString(R.string.back))
             setOnClickListener { showDiPlayHome() }
         }
         panel.addView(back, LinearLayout.LayoutParams(dp(300), dp(64)))
@@ -1750,14 +1773,13 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         panel.addView(gestureHint)
         paintWaitingScreen = {
-            val colors = WaitingScreenColors.of(darkMode)
+            val colors = WaitingScreenColors.forNewUiShell()
             viewport.setBackgroundColor(colors.background)
             title.setTextColor(colors.text)
             stage.setTextColor(colors.text)
             instructions.setTextColor(colors.secondary)
             gestureHint.setTextColor(colors.secondary)
             val buttonPalette = DiPlayPalette.of(darkMode)
-            back.style(DiPlayButtonKind.PRIMARY, buttonPalette, overlay = false)
             retry.style(DiPlayButtonKind.SECONDARY, buttonPalette, overlay = false)
             recovery.style(DiPlayButtonKind.SECONDARY, buttonPalette, overlay = false)
         }
@@ -1781,7 +1803,10 @@ class CarPlayHostActivity : ComponentActivity() {
             fun spacing(short: Float, regular: Float) = dp(size(short, regular).toInt())
             val availableWidth = viewport.width - viewport.paddingLeft - viewport.paddingRight - dp(48)
             val buttonWidth = minOf(dp(300), availableWidth.coerceAtLeast(dp(48)))
-            for (button in listOf(back, recovery, retry)) {
+            if (back.layoutParams.width != buttonWidth) {
+                back.layoutParams = back.layoutParams.apply { width = buttonWidth }
+            }
+            for (button in listOf(recovery, retry)) {
                 if (button.layoutParams.width != buttonWidth) {
                     button.layoutParams = button.layoutParams.apply { width = buttonWidth }
                 }
@@ -1789,14 +1814,18 @@ class CarPlayHostActivity : ComponentActivity() {
             if (preparationHeight == height) return
             preparationHeight = height
             panel.setPadding(dp(24), spacing(16f, 32f), dp(24), spacing(16f, 32f))
-            val iconSize = spacing(54f, 88f)
-            icon.layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
+            val maxLogoWidth = availableWidth.coerceAtLeast(dp(48))
+            val logoWidth = minOf(spacing(117f, WAITING_BRAND_LOGO_WIDTH_DP.toFloat()), maxLogoWidth)
+            val logoHeight = (logoWidth.toFloat() * WAITING_BRAND_LOGO_HEIGHT_DP / WAITING_BRAND_LOGO_WIDTH_DP)
+                .roundToInt()
+            icon.layoutParams = LinearLayout.LayoutParams(logoWidth, logoHeight)
             title.textSize = size(26f, 34f)
             title.setPadding(0, spacing(8f, 18f), 0, spacing(6f, 14f))
             stage.textSize = size(19f, 22f)
             instructions.textSize = size(15f, 17f)
             instructions.setPadding(0, spacing(8f, 14f), 0, spacing(12f, 24f))
-            for (button in listOf(back, recovery, retry)) {
+            back.applyLayout(size(17f, 18f), spacing(50f, 64f), buttonWidth)
+            for (button in listOf(recovery, retry)) {
                 button.textSize = size(17f, 18f)
                 button.layoutParams = button.layoutParams.apply { this.height = spacing(50f, 64f) }
             }
@@ -1842,8 +1871,51 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint = gestureHint
         stageStatusView = stage
         connectionPanel = viewport
+        waitingRevealOverlay?.let { overlay ->
+            waitingReveal = CarPlayWaitingReveal(
+                activity = this,
+                overlay = overlay,
+                connectionPanel = viewport,
+                onFinished = { updateDebugOverlays() },
+                onStarting = { bringWaitingRevealToFront() },
+            )
+        }
         updateDebugOverlays()
         return root
+    }
+
+    /** Keeps the reveal layer above the connection panel and CarPlay surface (below settings). */
+    private fun bringWaitingRevealToFront() {
+        val root = contentRoot ?: return
+        val overlay = waitingRevealOverlay ?: return
+        val settingsIndex = settingsMenu?.let { menu ->
+            root.indexOfChild(menu).takeIf { it >= 0 }
+        } ?: root.childCount
+        val targetIndex = settingsIndex.coerceAtMost(root.childCount)
+        if (root.indexOfChild(overlay) == targetIndex - 1) return
+        val params = overlay.layoutParams ?: FrameLayout.LayoutParams(-1, -1)
+        root.removeView(overlay)
+        root.addView(overlay, targetIndex.coerceAtMost(root.childCount), params)
+    }
+
+    /** Replays stream-active UI when adopting a session that already decoded CarPlay video. */
+    private fun syncWaitingRevealWithSink() {
+        val generation = restartGeneration
+        if (sink?.activeScreenStreamTypes()?.contains(SCREEN_TYPE_MAIN) == true) {
+            onScreenStreamStateChanged(generation, SCREEN_TYPE_MAIN, true)
+        }
+        maybeStartWaitingReveal()
+    }
+
+    private fun maybeStartWaitingReveal() {
+        if (waitingReveal == null) return
+        if (waitingReveal?.isRunning == true) {
+            waitingRevealPlayedForSession = true
+            return
+        }
+        if (waitingRevealPlayedForSession) return
+        waitingRevealPlayedForSession = true
+        waitingReveal?.onMainCarPlayStreamActive()
     }
 
     // DiPlay's side panel: placed over the part of the stream CarPlay leaves black (placeSidePanel), so it
@@ -4815,6 +4887,7 @@ class CarPlayHostActivity : ComponentActivity() {
             override fun onVideoFrameRendered(session: AirPlaySession) {
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration || activeAirPlaySession !== session || shuttingDown.get()) return@runOnUiThread
+                    maybeStartWaitingReveal()
                     if (!startupRetryBudget.firstFrame(session, android.os.SystemClock.elapsedRealtime())) return@runOnUiThread
                     mainHandler.postDelayed({
                         if (controllerGeneration == restartGeneration && activeAirPlaySession === session &&
@@ -4841,6 +4914,8 @@ class CarPlayHostActivity : ComponentActivity() {
                     callPopupSessionReady = false
                     dismissClusterPresentation()
                     updateCallPopupGuard()
+                    waitingRevealPlayedForSession = false
+                    waitingReveal?.resetForNewSession()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
@@ -4862,6 +4937,8 @@ class CarPlayHostActivity : ComponentActivity() {
                     activeAirPlaySession = null
                     CarPlayBackgroundSession.active = false
                     dismissClusterPresentation()
+                    waitingRevealPlayedForSession = false
+                    waitingReveal?.resetForNewSession()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
@@ -4988,6 +5065,7 @@ class CarPlayHostActivity : ComponentActivity() {
         snapshot.sink.setScreenStreamActiveChangedListener { type, active ->
             onScreenStreamStateChanged(restartGeneration, type, active)
         }
+        syncWaitingRevealWithSink()
         currentSurface?.let(::attachSurface)
         val serviceReused = snapshot.controller.hasActiveAirPlayAttachment()
         appendLog(
@@ -5061,6 +5139,7 @@ class CarPlayHostActivity : ComponentActivity() {
             controllerGeneration = controllerGeneration,
         )
         sink = renderer
+        syncWaitingRevealWithSink()
         currentSurface?.let(::attachSurface)
         clusterSurface?.let { renderer.setSurface(SCREEN_TYPE_ALT, it) }
         MapMirrors.reapply()
@@ -5417,12 +5496,16 @@ class CarPlayHostActivity : ComponentActivity() {
         if (menuOpen) recoveryPendingAfterMenu = true
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || startupRetryStopped) return
         if (reconnectScheduled) return
-        val startupDelay = if (startupFailure != null && startupFailure.retryable)
-            startupRetryBudget.nextDelayMillis() else null
-        if (startupFailure != null && startupDelay == null) {
+        val budgetedWirelessRetry = usesWirelessStartupRetryBudget(startupFailure, englishReason)
+        val startupDelay = when {
+            budgetedWirelessRetry && (startupFailure == null || startupFailure.retryable) ->
+                startupRetryBudget.nextDelayMillis()
+            else -> null
+        }
+        if (budgetedWirelessRetry && startupDelay == null) {
             startupRetryStopped = true
             startupRetryButton?.visibility = View.VISIBLE
-            if (!startupFailure.retryable) {
+            if (startupFailure != null && !startupFailure.retryable) {
                 setConnectionStage(reason, englishReason)
             } else {
                 setConnectionStage("$reason\n${getString(R.string.wireless_startup_retries_exhausted)}",
@@ -5462,6 +5545,20 @@ class CarPlayHostActivity : ComponentActivity() {
         )
     }
 
+    private fun usesWirelessStartupRetryBudget(
+        startupFailure: WirelessStartupFailure?,
+        englishReason: String,
+    ): Boolean {
+        if (startupFailure != null) return true
+        if (!wirelessEnabled || wirelessHotspotMode != WirelessHotspotMode.WIFI_P2P) return false
+        val text = englishReason
+        return text.contains("createGroup failed", ignoreCase = true) ||
+            text.contains("Could not establish WIFI_P2P", ignoreCase = true) ||
+            text.contains("Wi-Fi P2P", ignoreCase = true) ||
+            text.contains("Wi-Fi Direct", ignoreCase = true) ||
+            text.contains("Turn on Wi-Fi", ignoreCase = true)
+    }
+
     /** Full-stack fallback when an AirPlay-only reconnect is unavailable. */
     private fun restartCarPlay(reason: String) {
         if (!CarPlayBackgroundSession.isOwner(this)) return
@@ -5474,6 +5571,8 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayBackgroundSession.active = false
         dismissClusterPresentation()
         activeScreenStreamTypes.clear()
+        waitingRevealPlayedForSession = false
+        waitingReveal?.resetForNewSession()
         ClusterActivityOutput.setStreamActive(false)
         setConnectionStage(reason)
         Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}")
@@ -6011,6 +6110,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     mainHandler.postDelayed(hideIdleCenterMap, CENTER_MAP_IDLE_MILLIS)
                 }
             }
+            if (active && type == SCREEN_TYPE_MAIN && waitingReveal?.onMainCarPlayStreamActive() == true) {
+                return@runOnUiThread
+            }
             updateDebugOverlays()
         }
     }
@@ -6048,7 +6150,14 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun updateDebugOverlays() {
         statusScrollView?.visibility = View.GONE
-        connectionPanel?.visibility = if (activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
+        if (waitingReveal?.isRunning == true) return
+        val waitingForCarPlay = activeScreenStreamTypes.isEmpty()
+        connectionPanel?.visibility = if (waitingForCarPlay) View.VISIBLE else View.GONE
+        // Transparent preparation UI sits above the video; hide the video so the New UI wallpaper shows
+        // through again after disconnect (otherwise the last frame or an empty TextureView looks "blank").
+        videoView?.visibility = if (waitingForCarPlay) View.INVISIBLE else View.VISIBLE
+        gestureOverlay?.visibility = if (waitingForCarPlay) View.GONE else View.VISIBLE
+        if (waitingForCarPlay) paintWaitingScreen()
     }
 
     // The keywords are English; matching the English text keeps the result the same in every UI language.
@@ -6190,6 +6299,9 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private companion object {
+        /** Hongqi wordmark on the CarPlay waiting screen ([R.drawable.hongqi_carplay_waiting_logo], ~916×541). */
+        const val WAITING_BRAND_LOGO_WIDTH_DP = 147
+        const val WAITING_BRAND_LOGO_HEIGHT_DP = 87
         const val CLUSTER_SMALL_WINDOW_ON = 1
         const val CLUSTER_SMALL_WINDOW_AUTO = 2
         const val SIDE_PANEL_REFRESH_MILLIS = 5_000L

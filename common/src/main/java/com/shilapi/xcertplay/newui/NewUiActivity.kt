@@ -211,7 +211,9 @@ class NewUiActivity : ComponentActivity() {
         }
         refreshAll()
         if (consumeBluetoothAutoConnectIntent(intent)) {
-            handler.post { connectionActions.connect(AirPlayPersistence.loadWirelessEnabled(this)) }
+            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
+        } else if (savedInstanceState == null && shouldAutoConnectOnColdStart(intent)) {
+            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
         }
         setContent {
             val activity = this@NewUiActivity
@@ -459,6 +461,14 @@ class NewUiActivity : ComponentActivity() {
                                 onPermissions = { pushSettingsSubpage(NewUiSettingsSubpage.PERMISSIONS) },
                                 onLanguage = { pushSettingsSubpage(NewUiSettingsSubpage.LANGUAGE) },
                                 onCheckUpdate = { openSettingsUpdatePage() },
+                                onCarPlayWheelMediaChanged = { enabled ->
+                                    NewUiSettingsActions.saveCarPlayWheelMedia(activity, enabled)
+                                    refreshAll()
+                                },
+                                onCarPlayWheelSiriChanged = { enabled ->
+                                    NewUiSettingsActions.saveCarPlayWheelSiri(activity, enabled)
+                                    refreshAll()
+                                },
                             )
                         }
                         NewUiDestination.DIAGNOSTICS -> when (diagnosticsSubpage) {
@@ -521,7 +531,9 @@ class NewUiActivity : ComponentActivity() {
         applyIntentNavigation(intent)
         refreshAll()
         if (consumeBluetoothAutoConnectIntent(intent)) {
-            handler.post { connectionActions.connect(AirPlayPersistence.loadWirelessEnabled(this)) }
+            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
+        } else if (shouldAutoConnectOnColdStart(intent)) {
+            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
         }
     }
 
@@ -722,6 +734,16 @@ class NewUiActivity : ComponentActivity() {
         if (CarPlayBackgroundSession.hasSession()) return false
         return true
     }
+
+    private fun shouldAutoConnectOnColdStart(intent: Intent): Boolean =
+        NewUiAutoConnectPolicy.shouldConnectOnColdStart(
+            intent = intent,
+            phoneAddress = DiPlayPreferences.phoneAddress(this),
+            setupError = connectionActions.setupError,
+            sessionRunning = CarPlayBackgroundSession.hasSession(),
+        )
+
+    private fun wirelessForAutoConnect(): Boolean = DiPlayPreferences.autoConnectWireless(this)
 
     private fun defaultDiagnosticDirectory(): String {
         val external = getExternalFilesDir(null)?.let { File(it, "diagnostic-reports") }

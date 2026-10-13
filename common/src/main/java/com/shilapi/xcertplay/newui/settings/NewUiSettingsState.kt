@@ -3,6 +3,8 @@ package com.shilapi.xcertplay.newui.settings
 import android.content.Context
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.AppLocale
+import com.shilapi.xcertplay.HongqiWheelKeys
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.update.UpdateAvailability
 
@@ -19,6 +21,9 @@ data class NewUiSettingsState(
     val languageLabel: String,
     val updateSummary: String,
     val versionName: String,
+    val showHongqiWheelKeys: Boolean,
+    val carPlayWheelMedia: Boolean,
+    val carPlayWheelSiri: Boolean,
 ) {
     /** Local stream routing applies only when CarPlay audio goes through the vehicle Bluetooth path. */
     val showLocalAudioRouting: Boolean get() = carBluetoothAudio
@@ -41,6 +46,9 @@ data class NewUiSettingsState(
             languageLabel = "",
             updateSummary = "",
             versionName = "",
+            showHongqiWheelKeys = false,
+            carPlayWheelMedia = true,
+            carPlayWheelSiri = true,
         )
 
         private fun channelLabel(context: Context, channel: Int): String =
@@ -77,6 +85,9 @@ internal object NewUiSettingsStateReader {
             languageLabel = AppLocale.displayName(context, AppLocale.preference(context)),
             updateSummary = updateSummary,
             versionName = version ?: "?",
+            showHongqiWheelKeys = HongqiHeadUnit.isHeadUnit(context),
+            carPlayWheelMedia = AirPlayPersistence.loadCarPlayWheelMedia(context),
+            carPlayWheelSiri = AirPlayPersistence.loadCarPlayWheelSiri(context),
         )
     }
 }
@@ -104,5 +115,15 @@ internal object NewUiSettingsActions {
 
     fun saveNavigationAudioChannel(context: Context, channel: Int) {
         AirPlayPersistence.saveNavigationAudioChannel(context, channel)
+    }
+
+    fun saveCarPlayWheelMedia(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveCarPlayWheelMedia(context, enabled)
+        HongqiWheelKeys.applySettings(context)
+    }
+
+    fun saveCarPlayWheelSiri(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveCarPlayWheelSiri(context, enabled)
+        HongqiWheelKeys.applySettings(context)
     }
 }

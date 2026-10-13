@@ -20,10 +20,6 @@ internal object HongqiWirelessPrewarm {
         if (!HongqiHeadUnit.isHeadUnit(app)) return
         if (!AirPlayPersistence.loadWirelessEnabled(app)) return
         val mode = AirPlayPersistence.loadWirelessHotspotMode(app)
-        if (WirelessStartupPolicy.optimisticStationWifi(app, mode)) {
-            Log.i(TAG, "prewarm skipped; optimistic station Wi-Fi connects before enabling radio")
-            return
-        }
         if (!running.compareAndSet(false, true)) return
         Thread({
             try {

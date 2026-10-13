@@ -30,21 +30,10 @@ import java.util.concurrent.Executors
  */
 internal object HongqiWheelKeys {
     private const val TAG = "DiPlay-HongqiKeys"
-    private const val PREFS = "diplay_steering_controls"
-    private const val PREF_ENABLED = "enabled"
     private const val HARD_KEY_ACTION_DOWN = 0
     private const val BIND_RETRY_MS = 5_000L
     private const val REFRESH_DELAY_MS = 250L
     private const val VIEW_FOCUS_COOLDOWN_MS = 2_000L
-
-    /** Matches FAW Play: previous, next, phone, voice, factory mode. */
-    private val factoryKeyCodes = intArrayOf(
-        KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-        KeyEvent.KEYCODE_MEDIA_NEXT,
-        KeyEvent.KEYCODE_CALL,
-        259,
-        110,
-    )
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { task ->
@@ -61,6 +50,7 @@ internal object HongqiWheelKeys {
     private var binding = false
     private var bindAttemptAt = 0L
     private var keysRegistered = false
+    private var registeredKeyCodes: IntArray = intArrayOf()
     private var viewFocusHeld = false
     private var viewFocusCooldownUntil = 0L
     private var phoneKeyHeld = false
@@ -105,16 +95,15 @@ internal object HongqiWheelKeys {
         scheduleRefresh(force = true)
     }
 
-    internal fun supported(context: Context): Boolean = HongqiHeadUnit.isHeadUnit(context)
-
-    private fun steeringEnabled(context: Context): Boolean {
-        if (!supported(context)) return false
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(PREF_ENABLED, true)
+    fun applySettings(context: Context) {
+        if (!supported(context)) return
+        scheduleRefresh(force = true)
     }
 
+    internal fun supported(context: Context): Boolean = HongqiHeadUnit.isHeadUnit(context)
+
     private fun shouldClaimHardKeys(context: Context): Boolean {
-        if (!steeringEnabled(context)) return false
+        if (!HongqiWheelKeyPolicy.shouldRegisterFactoryKeys(context)) return false
         if (AirPlayPersistence.loadCarBluetoothAudio(context)) return false
         return sessionReady(controller)
     }
@@ -150,16 +139,21 @@ internal object HongqiWheelKeys {
         }
         ensureServiceLocked(context)
         val binder = serviceBinder ?: return
-        if (claimKeys && !keysRegistered) {
+        val desiredKeys = if (claimKeys) HongqiWheelKeyPolicy.factoryKeyCodes(context) else intArrayOf()
+        if (claimKeys && keysRegistered && !registeredKeyCodes.contentEquals(desiredKeys)) {
+            releaseHardKeysLocked(context, binder)
+        }
+        if (claimKeys && !keysRegistered && desiredKeys.isNotEmpty()) {
             runCatching {
                 HongqiQisiSystemKeysBinder.registerHardKeys(
                     binder,
                     context.packageName,
-                    factoryKeyCodes,
+                    desiredKeys,
                     hardKeyListener,
                 )
                 keysRegistered = true
-                Log.i(TAG, "temporary keys registered: previous,next,phone,voice,mode")
+                registeredKeyCodes = desiredKeys
+                Log.i(TAG, "temporary keys registered count=${desiredKeys.size}")
             }.onFailure { error ->
                 Log.w(TAG, "factory key registration failed: ${error.javaClass.simpleName}")
                 bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
@@ -252,16 +246,22 @@ internal object HongqiWheelKeys {
         serviceBinder = null
         binding = false
         keysRegistered = false
+        registeredKeyCodes = intArrayOf()
         viewFocusHeld = false
         phoneKeyHeld = false
     }
 
     private fun releaseHardKeysLocked(context: Context, binder: IBinder) {
+        val keys = registeredKeyCodes
+        if (keys.isEmpty()) {
+            keysRegistered = false
+            return
+        }
         runCatching {
             HongqiQisiSystemKeysBinder.unregisterHardKeys(
                 binder,
                 context.packageName,
-                factoryKeyCodes,
+                keys,
                 hardKeyListener,
             )
             Log.i(TAG, "temporary keys released to factory")
@@ -269,6 +269,7 @@ internal object HongqiWheelKeys {
             Log.w(TAG, "factory key release failed: ${error.javaClass.simpleName}")
         }
         keysRegistered = false
+        registeredKeyCodes = intArrayOf()
         phoneKeyHeld = false
     }
 
@@ -301,9 +302,21 @@ internal object HongqiWheelKeys {
         if (action != HARD_KEY_ACTION_DOWN) return
         val role = HongqiQisiSystemKeysBinder.steeringRoleForFactoryKey(keyCode) ?: return
         val sent = when (role) {
-            0 -> CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.PREVIOUS, "hongqi-wheel")
-            1 -> CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.NEXT, "hongqi-wheel")
-            3 -> CarPlayMediaKeys.onExternalSiriKey()
+            0 -> if (AirPlayPersistence.loadCarPlayWheelMedia(context)) {
+                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.PREVIOUS, "hongqi-wheel")
+            } else {
+                false
+            }
+            1 -> if (AirPlayPersistence.loadCarPlayWheelMedia(context)) {
+                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.NEXT, "hongqi-wheel")
+            } else {
+                false
+            }
+            3 -> if (AirPlayPersistence.loadCarPlayWheelSiri(context)) {
+                CarPlayMediaKeys.onExternalSiriKey()
+            } else {
+                false
+            }
             else -> false
         }
         Log.i(TAG, "factory key=$keyCode action=$action sent=$sent")

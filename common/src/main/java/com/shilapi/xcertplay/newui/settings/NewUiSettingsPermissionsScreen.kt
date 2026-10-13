@@ -41,11 +41,13 @@ fun NewUiSettingsPermissionsScreen(
             NewUiSecondaryActionButton(
                 label = stringResource(R.string.app_permissions),
                 onClick = onOpenAppPermissions,
+                verticalPadding = 32.dp,
             )
             NewUiSecondaryActionButton(
                 label = stringResource(R.string.bluetooth_settings),
                 modifier = Modifier.padding(top = 12.dp),
                 onClick = onOpenBluetoothSettings,
+                verticalPadding = 32.dp,
             )
         }
         NewUiSubpageBottomBar(

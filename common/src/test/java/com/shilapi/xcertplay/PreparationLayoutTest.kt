@@ -20,7 +20,13 @@ class PreparationLayoutTest {
         val method = CarPlayHostActivity::class.java.getDeclaredMethod("buildContentView")
         method.isAccessible = true
         val root = method.invoke(activity) as android.widget.FrameLayout
-        val viewport = root.getChildAt(2) as FrameLayout
+        val viewport = (0 until root.childCount)
+            .map { root.getChildAt(it) }
+            .filterIsInstance<FrameLayout>()
+            .first { frame ->
+                frame.getChildAt(0) is LinearLayout &&
+                    (frame.getChildAt(0) as LinearLayout).orientation == LinearLayout.VERTICAL
+            }
         val panel = viewport.getChildAt(0) as LinearLayout
         val density = activity.resources.displayMetrics.density
         fun layout(heightDp: Int) {

@@ -54,19 +54,25 @@ object WifiClientEnable {
         return stopped() ?: if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) Result.READY else Result.FAILED
     }
 
-    internal fun requestEnable(wifi: WifiManager, log: (String) -> Unit): Boolean {
+    internal fun requestEnable(wifi: WifiManager, log: (String) -> Unit): Boolean =
+        requestWifiEnabled(wifi, enabled = true, log = log)
+
+    internal fun requestDisable(wifi: WifiManager, log: (String) -> Unit): Boolean =
+        requestWifiEnabled(wifi, enabled = false, log = log)
+
+    private fun requestWifiEnabled(wifi: WifiManager, enabled: Boolean, log: (String) -> Unit): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching {
                 wifi.javaClass.getMethod("setWifiEnabled", Boolean::class.javaPrimitiveType)
-                    .invoke(wifi, true) as Boolean
+                    .invoke(wifi, enabled) as Boolean
             }.getOrNull()?.let { accepted ->
-                log("Wi-Fi client enable setWifiEnabled accepted=$accepted")
+                log("Wi-Fi client ${if (enabled) "enable" else "disable"} setWifiEnabled accepted=$accepted")
                 return accepted
             }
         } else {
             @Suppress("DEPRECATION")
-            runCatching { wifi.setWifiEnabled(true) }.getOrNull()?.let { accepted ->
-                log("Wi-Fi client enable legacy setWifiEnabled accepted=$accepted")
+            runCatching { wifi.setWifiEnabled(enabled) }.getOrNull()?.let { accepted ->
+                log("Wi-Fi client ${if (enabled) "enable" else "disable"} legacy setWifiEnabled accepted=$accepted")
                 return accepted
             }
         }

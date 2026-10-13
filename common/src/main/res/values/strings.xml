@@ -760,8 +760,12 @@
     <string name="side_panel_full_screen">⤢ Full screen</string>
     <string name="main_buffered_audio">Buffered music (experimental)</string>
     <string name="main_buffered_audio_description">Apps that support it, such as Apple Music, send up to about two minutes of music ahead, so short Wi-Fi gaps are not heard. Other apps keep the normal stream. Reconnects CarPlay.</string>
-    <string name="settings_car_bluetooth_audio">CarPlay audio over the car\'s Bluetooth (experimental)</string>
+    <string name="settings_car_bluetooth_audio">CarPlay audio over the car\'s Bluetooth</string>
     <string name="settings_car_bluetooth_audio_description">DiPlay offers the iPhone no CarPlay audio, so music, navigation and calls should go over the iPhone\'s Bluetooth connection with the car. Keep the iPhone paired with the car and choose Bluetooth as the car\'s audio source. If the sound plays on the iPhone instead, turn this off. Reconnects CarPlay.</string>
+    <string name="settings_carplay_wheel_media">CarPlay wheel track skip</string>
+    <string name="settings_carplay_wheel_media_description">While CarPlay is active, the wheel previous and next keys change tracks on the iPhone. Off keeps the car\'s original action for those keys.</string>
+    <string name="settings_carplay_wheel_siri">CarPlay wheel Siri</string>
+    <string name="settings_carplay_wheel_siri_description">While CarPlay is on screen, the wheel voice key wakes Siri on the iPhone. Off keeps the car\'s original voice assistant key.</string>
     <string name="call_echo_cancellation">Call echo cancellation (experimental)</string>
     <string name="call_echo_cancellation_description">Tries to reduce speaker echo sent to the other person during CarPlay calls. Results depend on the head unit. Applies at the next CarPlay connection.</string>
     <string name="call_voice_filter">Clearer call voices (experimental)</string>
@@ -1002,7 +1006,8 @@
     <string name="new_ui_about_sec3_body">This is third-party compatibility software. Install and use it only if you understand the risks.\n\nBehavior may vary with head-unit model, system version, hardware, and other apps. You assume risks such as crashes, incompatibility, data issues, or system problems.\n\nDevelopers are not liable for unexpected effects from your installation, use, modification, or misuse, except where law requires otherwise. Adjust settings only when parked safely; do not use the head unit while driving.</string>
     <string name="new_ui_about_sec4_title">4. Updates and community</string>
     <string name="new_ui_about_sec4_body">Hongqi HS5 owners are welcome to join our community for releases, compatibility notes, and tips.</string>
-    <string name="new_ui_about_sec4_scan_hint">Scan the QR code below in Douyin to open our profile and join the group for live updates.</string>
+    <string name="new_ui_about_sec4_scan_hint">Scan in Douyin to join the owner group and get updates.</string>
+    <string name="new_ui_about_payment_caption">Voluntary tip · WeChat or Alipay</string>
     <string name="new_ui_about_qr_placeholder">Douyin QR placeholder</string>
     <string name="new_ui_about_thanks">Thank you for your support and feedback. This project stays free, keeps adapting, and learns from the community.</string>
     <string name="new_ui_update_latest">Up to date</string>

@@ -11,10 +11,10 @@
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:icon="@drawable/ic_carplay"
+        android:icon="@drawable/ic_launcher_rounded"
         android:label="@string/launcher_label"
         android:localeConfig="@xml/locales_config"
-        android:roundIcon="@drawable/ic_carplay"
+        android:roundIcon="@drawable/ic_launcher_rounded"
         android:supportsRtl="true"
         android:resizeableActivity="true"
         android:theme="@style/Theme.Xcertplay">

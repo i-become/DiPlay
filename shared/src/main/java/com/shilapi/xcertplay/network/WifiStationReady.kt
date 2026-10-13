@@ -112,6 +112,48 @@ object WifiStationReady {
         }
     }
 
+    /**
+     * Hongqi head units often report station Wi-Fi as on while Wi-Fi Direct still fails until the
+     * driver toggles Wi-Fi in settings. Cycles the radio when it already reads enabled.
+     */
+    fun reinitializeWhenAlreadyOn(
+        context: Context,
+        isCancelled: () -> Boolean = { false },
+        timeoutMillis: Long,
+        log: (String) -> Unit = {},
+    ): Outcome {
+        val app = context.applicationContext
+        if (!HongqiHeadUnit.isHeadUnit(app)) {
+            return ensure(app, isCancelled, timeoutMillis, tryEnable = true, log = log)
+        }
+        val wifi = app.getSystemService(WifiManager::class.java) ?: return Outcome.UNAVAILABLE
+        if (readPhase(wifi) != Phase.READY) {
+            return ensure(app, isCancelled, timeoutMillis, tryEnable = true, log = log)
+        }
+        log("Hongqi station Wi-Fi reads on; cycling radio before Wi-Fi Direct")
+        if (!WifiClientEnable.requestDisable(wifi, log)) {
+            log("Wi-Fi disable not accepted; stabilizing in place")
+            return confirmStableWhenOn(app, isCancelled, timeoutMillis, log = log)
+        }
+        val halfMillis = (timeoutMillis / 2).coerceAtLeast(500)
+        val disableDeadline = System.nanoTime() + halfMillis * 1_000_000L
+        val pollMillis = WirelessStartupPolicy.interfacePollMillis(app).coerceIn(50L, 300L)
+        while (readPhase(wifi) == Phase.READY) {
+            if (isCancelled() || Thread.currentThread().isInterrupted) return Outcome.CANCELLED
+            if (System.nanoTime() >= disableDeadline) break
+            try {
+                Thread.sleep(minOf(pollMillis, ((disableDeadline - System.nanoTime()) / 1_000_000L).coerceAtLeast(1)))
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return Outcome.CANCELLED
+            }
+        }
+        WifiClientEnable.requestEnable(wifi, log)
+        val enableDeadline = System.nanoTime() + halfMillis * 1_000_000L
+        val remaining = ((enableDeadline - System.nanoTime()) / 1_000_000L).coerceAtLeast(500)
+        return ensure(app, isCancelled, remaining, tryEnable = true, log = log)
+    }
+
     fun preflightWaitMillis(context: Context): Long {
         val afterBoot = SystemClock.elapsedRealtime() < WirelessStartupPolicy.bootGraceMillis(context)
         return when {

@@ -72,6 +72,11 @@ class P2pStartupRecoveryTest {
         }
     }
 
+    @Test fun systemDefaultFirstPlacesNullConfigBeforeExplicitChannels() {
+        val plan = P2pStartupRecovery.plan(5180, systemDefaultFirst = true)
+        assertEquals(P2pCreationMode.SYSTEM_DEFAULT, plan.first().mode)
+    }
+
     @Test fun confirmedFrequencyGoesFirstWithoutBeingRetriedLater() {
         val preferred = P2pCreationRequest(P2pCreationMode.FIXED_2_GHZ, 2437)
         val plan = P2pStartupRecovery.plan(5180, preferred)

@@ -58,8 +58,13 @@ object WirelessStartupPolicy {
      */
     fun optimisticStationWifi(context: Context, mode: WirelessHotspotMode): Boolean {
         if (!HongqiHeadUnit.isHeadUnit(context)) return false
+        // Try the wireless link first; do not block on station Wi-Fi appearing enabled.
         return mode == WirelessHotspotMode.WIFI_P2P || mode == WirelessHotspotMode.EXISTING_WIFI
     }
+
+    /** When true, [WirelessLinkPrepare] does not wait for or enable station Wi-Fi before the link attempt. */
+    fun skipStationWifiPrepare(mode: WirelessHotspotMode): Boolean =
+        mode == WirelessHotspotMode.WIFI_P2P
 
     /**
      * Tighter budgets when the saved link mode's radio is already up.

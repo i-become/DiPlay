@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.Button
 import com.shilapi.xcertplay.network.WirelessStartupFailure
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -83,6 +84,21 @@ class WirelessStartupRecoveryTest {
         assertEquals(0, budget().retries)
         assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
         assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertEquals(View.VISIBLE, retry.visibility)
+    }
+
+    @Test fun wifiDirectFailureUsesStartupBudgetThenManualRetry() {
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
+        ReflectionHelpers.setField(activity, "wirelessHotspotMode", WirelessHotspotMode.WIFI_P2P)
+        val failure = CarPlayStatus.Failed("Wi-Fi P2P createGroup failed: BUSY (code=2)")
+        repeat(6) { generation ->
+            ReflectionHelpers.setField(activity, "restartGeneration", generation)
+            ReflectionHelpers.setField(activity, "reconnectScheduled", false)
+            report(generation, failure)
+        }
+        assertEquals(5, budget().retries)
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
         assertEquals(View.VISIBLE, retry.visibility)
     }
 

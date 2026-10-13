@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.network
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +49,7 @@ class WirelessStartupPolicyTest {
             }
         })
         assertTrue(WirelessStartupPolicy.optimisticStationWifi(context, WirelessHotspotMode.WIFI_P2P))
+        assertTrue(WirelessStartupPolicy.skipStationWifiPrepare(WirelessHotspotMode.WIFI_P2P))
         assertEquals(0L, WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(context, WirelessHotspotMode.WIFI_P2P))
     }
 

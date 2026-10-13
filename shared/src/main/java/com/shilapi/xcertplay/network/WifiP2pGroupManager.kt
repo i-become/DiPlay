@@ -19,9 +19,11 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.shilapi.xcertplay.compat.closeCompat
 import com.shilapi.xcertplay.compat.isLocationEnabledCompat
+import com.shilapi.xcertplay.hud.HongqiHeadUnit
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -61,15 +63,16 @@ class WifiP2pGroupManager(
     private var pendingSuccess: (() -> Boolean)? = null
     private var carPlayConfirmed = false
     private val ownership = appContext.getSharedPreferences("carplay_wifi_p2p", Context.MODE_PRIVATE)
-    private val ssidPrefix by lazy {
-        // ANDROID_ID is scoped to the signing key, user and device on our supported OS versions.
-        val id = runCatching { Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID) }
+    private val scopedDeviceId by lazy {
+        runCatching { Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID) }
             .getOrNull()?.takeIf { it.isNotBlank() }
             ?: ownership.getString("fallback_id", null)
             ?: java.util.UUID.randomUUID().toString().also {
                 check(ownership.edit().putString("fallback_id", it).commit())
             }
-        P2pOwnership.prefix(appContext.packageName, id)
+    }
+    private val ssidPrefix by lazy {
+        P2pOwnership.prefix(appContext.packageName, scopedDeviceId)
     }
 
     private var channel: WifiP2pManager.Channel? = null
@@ -162,6 +165,16 @@ class WifiP2pGroupManager(
             }
 
             if (!legacyChannels) logP2pState(attempt, p2pChannel)
+            if (HongqiHeadUnit.isHeadUnit(appContext)) {
+                WifiP2pBrandedDeviceName.applyBlocking(
+                    manager = p2pManager,
+                    channel = p2pChannel,
+                    context = appContext,
+                    scopedDeviceId = scopedDeviceId,
+                    timeoutMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos(deadlineNanos)).coerceIn(500L, 1_500L),
+                    log = diagnostic,
+                )
+            }
             // Preferences disappear on reinstall, but the scoped namespace survives.
             val existing = requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true)
             diagnostic("Wi-Fi P2P existingGroup=${existing != null}")
@@ -185,20 +198,15 @@ class WifiP2pGroupManager(
                 preferredChannel = preferredChannel,
                 // Band-only requests need the API 29 WifiP2pConfig; the legacy path pins channels.
                 bandRequests = !legacyChannels,
+                systemDefaultFirst = HongqiHeadUnit.isHeadUnit(appContext) &&
+                    preferredChannel == WifiP2pChannels.AUTO,
                 beforeRetry = {
                     ensureStartActive(attempt)
                     // Do not cancel discovery, toggle Wi-Fi, or remove a newly observed group.
                     // A competing app may have acquired the radio since our rejected request.
                     synchronized(stateLock) { waitNanos(TimeUnit.MILLISECONDS.toNanos(500)) }
                     ensureStartActive(attempt)
-                    checkPrerequisites(
-                        attempt,
-                        readStation(),
-                        minOf(
-                            WifiStationReady.preflightWaitMillis(appContext),
-                            TimeUnit.NANOSECONDS.toMillis(remainingNanos(deadlineNanos)).coerceAtLeast(1),
-                        ),
-                    )
+                    checkPrerequisites(attempt, readStation(), wifiWaitMillis = 0L)
                     if (requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true) != null) {
                         throw P2pResetRequiredException()
                     }
@@ -740,11 +748,7 @@ class WifiP2pGroupManager(
     }.getOrDefault(Station(null, null))
 
     private fun initialWifiPreflightWaitMillis(): Long =
-        if (WirelessStartupPolicy.optimisticStationWifi(appContext, WirelessHotspotMode.WIFI_P2P)) {
-            0L
-        } else {
-            WifiStationReady.preflightWaitMillis(appContext)
-        }
+        if (HongqiHeadUnit.isHeadUnit(appContext)) WifiStationReady.preflightWaitMillis(appContext) else 0L
 
     private fun checkPrerequisites(attempt: StartAttempt, station: Station, wifiWaitMillis: Long) {
         val wifi = appContext.getSystemService(WifiManager::class.java)
@@ -765,41 +769,33 @@ class WifiP2pGroupManager(
         val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
         @Suppress("DEPRECATION")
         val wifiState = runCatching { wifi?.wifiState }.getOrNull()
-        val optimistic = wifiWaitMillis <= 0L &&
-            WirelessStartupPolicy.optimisticStationWifi(appContext, WirelessHotspotMode.WIFI_P2P)
-        if (optimistic) {
-            diagnostic(
-                "Wi-Fi P2P preflight optimistic=true wifiEnabled=$wifiEnabled wifiState=$wifiState " +
-                    "locationEnabled=$locationEnabled permissionGranted=$granted " +
-                    "locationAccessMode=${locationAccessMode ?: "unknown"} stationMHz=${station.alignmentFrequency ?: "unknown"} " +
-                    "stationState=${station.state ?: "unknown"} reportedStationMHz=${station.reportedFrequency ?: "unknown"} " +
-                    "fiveGhzSupported=${fiveGhzSupported ?: "unknown"}",
-            )
-            return
-        }
-        val wifiOutcome = WifiStationReady.ensure(
-            appContext,
-            isCancelled = {
-                synchronized(stateLock) {
-                    closed || startAttempt !== attempt || attempt.stopped
-                }
-            },
-            timeoutMillis = wifiWaitMillis,
-            tryEnable = true,
-            log = diagnostic,
-        )
         diagnostic(
-            "Wi-Fi P2P preflight wifiEnabled=$wifiEnabled wifiState=$wifiState wifiWaitMs=$wifiWaitMillis " +
-                "wifiOutcome=$wifiOutcome locationEnabled=$locationEnabled permissionGranted=$granted " +
+            "Wi-Fi P2P preflight directAttempt=true wifiEnabled=$wifiEnabled wifiState=$wifiState " +
+                "locationEnabled=$locationEnabled permissionGranted=$granted " +
                 "locationAccessMode=${locationAccessMode ?: "unknown"} stationMHz=${station.alignmentFrequency ?: "unknown"} " +
                 "stationState=${station.state ?: "unknown"} reportedStationMHz=${station.reportedFrequency ?: "unknown"} " +
-                "fiveGhzSupported=${fiveGhzSupported ?: "unknown"}",
+                "fiveGhzSupported=${fiveGhzSupported ?: "unknown"} wifiWaitMillis=$wifiWaitMillis",
         )
-        if (wifiOutcome != WifiStationReady.Outcome.READY) {
-            throw IOException(WifiStationReady.outcomeMessage(wifiOutcome))
+        if (wifiWaitMillis <= 0) return
+        ensureStartActive(attempt)
+        when (
+            WifiStationReady.confirmStableWhenOn(
+                appContext,
+                isCancelled = {
+                    synchronized(stateLock) {
+                        closed || startAttempt !== attempt || attempt.stopped
+                    }
+                },
+                timeoutMillis = wifiWaitMillis,
+                log = diagnostic,
+            )
+        ) {
+            WifiStationReady.Outcome.READY -> Unit
+            WifiStationReady.Outcome.CANCELLED -> throw InterruptedIOException("Wi-Fi P2P startup was cancelled")
+            else -> throw IOException(
+                WifiStationReady.outcomeMessage(WifiStationReady.Outcome.NEEDS_USER),
+            )
         }
-        // Location mode is diagnostic only: AOSP createGroup does not require it to be on.
-        // Do not block firmware where Wi-Fi Direct works with Location services disabled.
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)

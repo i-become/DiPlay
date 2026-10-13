@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -127,6 +128,7 @@ fun NewUiSecondaryActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    verticalPadding: Dp = 16.dp,
 ) {
     val shape = RoundedCornerShape(12.dp)
     Text(
@@ -140,6 +142,6 @@ fun NewUiSecondaryActionButton(
             .background(NewUiSurfaces.pillGlassBrush(), shape)
             .border(1.dp, NewUiSurfaces.glassBorderSoft, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 16.dp),
+            .padding(vertical = verticalPadding),
     )
 }
