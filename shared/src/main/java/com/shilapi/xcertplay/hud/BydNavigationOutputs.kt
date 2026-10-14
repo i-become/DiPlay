@@ -19,7 +19,7 @@ object BydNavigationOutputs {
     }
     fun setDiagnosticHold(hold: Boolean) { BydStandaloneHudOutput.syntheticHold = hold }
     @Volatile private var useStandalone = false
-    @Volatile private var useHongqi = false
+    @Volatile private var useHs5Guidance = false
     @Volatile private var overlayListener: ((ClusterTurnGuidance?) -> Unit)? = null
     private val overlayLock = Any()
     private var publishedOverlay: ClusterTurnGuidance? = null
@@ -31,14 +31,14 @@ object BydNavigationOutputs {
     private val standalone = NavigationOutputWorker("diplay-standalone-output", BydStandaloneNavigationBridge::clear)
     private val hud = NavigationOutputWorker("diplay-hud-output", BydHudBridge::clear)
     private val cluster = NavigationOutputWorker("diplay-cluster-output", BydClusterBridge::clear)
-    private val hongqi = NavigationOutputWorker("diplay-hongqi-output", HongqiNavigationBridge::clear)
+    private val hs5Guidance = NavigationOutputWorker("xcert-hs5-guidance-out", Hs5GuidanceBridge::clear)
     private val fceCluster = NavigationOutputWorker("diplay-fce-cluster-output", FceClusterBridge::clear)
 
     /** The host reports whether its CarPlay map window is on the cluster (see [BydClusterMapPause]). */
     fun setClusterMapShown(shown: Boolean) {
         BydClusterMapPause.clusterMapShown = shown
         BydClusterBridge.setMapShown(shown)
-        HongqiNavigationBridge.setClusterMapShown(shown)
+        Hs5GuidanceBridge.setClusterMapShown(shown)
     }
 
     /** The running CarPlay session: told every second whether the cluster currently shows the map. */
@@ -73,10 +73,10 @@ object BydNavigationOutputs {
     fun start(context: Context) {
         val app = context.applicationContext
         useStandalone = BydStandaloneHudOutput.available(app)
-        useHongqi = !useStandalone && !HongqiHeadUnit.isBydHeadUnit(app) &&
-            (HongqiAmapAdapter.navigationOutputPackages(app).isNotEmpty() || HongqiHeadUnit.isHeadUnit(app))
+        useHs5Guidance = !useStandalone && !Hs5HeadUnit.isBydHeadUnit(app) &&
+            (Hs5NavPackages.navigationOutputPackages(app).isNotEmpty() || Hs5HeadUnit.isHeadUnit(app))
         if (useStandalone) standalone.start { BydStandaloneNavigationBridge.initialize(app) }
-        else if (useHongqi) hongqi.start { HongqiNavigationBridge.initialize(app) }
+        else if (useHs5Guidance) hs5Guidance.start { Hs5GuidanceBridge.initialize(app) }
         else {
             hud.start { BydHudBridge.initialize(app) }
             cluster.start { BydClusterBridge.initialize(app) }
@@ -102,7 +102,7 @@ object BydNavigationOutputs {
         updateOverlay(owned)
         fceCluster.submit { FceClusterBridge.onFrame(owned) }
         if (useStandalone) standalone.submit { BydStandaloneNavigationBridge.onFrame(owned) }
-        else if (useHongqi) hongqi.submit { HongqiNavigationBridge.onFrame(owned) }
+        else if (useHs5Guidance) hs5Guidance.submit { Hs5GuidanceBridge.onFrame(owned) }
         else {
             hud.submit { BydHudBridge.onFrame(owned) }
             cluster.submit { BydClusterBridge.onFrame(owned) }
@@ -163,7 +163,7 @@ object BydNavigationOutputs {
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow(preserveTurnOverlay: Boolean = false) {
-        standalone.clear(); hud.clear(); cluster.clear(); hongqi.clear(); fceCluster.clear(); BydClusterSong.end(); BydCarPlayCall.end()
+        standalone.clear(); hud.clear(); cluster.clear(); hs5Guidance.clear(); fceCluster.clear(); BydClusterSong.end(); BydCarPlayCall.end()
         // Only a wireless session replacement retains the card. Explicit controller close
         // and wired disconnect still clear it immediately.
         if (!preserveTurnOverlay) {

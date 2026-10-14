@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.network
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.SystemClock
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import java.io.IOException
 
@@ -26,13 +26,13 @@ object WirelessStartupPolicy {
     private const val HONGQI_STABLE_SAMPLES = 2
 
     fun hotspotReadyMillis(context: Context, linkMode: WirelessHotspotMode? = null): Long {
-        if (!HongqiHeadUnit.isHeadUnit(context)) return HOTSPOT_READY_MILLIS
+        if (!Hs5HeadUnit.isHeadUnit(context)) return HOTSPOT_READY_MILLIS
         if (linkMode != null && hongqiFastBringUp(context, linkMode)) return HONGQI_FAST_BRINGUP_MILLIS
         return HONGQI_HOTSPOT_READY_MILLIS
     }
 
     fun interfacePollMillis(context: Context, linkMode: WirelessHotspotMode? = null): Long {
-        if (HongqiHeadUnit.isHeadUnit(context)) {
+        if (Hs5HeadUnit.isHeadUnit(context)) {
             if (linkMode != null && hongqiFastBringUp(context, linkMode)) return HONGQI_FAST_INTERFACE_POLL_MILLIS
             return HONGQI_INTERFACE_POLL_MILLIS
         }
@@ -40,7 +40,7 @@ object WirelessStartupPolicy {
     }
 
     fun stableSamples(context: Context, linkMode: WirelessHotspotMode? = null): Int {
-        if (HongqiHeadUnit.isHeadUnit(context)) {
+        if (Hs5HeadUnit.isHeadUnit(context)) {
             if (linkMode != null && hongqiFastBringUp(context, linkMode)) return 1
             return HONGQI_STABLE_SAMPLES
         }
@@ -57,7 +57,7 @@ object WirelessStartupPolicy {
      * and only enable the radio after the first link attempt fails.
      */
     fun optimisticStationWifi(context: Context, mode: WirelessHotspotMode): Boolean {
-        if (!HongqiHeadUnit.isHeadUnit(context)) return false
+        if (!Hs5HeadUnit.isHeadUnit(context)) return false
         // Try the wireless link first; do not block on station Wi-Fi appearing enabled.
         return mode == WirelessHotspotMode.WIFI_P2P || mode == WirelessHotspotMode.EXISTING_WIFI
     }
@@ -71,10 +71,10 @@ object WirelessStartupPolicy {
      * Manual mode treats an unknown AP state as "do not block" because QiSi often hides [CarHotspotStatus].
      */
     fun bootGraceMillis(context: Context): Long =
-        if (HongqiHeadUnit.isHeadUnit(context)) HONGQI_BOOT_GRACE_MILLIS else GENERIC_BOOT_GRACE_MILLIS
+        if (Hs5HeadUnit.isHeadUnit(context)) HONGQI_BOOT_GRACE_MILLIS else GENERIC_BOOT_GRACE_MILLIS
 
     fun wifiP2pStartTimeoutMillis(context: Context): Long {
-        if (HongqiHeadUnit.isHeadUnit(context) &&
+        if (Hs5HeadUnit.isHeadUnit(context) &&
             SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS
         ) {
             return 35_000L
@@ -83,7 +83,7 @@ object WirelessStartupPolicy {
     }
 
     fun hongqiFastBringUp(context: Context, mode: WirelessHotspotMode): Boolean {
-        if (!HongqiHeadUnit.isHeadUnit(context)) return false
+        if (!Hs5HeadUnit.isHeadUnit(context)) return false
         if (SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS) return false
         if (optimisticStationWifi(context, mode)) return true
         return when (mode) {
@@ -99,7 +99,7 @@ object WirelessStartupPolicy {
         if (linkMode != null && optimisticStationWifi(context, linkMode)) return 0L
         val total = hotspotReadyMillis(context, linkMode)
         if (linkMode != null && hongqiFastBringUp(context, linkMode)) return 1L
-        val cap = if (HongqiHeadUnit.isHeadUnit(context)) 2_500L else 5_000L
+        val cap = if (Hs5HeadUnit.isHeadUnit(context)) 2_500L else 5_000L
         return minOf(cap, total / 2).coerceAtLeast(1)
     }
     const val FIRST_TCP_MILLIS = 30_000L

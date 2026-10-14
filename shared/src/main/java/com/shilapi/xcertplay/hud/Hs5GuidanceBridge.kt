@@ -15,8 +15,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** CarPlay turn-by-turn for Hongqi head units (QiSi binder or Gaode-style broadcasts). */
-internal object HongqiNavigationBridge {
-    private const val TAG = "DiPlay-Hongqi-Navi"
+internal object Hs5GuidanceBridge {
+    private const val TAG = "Xcert-Hs5-Guidance"
     private const val AMAP_ACTION = "AUTONAVI_STANDARD_BROADCAST_SEND"
     private const val KEY_GUIDANCE = 10001
     private const val KEY_STATE = 10019
@@ -29,7 +29,7 @@ internal object HongqiNavigationBridge {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val route = BydHudRouteState()
     private var context: Context? = null
-    private var adapter: HongqiAmapAdapter? = null
+    private var adapter: Hs5NavPackages? = null
     private var amapTargetPackage: String? = null
     private var available = false
     private var useQisi = false
@@ -48,31 +48,31 @@ internal object HongqiNavigationBridge {
     private var instrumentNavActive = false
     private var instrumentMapActive = false
     private var clusterMapShown = false
-    private var lastInstrument: HongqiQisiInstrumentGuidance? = null
+    private var lastInstrument: QisiInstrumentFrame? = null
 
     private val bindRetry = Runnable { bindAdapterLocked() }
 
     fun initialize(appContext: Context) = synchronized(lock) {
         if (context != null) return@synchronized
         context = appContext.applicationContext
-        val packageName = HongqiAmapAdapter.resolvedPackage(appContext)
+        val packageName = Hs5NavPackages.resolvedPackage(appContext)
         adapter = packageName?.let { pkg ->
-            HongqiAmapAdapter.entries.firstOrNull { it.packageName == pkg } ?: HongqiAmapAdapter.AMAP_AUTO
+            Hs5NavPackages.entries.firstOrNull { it.packageName == pkg } ?: Hs5NavPackages.AMAP_AUTO
         }
-        val outputPackages = HongqiAmapAdapter.navigationOutputPackages(appContext)
+        val outputPackages = Hs5NavPackages.navigationOutputPackages(appContext)
         amapTargetPackage = packageName ?: outputPackages.firstOrNull()
-        useQisi = HongqiAmapAdapter.isQisiStack(appContext)
-        available = !HongqiHeadUnit.isBydHeadUnit(appContext) &&
+        useQisi = Hs5NavPackages.isQisiStack(appContext)
+        available = !Hs5HeadUnit.isBydHeadUnit(appContext) &&
             (useQisi || outputPackages.isNotEmpty())
         Log.i(
             TAG,
-            "hongqi nav available=$available qisi=$useQisi target=$amapTargetPackage outputs=$outputPackages",
+            "hs5 guidance available=$available qisi=$useQisi target=$amapTargetPackage outputs=$outputPackages",
         )
         if (available && useQisi) mainHandler.post { bindAdapterLocked() }
         if (available && !senderStarted) {
             senderStarted = true
             Executors.newSingleThreadScheduledExecutor { runnable ->
-                Thread(runnable, "diplay-hongqi-navi").apply { isDaemon = true }
+                Thread(runnable, "xcert-hs5-guidance").apply { isDaemon = true }
             }.scheduleAtFixedRate(::tick, 1, 1, TimeUnit.SECONDS)
         }
     }
@@ -126,7 +126,7 @@ internal object HongqiNavigationBridge {
             ticksSinceSend = 0
             if (!guidanceLogged) {
                 guidanceLogged = true
-                Log.i(TAG, "hongqi guidance sent $frame qisi=$useQisi")
+                Log.i(TAG, "guidance frame sent $frame qisi=$useQisi")
             }
         }
     }
@@ -149,7 +149,7 @@ internal object HongqiNavigationBridge {
             }
             true
         } catch (error: Exception) {
-            Log.w(TAG, "navigation service unavailable${error.message?.let { ": $it" }.orEmpty()}", error)
+            Log.w(TAG, "adapter service not reachable${error.message?.let { ": $it" }.orEmpty()}", error)
             resetModulesLocked()
             scheduleBindRetryLocked()
             false
@@ -158,19 +158,19 @@ internal object HongqiNavigationBridge {
 
     private fun sendHudLocked(hud: IBinder, frame: BydClusterFrame) {
         val icon = frame.icon.coerceIn(0, 31)
-        HongqiQisiBinder.transactInts(hud, HongqiQisiBinder.TOKEN_HUD, HongqiQisiBinder.HUD_SET_ICON, intArrayOf(icon))
-        val distance = HongqiQisiBinder.hudDistanceUnits(frame.distanceMeters)
-        HongqiQisiBinder.transactInts(
+        QisiVehicleBinder.transactInts(hud, QisiVehicleBinder.TOKEN_HUD, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(icon))
+        val distance = QisiVehicleBinder.hudDistanceUnits(frame.distanceMeters)
+        QisiVehicleBinder.transactInts(
             hud,
-            HongqiQisiBinder.TOKEN_HUD,
-            HongqiQisiBinder.HUD_SET_DISTANCE,
+            QisiVehicleBinder.TOKEN_HUD,
+            QisiVehicleBinder.HUD_SET_DISTANCE,
             distance,
         )
         val roundabout = frame.roundaboutExit.coerceIn(0, 16)
-        HongqiQisiBinder.transactInts(
+        QisiVehicleBinder.transactInts(
             hud,
-            HongqiQisiBinder.TOKEN_HUD,
-            HongqiQisiBinder.HUD_SET_ROUNDABOUT,
+            QisiVehicleBinder.TOKEN_HUD,
+            QisiVehicleBinder.HUD_SET_ROUNDABOUT,
             intArrayOf(roundabout),
         )
         hudActive = true
@@ -178,30 +178,30 @@ internal object HongqiNavigationBridge {
 
     private fun sendInstrumentGuidanceLocked(instrument: IBinder, frame: BydClusterFrame) {
         if (!instrumentNavActive) {
-            HongqiQisiBinder.transactInts(
+            QisiVehicleBinder.transactInts(
                 instrument,
-                HongqiQisiBinder.TOKEN_INSTRUMENT,
-                HongqiQisiBinder.INSTRUMENT_SET_ACTIVE,
+                QisiVehicleBinder.TOKEN_INSTRUMENT,
+                QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
                 intArrayOf(1),
             )
             instrumentNavActive = true
         }
-        val units = HongqiQisiBinder.hudDistanceUnits(frame.distanceMeters)
-        val guidance = HongqiQisiInstrumentGuidance(
-            distanceLabel = HongqiQisiLabels.segmentDistance(frame.distanceMeters),
+        val units = QisiVehicleBinder.hudDistanceUnits(frame.distanceMeters)
+        val guidance = QisiInstrumentFrame(
+            distanceLabel = QisiDistanceFormat.segmentDistance(frame.distanceMeters),
             icon = frame.icon.coerceIn(0, 31),
             nextRoad = frame.road,
-            routeDistanceLabel = HongqiQisiLabels.routeDistance(
+            routeDistanceLabel = QisiDistanceFormat.routeDistance(
                 frame.routeRemainingMeters.takeIf { it >= 0 },
             ),
-            etaLabel = HongqiQisiLabels.eta(
+            etaLabel = QisiDistanceFormat.eta(
                 frame.routeRemainingSeconds.takeIf { it >= 0 }?.toLong(),
             ),
             distanceUnit = units[0],
             roundaboutExit = if (frame.roundaboutExit in 1..16) frame.roundaboutExit - 1 else -1,
         )
         if (guidance == lastInstrument) return
-        HongqiQisiBinder.sendInstrumentGuidance(instrument, guidance)
+        QisiVehicleBinder.sendInstrumentGuidance(instrument, guidance)
         lastInstrument = guidance
     }
 
@@ -209,17 +209,17 @@ internal object HongqiNavigationBridge {
         try {
             hudBinder?.let { hud ->
                 if (hudActive) {
-                    HongqiQisiBinder.transactInts(hud, HongqiQisiBinder.TOKEN_HUD, HongqiQisiBinder.HUD_SET_ICON, intArrayOf(0))
-                    HongqiQisiBinder.transactInts(
+                    QisiVehicleBinder.transactInts(hud, QisiVehicleBinder.TOKEN_HUD, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(0))
+                    QisiVehicleBinder.transactInts(
                         hud,
-                        HongqiQisiBinder.TOKEN_HUD,
-                        HongqiQisiBinder.HUD_SET_DISTANCE,
+                        QisiVehicleBinder.TOKEN_HUD,
+                        QisiVehicleBinder.HUD_SET_DISTANCE,
                         intArrayOf(0, 0),
                     )
-                    HongqiQisiBinder.transactInts(
+                    QisiVehicleBinder.transactInts(
                         hud,
-                        HongqiQisiBinder.TOKEN_HUD,
-                        HongqiQisiBinder.HUD_SET_ROUNDABOUT,
+                        QisiVehicleBinder.TOKEN_HUD,
+                        QisiVehicleBinder.HUD_SET_ROUNDABOUT,
                         intArrayOf(0),
                     )
                     Log.i(TAG, "HUD guidance cleared")
@@ -228,64 +228,64 @@ internal object HongqiNavigationBridge {
             instrumentBinder?.let { instrument ->
                 if (instrumentNavActive) {
                     if (instrumentTbtEnabled()) {
-                        HongqiQisiBinder.sendInstrumentGuidance(instrument, HongqiQisiInstrumentGuidance.cleared)
+                        QisiVehicleBinder.sendInstrumentGuidance(instrument, QisiInstrumentFrame.cleared)
                     }
-                    HongqiQisiBinder.transactInts(
+                    QisiVehicleBinder.transactInts(
                         instrument,
-                        HongqiQisiBinder.TOKEN_INSTRUMENT,
-                        HongqiQisiBinder.INSTRUMENT_SET_ACTIVE,
+                        QisiVehicleBinder.TOKEN_INSTRUMENT,
+                        QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
                         intArrayOf(0),
                     )
                 }
             }
         } catch (error: Exception) {
-            Log.w(TAG, "navigation service unavailable", error)
+            Log.w(TAG, "adapter service not reachable", error)
             resetModulesLocked()
             scheduleBindRetryLocked()
         } finally {
             hudActive = false
             instrumentNavActive = false
-            Log.i(TAG, "hongqi guidance ended")
+            Log.i(TAG, "guidance output ended")
         }
     }
 
     private fun applyInstrumentMapLocked() {
         val system = systemBinder ?: return
         val instrument = instrumentBinder ?: return
-        if (!BydOutputSettings.hongqiClusterVisible(context ?: return)) return
+        if (!BydOutputSettings.hs5ClusterVisible(context ?: return)) return
         try {
             if (clusterMapShown && !instrumentMapActive) {
-                HongqiQisiBinder.transactInts(
+                QisiVehicleBinder.transactInts(
                     system,
-                    HongqiQisiBinder.TOKEN_SYSTEM,
-                    HongqiQisiBinder.SYSTEM_INSTRUMENT_MAP,
+                    QisiVehicleBinder.TOKEN_SYSTEM,
+                    QisiVehicleBinder.SYSTEM_INSTRUMENT_MAP,
                     intArrayOf(1, 0),
                 )
-                HongqiQisiBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PREPARE)
-                HongqiQisiBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PRESENT)
-                HongqiQisiBinder.transactInts(
+                QisiVehicleBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PREPARE)
+                QisiVehicleBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PRESENT)
+                QisiVehicleBinder.transactInts(
                     instrument,
-                    HongqiQisiBinder.TOKEN_INSTRUMENT,
-                    HongqiQisiBinder.INSTRUMENT_SET_ACTIVE,
+                    QisiVehicleBinder.TOKEN_INSTRUMENT,
+                    QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
                     intArrayOf(1),
                 )
                 instrumentMapActive = true
-                Log.i(TAG, "instrument map stream active")
+                Log.i(TAG, "cluster map projection started")
             } else if (!clusterMapShown && instrumentMapActive) {
-                HongqiQisiBinder.transactInts(
+                QisiVehicleBinder.transactInts(
                     instrument,
-                    HongqiQisiBinder.TOKEN_INSTRUMENT,
-                    HongqiQisiBinder.INSTRUMENT_SET_ACTIVE,
+                    QisiVehicleBinder.TOKEN_INSTRUMENT,
+                    QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
                     intArrayOf(0),
                 )
-                HongqiQisiBinder.transactInts(
+                QisiVehicleBinder.transactInts(
                     system,
-                    HongqiQisiBinder.TOKEN_SYSTEM,
-                    HongqiQisiBinder.SYSTEM_INSTRUMENT_MAP,
+                    QisiVehicleBinder.TOKEN_SYSTEM,
+                    QisiVehicleBinder.SYSTEM_INSTRUMENT_MAP,
                     intArrayOf(0, 0),
                 )
                 instrumentMapActive = false
-                Log.i(TAG, "instrument map cleared")
+                Log.i(TAG, "cluster map projection stopped")
             }
         } catch (error: Exception) {
             Log.w(TAG, "instrument map stream failed", error)
@@ -306,17 +306,17 @@ internal object HongqiNavigationBridge {
         val appContext = context ?: return
         if (remoteBinder != null || binding) return
         val intent = Intent().setComponent(
-            ComponentName(HongqiQisiBinder.ADAPTER_PACKAGE, HongqiQisiBinder.ADAPTER_SERVICE),
+            ComponentName(QisiVehicleBinder.ADAPTER_PACKAGE, QisiVehicleBinder.ADAPTER_SERVICE),
         )
         try {
             binding = appContext.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             if (!binding) {
-                Log.w(TAG, "navigation service bind refused")
+                Log.w(TAG, "adapter service bind denied")
                 scheduleBindRetryLocked()
             }
         } catch (error: Exception) {
             binding = false
-            Log.w(TAG, "navigation service bind failed: ${error.javaClass.simpleName}", error)
+            Log.w(TAG, "adapter service bind failed: ${error.javaClass.simpleName}", error)
             scheduleBindRetryLocked()
         }
     }
@@ -330,20 +330,20 @@ internal object HongqiNavigationBridge {
         binding = true
         remoteBinder = service
         try {
-            hudBinder = HongqiQisiBinder.queryModule(
+            hudBinder = QisiVehicleBinder.queryModule(
                 service,
-                HongqiQisiBinder.MODULE_HUD,
-                HongqiQisiBinder.TOKEN_HUD,
+                QisiVehicleBinder.MODULE_HUD,
+                QisiVehicleBinder.TOKEN_HUD,
             )
-            instrumentBinder = HongqiQisiBinder.queryModule(
+            instrumentBinder = QisiVehicleBinder.queryModule(
                 service,
-                HongqiQisiBinder.MODULE_INSTRUMENT,
-                HongqiQisiBinder.TOKEN_INSTRUMENT,
+                QisiVehicleBinder.MODULE_INSTRUMENT,
+                QisiVehicleBinder.TOKEN_INSTRUMENT,
             )
-            systemBinder = HongqiQisiBinder.queryModule(
+            systemBinder = QisiVehicleBinder.queryModule(
                 service,
-                HongqiQisiBinder.MODULE_SYSTEM,
-                HongqiQisiBinder.TOKEN_SYSTEM,
+                QisiVehicleBinder.MODULE_SYSTEM,
+                QisiVehicleBinder.TOKEN_SYSTEM,
             )
             if (!modulesReadyLogged) {
                 modulesReadyLogged = true
@@ -352,7 +352,7 @@ internal object HongqiNavigationBridge {
             applyInstrumentMapLocked()
             queueApplyLocked(force = true)
         } catch (error: Exception) {
-            Log.w(TAG, "navigation service unavailable", error)
+            Log.w(TAG, "adapter service not reachable", error)
             resetModulesLocked()
             scheduleBindRetryLocked()
         }
@@ -425,7 +425,7 @@ internal object HongqiNavigationBridge {
     }
 
     private fun baseIntent(keyType: Int): Intent {
-        val pkg = amapTargetPackage ?: adapter?.packageName ?: HongqiAmapAdapter.AMAP_AUTO.packageName
+        val pkg = amapTargetPackage ?: adapter?.packageName ?: Hs5NavPackages.AMAP_AUTO.packageName
         return Intent(AMAP_ACTION).apply {
             setPackage(pkg)
             addFlags(FLAG_RECEIVER_INCLUDE_BACKGROUND)
@@ -435,7 +435,7 @@ internal object HongqiNavigationBridge {
 
     private fun broadcastLocked(intent: Intent): Boolean {
         val appContext = context ?: return false
-        val targets = HongqiAmapAdapter.navigationOutputPackages(appContext).ifEmpty {
+        val targets = Hs5NavPackages.navigationOutputPackages(appContext).ifEmpty {
             listOfNotNull(amapTargetPackage, adapter?.packageName)
         }
         for (pkg in targets) {
@@ -452,7 +452,7 @@ internal object HongqiNavigationBridge {
             appContext.sendBroadcast(copy)
             true
         } catch (error: RuntimeException) {
-            Log.w(TAG, "hongqi broadcast failed pkg=$packageName", error)
+            Log.w(TAG, "nav broadcast failed pkg=$packageName", error)
             false
         }
     }

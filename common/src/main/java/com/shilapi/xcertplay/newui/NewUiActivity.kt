@@ -22,7 +22,7 @@ import androidx.compose.runtime.setValue
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.CarPlayBackgroundSession
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
-import com.shilapi.xcertplay.HongqiWheelKeys
+import com.shilapi.xcertplay.Hs5SteeringKeys
 import androidx.core.content.FileProvider
 import com.shilapi.xcertplay.AppLocale
 import com.shilapi.xcertplay.DiPlayLauncher
@@ -220,7 +220,7 @@ class NewUiActivity : ComponentActivity() {
             NewUiTheme {
                 NewUiShell(
                     destination = destination,
-                    showHongqiBranding = true,
+                    showHs5Branding = true,
                     topBarStatus = topBarStatus,
                     onDestinationSelected = { selected ->
                         if (selected == destination && hasSubpage(selected)) {
@@ -553,13 +553,13 @@ class NewUiActivity : ComponentActivity() {
     }
 
     override fun onPause() {
-        HongqiWheelKeys.hostPaused(this)
+        Hs5SteeringKeys.hostPaused(this)
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        HongqiWheelKeys.hostResumed(this)
+        Hs5SteeringKeys.hostResumed(this)
         enforceInterfaceSize()
         DiPlayWindowFullscreen.apply(this)
         refreshAll()

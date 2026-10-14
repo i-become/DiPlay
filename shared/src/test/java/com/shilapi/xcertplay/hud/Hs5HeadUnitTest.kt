@@ -14,26 +14,26 @@ import org.robolectric.shadows.ShadowBuild
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
-class HongqiHeadUnitTest {
+class Hs5HeadUnitTest {
     private val context get() = RuntimeEnvironment.getApplication()
 
     @Test fun hs5ModelIsRecognized() {
         ShadowBuild.setModel("HS5")
         ShadowBuild.setManufacturer("FAW")
-        assertTrue(HongqiHeadUnit.isHeadUnit(context))
-        assertTrue(HongqiHeadUnit.skipsBackgroundAdb(context))
+        assertTrue(Hs5HeadUnit.isHeadUnit(context))
+        assertTrue(Hs5HeadUnit.skipsBackgroundAdb(context))
     }
 
     @Test fun bydSkipsBackgroundAdbOnlyOnHongqi() {
         ShadowBuild.setFingerprint("BYD-AUTO/IVI/IVI:13/release-keys")
         install("com.byd.carsettings", system = true)
-        assertFalse(HongqiHeadUnit.skipsBackgroundAdb(context))
+        assertFalse(Hs5HeadUnit.skipsBackgroundAdb(context))
     }
 
     @Test fun bydFingerprintIsNotHongqi() {
         ShadowBuild.setFingerprint("BYD-AUTO/IVI/IVI:13/release-keys")
         install("com.byd.carsettings", system = true)
-        assertFalse(HongqiHeadUnit.isHeadUnit(context))
+        assertFalse(Hs5HeadUnit.isHeadUnit(context))
     }
 
     private fun install(name: String, system: Boolean) {

@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay.network
 
 import android.content.Context
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /**
@@ -47,7 +47,7 @@ object WirelessLinkPrepare {
     ) {
         when (CarHotspotStatus.isEnabled(context)) {
             true -> return
-            null -> if (HongqiHeadUnit.isHeadUnit(context)) {
+            null -> if (Hs5HeadUnit.isHeadUnit(context)) {
                 log("manual hotspot: AP state hidden on Hongqi; skip auto-enable")
                 return
             }

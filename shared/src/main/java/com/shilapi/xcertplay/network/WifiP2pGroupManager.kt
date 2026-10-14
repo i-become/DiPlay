@@ -19,7 +19,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.shilapi.xcertplay.compat.closeCompat
 import com.shilapi.xcertplay.compat.isLocationEnabledCompat
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
 import java.io.IOException
@@ -165,7 +165,7 @@ class WifiP2pGroupManager(
             }
 
             if (!legacyChannels) logP2pState(attempt, p2pChannel)
-            if (HongqiHeadUnit.isHeadUnit(appContext)) {
+            if (Hs5HeadUnit.isHeadUnit(appContext)) {
                 WifiP2pBrandedDeviceName.applyBlocking(
                     manager = p2pManager,
                     channel = p2pChannel,
@@ -198,7 +198,7 @@ class WifiP2pGroupManager(
                 preferredChannel = preferredChannel,
                 // Band-only requests need the API 29 WifiP2pConfig; the legacy path pins channels.
                 bandRequests = !legacyChannels,
-                systemDefaultFirst = HongqiHeadUnit.isHeadUnit(appContext) &&
+                systemDefaultFirst = Hs5HeadUnit.isHeadUnit(appContext) &&
                     preferredChannel == WifiP2pChannels.AUTO,
                 beforeRetry = {
                     ensureStartActive(attempt)
@@ -748,7 +748,7 @@ class WifiP2pGroupManager(
     }.getOrDefault(Station(null, null))
 
     private fun initialWifiPreflightWaitMillis(): Long =
-        if (HongqiHeadUnit.isHeadUnit(appContext)) WifiStationReady.preflightWaitMillis(appContext) else 0L
+        if (Hs5HeadUnit.isHeadUnit(appContext)) WifiStationReady.preflightWaitMillis(appContext) else 0L
 
     private fun checkPrerequisites(attempt: StartAttempt, station: Station, wifiWaitMillis: Long) {
         val wifi = appContext.getSystemService(WifiManager::class.java)

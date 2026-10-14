@@ -5,16 +5,16 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class HongqiAmapAdapterTest {
+class Hs5NavPackagesTest {
     @Test fun prefersStockAmapAutoPackage() {
         val packages = mutableSetOf<String>()
-        assertEquals(HongqiAmapAdapter.AMAP_AUTO, HongqiAmapAdapter.find {
-            packages.add(it); it == HongqiAmapAdapter.AMAP_AUTO.packageName
+        assertEquals(Hs5NavPackages.AMAP_AUTO, Hs5NavPackages.find {
+            packages.add(it); it == Hs5NavPackages.AMAP_AUTO.packageName
         })
-        assertTrue(packages.contains(HongqiAmapAdapter.AMAP_AUTO.packageName))
+        assertTrue(packages.contains(Hs5NavPackages.AMAP_AUTO.packageName))
     }
 
     @Test fun returnsNullWhenNothingInstalled() {
-        assertNull(HongqiAmapAdapter.find { false })
+        assertNull(Hs5NavPackages.find { false })
     }
 }

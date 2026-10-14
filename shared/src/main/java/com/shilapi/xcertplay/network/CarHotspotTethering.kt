@@ -7,7 +7,7 @@ import android.os.ResultReceiver
 import android.provider.Settings
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -47,7 +47,7 @@ object CarHotspotTethering {
                 Boolean::class.javaPrimitiveType, String::class.java,
             ).invoke(service, 0, receiver, false, context.packageName)
         }
-        val startAdb: (() -> Boolean)? = if (HongqiHeadUnit.skipsBackgroundAdb(context)) {
+        val startAdb: (() -> Boolean)? = if (Hs5HeadUnit.skipsBackgroundAdb(context)) {
             null
         } else {
             {

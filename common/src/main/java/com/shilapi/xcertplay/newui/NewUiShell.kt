@@ -44,7 +44,7 @@ import com.shilapi.xcertplay.newui.NewUiSurfaces
 @Composable
 fun NewUiShell(
     destination: NewUiDestination,
-    showHongqiBranding: Boolean,
+    showHs5Branding: Boolean,
     topBarStatus: NewUiTopBarStatus,
     onDestinationSelected: (NewUiDestination) -> Unit,
     onOpenHeadUnitHome: () -> Unit,
@@ -60,7 +60,7 @@ fun NewUiShell(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     NewUiTopBar(
-                        showHongqiBranding = showHongqiBranding,
+                        showHs5Branding = showHs5Branding,
                         status = topBarStatus,
                     )
                 }
@@ -242,7 +242,7 @@ private fun NewUiSidebarItem(
 
 @Composable
 private fun NewUiTopBar(
-    showHongqiBranding: Boolean,
+    showHs5Branding: Boolean,
     status: NewUiTopBarStatus,
 ) {
     Box(
@@ -263,7 +263,7 @@ private fun NewUiTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start,
             ) {
-                if (showHongqiBranding) {
+                if (showHs5Branding) {
                     Image(
                         painter = painterResource(R.drawable.new_ui_hongqi_badge),
                         contentDescription = stringResource(R.string.new_ui_brand_hongqi),

@@ -1344,7 +1344,7 @@ class CarPlayController(
 
             val adapter = bluetoothAdapter
                 ?: throw IOException("Bluetooth adapter is unavailable")
-            val bluetoothRecoveryTimeoutMillis = if (com.shilapi.xcertplay.hud.HongqiHeadUnit.skipsBackgroundAdb(appContext)) {
+            val bluetoothRecoveryTimeoutMillis = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.skipsBackgroundAdb(appContext)) {
                 2_000L
             } else {
                 8_000L

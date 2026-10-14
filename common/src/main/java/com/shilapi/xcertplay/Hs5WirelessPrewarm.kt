@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.network.WifiStationReady
 import com.shilapi.xcertplay.network.WirelessLinkPrepare
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
@@ -11,13 +11,13 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Turns Wi-Fi on early on Hongqi head units so wireless CarPlay does not wait on cold boot. */
-internal object HongqiWirelessPrewarm {
-    private const val TAG = "DiPlay-Hongqi-WiFi"
+internal object Hs5WirelessPrewarm {
+    private const val TAG = "Xcert-Hs5-WiFi"
     private val running = AtomicBoolean(false)
 
     fun schedule(context: Context) {
         val app = context.applicationContext
-        if (!HongqiHeadUnit.isHeadUnit(app)) return
+        if (!Hs5HeadUnit.isHeadUnit(app)) return
         if (!AirPlayPersistence.loadWirelessEnabled(app)) return
         val mode = AirPlayPersistence.loadWirelessHotspotMode(app)
         if (!running.compareAndSet(false, true)) return

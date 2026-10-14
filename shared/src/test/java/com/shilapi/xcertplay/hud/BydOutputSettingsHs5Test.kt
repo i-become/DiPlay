@@ -13,20 +13,20 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30], manifest = Config.NONE)
-class BydOutputSettingsHongqiTest {
+class BydOutputSettingsHs5Test {
     private val context get() = RuntimeEnvironment.getApplication()
 
     @Test fun stockGaodeMakesNavigationSettingsAvailableOnNonByd() {
-        install(HongqiAmapAdapter.AMAP_AUTO.packageName)
+        install(Hs5NavPackages.AMAP_AUTO.packageName)
         assertTrue(BydOutputSettings.available(context))
-        assertTrue(HongqiHeadUnit.showsHongqiNavigationBranding(context))
+        assertTrue(Hs5HeadUnit.showsHs5NavigationBranding(context))
     }
 
     @Test fun bydHeadUnitDoesNotUseHongqiBrandingWithAmap() {
-        install(HongqiAmapAdapter.AMAP_AUTO.packageName)
+        install(Hs5NavPackages.AMAP_AUTO.packageName)
         install("com.byd.carsettings", system = true)
         assertTrue(BydOutputSettings.available(context))
-        assertFalse(HongqiHeadUnit.showsHongqiNavigationBranding(context))
+        assertFalse(Hs5HeadUnit.showsHs5NavigationBranding(context))
     }
 
     private fun install(name: String, system: Boolean = false) {

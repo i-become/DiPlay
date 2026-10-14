@@ -14,7 +14,7 @@ class BootReceiver : BroadcastReceiver() {
         PhoneAudioRoute.attach(context)
         val launchEnabled = AirPlayPersistence.loadAutoStartOnBoot(context)
         StartupDiagnosticSnapshot.received(context, launchEnabled)
-        HongqiWirelessPrewarm.schedule(context)
+        Hs5WirelessPrewarm.schedule(context)
         if (!launchEnabled) return
 
         val launch = Intent(context, com.shilapi.xcertplay.newui.NewUiActivity::class.java).apply {

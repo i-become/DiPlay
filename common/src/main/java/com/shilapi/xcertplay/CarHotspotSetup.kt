@@ -7,7 +7,7 @@ import android.util.Log
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.hud.BydOutputSettings
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.network.CarHotspotSettings
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
 import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
@@ -54,7 +54,7 @@ internal object CarHotspotSetup {
     fun shouldStartOnLaunch(context: Context, hasSession: Boolean): Boolean {
         if (hasSession) return false
         val mode = AirPlayPersistence.loadWirelessHotspotMode(context)
-        if (HongqiHeadUnit.isHeadUnit(context) &&
+        if (Hs5HeadUnit.isHeadUnit(context) &&
             WirelessStartupPolicy.hongqiFastBringUp(context, mode)
         ) {
             return false

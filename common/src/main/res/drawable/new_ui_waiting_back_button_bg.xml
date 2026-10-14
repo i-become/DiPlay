@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Capsule back control on the CarPlay waiting screen (Hongqi New UI). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:endColor="#CC101F33"
+        android:startColor="#99142D4C"
+        android:type="linear" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/new_ui_primary_blue" />
+    <corners android:radius="999dp" />
+</shape>

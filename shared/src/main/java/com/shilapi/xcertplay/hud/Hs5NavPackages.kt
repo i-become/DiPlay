@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 
 /** Known stock navigation packages on Hongqi head units. */
-internal enum class HongqiAmapAdapter(val packageName: String) {
+internal enum class Hs5NavPackages(val packageName: String) {
     /** QiSi IVI navigation (common on HS5; no standalone Gaode APK). */
     QISI_NAVI("ltd.qisi.navi"),
     VIEW_SERVICE("faw.system.viewservice"),
@@ -27,7 +27,7 @@ internal enum class HongqiAmapAdapter(val packageName: String) {
     companion object {
         private const val AMAP_BROADCAST = "AUTONAVI_STANDARD_BROADCAST_SEND"
 
-        fun find(installed: (String) -> Boolean): HongqiAmapAdapter? =
+        fun find(installed: (String) -> Boolean): Hs5NavPackages? =
             entries.firstOrNull { installed(it.packageName) }
 
         fun isQisiStack(context: Context): Boolean =

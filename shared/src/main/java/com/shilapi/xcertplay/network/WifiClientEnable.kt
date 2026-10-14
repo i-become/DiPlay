@@ -5,7 +5,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 /** Turns on station Wi-Fi when it is off. Used for Wi-Fi Direct and existing Wi-Fi CarPlay links. */
 object WifiClientEnable {
@@ -33,7 +33,7 @@ object WifiClientEnable {
             WifiStationReady.Outcome.NEEDS_USER -> Unit
         }
 
-        if (HongqiHeadUnit.skipsBackgroundAdb(app)) {
+        if (Hs5HeadUnit.skipsBackgroundAdb(app)) {
             return if (runCatching { wifi.isWifiEnabled }.getOrDefault(false)) Result.READY else Result.FAILED
         }
 

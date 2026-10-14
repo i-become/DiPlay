@@ -28,8 +28,8 @@ import android.widget.ProgressBar
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
-import com.shilapi.xcertplay.hud.HongqiClusterDisplay
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5ClusterDisplay
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 /**
  * Shows CarPlay's instrument-cluster stream on a BYD cluster projection display.
@@ -215,7 +215,7 @@ internal class ClusterMapPresentation(
                     val size = sizeOf(display)
                     DiLink4ClusterDisplay.accepts(display.name, size.x, size.y)
                 }?.let { return it }
-                return pickHongqiCluster(context, displays)
+                return pickHs5Cluster(context, displays)
             }
             val byd = displays.firstOrNull { it.name == name }?.takeIf {
                 if (!DiLink51ClusterLayout.supported()) true else {
@@ -224,18 +224,18 @@ internal class ClusterMapPresentation(
                 }
             }
             if (byd != null) return byd
-            return pickHongqiCluster(context, displays)
+            return pickHs5Cluster(context, displays)
         }
 
-        private fun pickHongqiCluster(context: Context, displays: Array<Display>): Display? {
-            if (!HongqiHeadUnit.isHeadUnit(context) &&
-                !HongqiHeadUnit.hasClusterPresentation(context) &&
-                !HongqiHeadUnit.showsHongqiNavigationBranding(context)
+        private fun pickHs5Cluster(context: Context, displays: Array<Display>): Display? {
+            if (!Hs5HeadUnit.isHeadUnit(context) &&
+                !Hs5HeadUnit.hasClusterPresentation(context) &&
+                !Hs5HeadUnit.showsHs5NavigationBranding(context)
             ) {
                 return null
             }
             val mainId = context.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
-            return HongqiClusterDisplay.pick(displays, mainId)
+            return Hs5ClusterDisplay.pick(displays, mainId)
         }
 
         fun describeDisplays(context: Context): String =
@@ -249,7 +249,7 @@ internal class ClusterMapPresentation(
             appendLine("clusterEnabled=${AirPlayPersistence.loadClusterMapEnabled(context)}")
             appendLine("navigationReceiverAvailable=${com.shilapi.xcertplay.hud.BydOutputSettings.navigationAvailable(context)}")
             appendLine("gaodePackage=${com.shilapi.xcertplay.hud.BydOutputSettings.resolvedGaodePackage(context)}")
-            appendLine("hongqiClusterPresentation=${HongqiHeadUnit.hasClusterPresentation(context)}")
+            appendLine("hs5ClusterPresentation=${Hs5HeadUnit.hasClusterPresentation(context)}")
             appendLine("allDisplays=${describeDisplays(context)}")
             val presentations = context.getSystemService(DisplayManager::class.java)
                 ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION).orEmpty()

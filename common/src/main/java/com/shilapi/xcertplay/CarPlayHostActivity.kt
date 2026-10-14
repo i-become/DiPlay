@@ -776,7 +776,7 @@ class CarPlayHostActivity : ComponentActivity() {
         locationPermissionAvailable = hasFineLocationPermission()
         loadConnectionSettings()
         wirelessPermissionsReady = !wirelessEnabled || hasRequiredWirelessPermissions()
-        if (wirelessEnabled) HongqiWirelessPrewarm.schedule(this)
+        if (wirelessEnabled) Hs5WirelessPrewarm.schedule(this)
     }
 
     /**
@@ -1001,7 +1001,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        HongqiWheelKeys.hostResumed(this)
+        Hs5SteeringKeys.hostResumed(this)
         WheelKeyService.restoreIfNeeded(this)
         hostAppearanceResumed = true
         updateCallPopupGuard()
@@ -1517,7 +1517,7 @@ class CarPlayHostActivity : ComponentActivity() {
         updateCallPopupGuard()
         AppAppearanceRuntime.clearHost(this)
         nightModeController.pause()
-        HongqiWheelKeys.hostPaused(this)
+        Hs5SteeringKeys.hostPaused(this)
         super.onPause()
     }
 
@@ -1688,7 +1688,7 @@ class CarPlayHostActivity : ComponentActivity() {
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
         com.shilapi.xcertplay.newui.NewUiShellBackgroundViews.install(this, root)
-        if (com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this)) {
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) {
             waitingRevealOverlay = FrameLayout(this).also {
                 root.addView(it, FrameLayout.LayoutParams(-1, -1))
             }
@@ -5453,7 +5453,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun maybeStartCarPlay() {
         if (shuttingDown.get()) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
-            val retryMs = if (com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(this)) 150L else 500L
+            val retryMs = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) 150L else 500L
             if (!adoptBackgroundSession()) mainHandler.postDelayed({ maybeStartCarPlay() }, retryMs)
             return
         }

@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.hud
 import java.util.concurrent.TimeUnit
 
 /** Localized strings written into the QiSi instrument guidance parcel. */
-internal object HongqiQisiLabels {
+internal object QisiDistanceFormat {
     fun segmentDistance(meters: Int): String = when {
         meters < 15 -> "现在"
         meters < 1_000 -> "${meters}米"

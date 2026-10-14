@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30], manifest = Config.NONE)
-class HongqiAmapAdapterBroadcastTest {
+class Hs5NavPackagesBroadcastTest {
     private val context get() = RuntimeEnvironment.getApplication()
 
     @Test fun resolvesGaodeFromAutonaviBroadcastReceiver() {
@@ -24,7 +24,7 @@ class HongqiAmapAdapterBroadcastTest {
             Intent("AUTONAVI_STANDARD_BROADCAST_SEND"),
             receiver,
         )
-        assertEquals("com.vendor.amapauto", HongqiAmapAdapter.resolvedPackage(context))
+        assertEquals("com.vendor.amapauto", Hs5NavPackages.resolvedPackage(context))
     }
 }
 

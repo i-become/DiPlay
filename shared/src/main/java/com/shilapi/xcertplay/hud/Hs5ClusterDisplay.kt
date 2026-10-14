@@ -10,7 +10,7 @@ import android.view.Display
  * display and can overlay turn-by-turn cards. DiPlay uses the same CarPlay alt-screen path once
  * a compatible display is visible.
  */
-object HongqiClusterDisplay {
+object Hs5ClusterDisplay {
     private val knownSizes = setOf(
         1920 to 720,
         1920 to 480,

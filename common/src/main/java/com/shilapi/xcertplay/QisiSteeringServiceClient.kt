@@ -8,7 +8,7 @@ import android.os.RemoteException
 import android.view.KeyEvent
 
 /** Binder client for [ltd.qisi.systemservice.QisiSystemService] steering-wheel hard keys. */
-internal object HongqiQisiSystemKeysBinder {
+internal object QisiSteeringServiceClient {
     const val PACKAGE = "ltd.qisi.systemservice"
     const val SERVICE = "ltd.qisi.systemservice.QisiSystemService"
     const val TOKEN = "ltd.qisi.systemmanager.ISystemServiceInterface"
@@ -24,8 +24,8 @@ internal object HongqiQisiSystemKeysBinder {
     val serviceIntent: Intent
         get() = Intent().setComponent(ComponentName(PACKAGE, SERVICE))
 
-    /** Maps QiSi hard-key codes to FAW Play steering roles (0 previous … 3 Siri). */
-    fun steeringRoleForFactoryKey(keyCode: Int): Int? = when (keyCode) {
+    /** Maps QiSi factory hard-key codes to CarPlay steering actions (0 previous … 3 Siri). */
+    fun carPlayActionForFactoryKey(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_MEDIA_PREVIOUS -> 0
         KeyEvent.KEYCODE_MEDIA_NEXT -> 1
         KeyEvent.KEYCODE_CALL -> 2

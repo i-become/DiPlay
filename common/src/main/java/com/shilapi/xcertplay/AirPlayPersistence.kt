@@ -239,7 +239,7 @@ object AirPlayPersistence {
     fun loadAudioFocusEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(KEY_AUDIO_FOCUS_ENABLED) &&
-            com.shilapi.xcertplay.hud.HongqiHeadUnit.isHeadUnit(context)
+            com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(context)
         ) {
             return true
         }
@@ -668,7 +668,7 @@ object AirPlayPersistence {
         if (enabled) {
             saveCarPlayWheelMedia(context, false)
             saveCarPlayWheelSiri(context, false)
-            HongqiWheelKeys.applySettings(context)
+            Hs5SteeringKeys.applySettings(context)
         }
     }
 

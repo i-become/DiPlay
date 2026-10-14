@@ -43,7 +43,7 @@ fun NewUiSettingsScreen(
                 checked = state.carBluetoothAudio,
                 onCheckedChange = onCarBluetoothAudioChanged,
             )
-            if (state.showHongqiWheelKeys) {
+            if (state.showHs5SteeringKeys) {
                 val wheelKeysEnabled = !state.carBluetoothAudio
                 NewUiToggleRow(
                     iconRes = R.drawable.ic_dp_audio,

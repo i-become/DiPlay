@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.network
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.SystemClock
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 /**
  * Waits for station Wi-Fi to be usable before Wi-Fi Direct or existing-Wi-Fi CarPlay.
@@ -123,14 +123,14 @@ object WifiStationReady {
         log: (String) -> Unit = {},
     ): Outcome {
         val app = context.applicationContext
-        if (!HongqiHeadUnit.isHeadUnit(app)) {
+        if (!Hs5HeadUnit.isHeadUnit(app)) {
             return ensure(app, isCancelled, timeoutMillis, tryEnable = true, log = log)
         }
         val wifi = app.getSystemService(WifiManager::class.java) ?: return Outcome.UNAVAILABLE
         if (readPhase(wifi) != Phase.READY) {
             return ensure(app, isCancelled, timeoutMillis, tryEnable = true, log = log)
         }
-        log("Hongqi station Wi-Fi reads on; cycling radio before Wi-Fi Direct")
+        log("HS5 station Wi-Fi reads on; cycling radio before Wi-Fi Direct")
         if (!WifiClientEnable.requestDisable(wifi, log)) {
             log("Wi-Fi disable not accepted; stabilizing in place")
             return confirmStableWhenOn(app, isCancelled, timeoutMillis, log = log)
@@ -157,8 +157,8 @@ object WifiStationReady {
     fun preflightWaitMillis(context: Context): Long {
         val afterBoot = SystemClock.elapsedRealtime() < WirelessStartupPolicy.bootGraceMillis(context)
         return when {
-            HongqiHeadUnit.isHeadUnit(context) && afterBoot -> 12_000L
-            HongqiHeadUnit.isHeadUnit(context) -> 4_000L
+            Hs5HeadUnit.isHeadUnit(context) && afterBoot -> 12_000L
+            Hs5HeadUnit.isHeadUnit(context) -> 4_000L
             afterBoot -> 8_000L
             else -> 3_000L
         }

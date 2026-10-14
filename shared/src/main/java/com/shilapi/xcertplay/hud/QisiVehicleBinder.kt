@@ -5,7 +5,7 @@ import android.os.Parcel
 import android.os.RemoteException
 
 /** Binder client for ltd.qisi.adapterservice vehicle modules (HUD, instrument, system). */
-internal object HongqiQisiBinder {
+internal object QisiVehicleBinder {
     const val ADAPTER_PACKAGE = "ltd.qisi.adapterservice"
     const val ADAPTER_SERVICE = "ltd.qisi.adapterservice.QISIAdapterService"
 
@@ -70,7 +70,7 @@ internal object HongqiQisiBinder {
         }
     }
 
-    fun sendInstrumentGuidance(binder: IBinder, guidance: HongqiQisiInstrumentGuidance) {
+    fun sendInstrumentGuidance(binder: IBinder, guidance: QisiInstrumentFrame) {
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         try {
@@ -124,7 +124,7 @@ internal object HongqiQisiBinder {
     }
 }
 
-internal data class HongqiQisiInstrumentGuidance(
+internal data class QisiInstrumentFrame(
     val distanceLabel: String,
     val icon: Int,
     val nextRoad: String,
@@ -144,6 +144,6 @@ internal data class HongqiQisiInstrumentGuidance(
     }
 
     companion object {
-        val cleared = HongqiQisiInstrumentGuidance("", 0, "", "", "", 0, -1)
+        val cleared = QisiInstrumentFrame("", 0, "", "", "", 0, -1)
     }
 }

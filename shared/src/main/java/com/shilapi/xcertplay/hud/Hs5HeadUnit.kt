@@ -12,9 +12,9 @@ import android.os.Build
 
 /** Detects Hongqi-family head units for OEM navigation output. */
 
-object HongqiHeadUnit {
+object Hs5HeadUnit {
 
-    private val fawPackages = listOf(
+    private val oemPackageAllowlist = listOf(
 
         "com.faw.hq",
 
@@ -53,7 +53,7 @@ object HongqiHeadUnit {
 
         val app = context.applicationContext
 
-        if (fawPackages.any { installed(app, it) }) return true
+        if (oemPackageAllowlist.any { installed(app, it) }) return true
 
         if (installedPackages(app).any { pkg ->
 
@@ -98,13 +98,13 @@ object HongqiHeadUnit {
     fun hasClusterPresentation(context: Context): Boolean {
         val manager = context.getSystemService(android.hardware.display.DisplayManager::class.java) ?: return false
         return manager.getDisplays(android.hardware.display.DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-            .any { HongqiClusterDisplay.isInstrumentCluster(it.name) }
+            .any { Hs5ClusterDisplay.isInstrumentCluster(it.name) }
     }
 
     fun clusterDisplaySummary(context: Context): String? {
         val manager = context.getSystemService(android.hardware.display.DisplayManager::class.java) ?: return null
         val display = manager.getDisplays(android.hardware.display.DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-            .firstOrNull { HongqiClusterDisplay.isInstrumentCluster(it.name) } ?: return null
+            .firstOrNull { Hs5ClusterDisplay.isInstrumentCluster(it.name) } ?: return null
         return "${display.name}#${display.displayId}"
     }
 
@@ -130,9 +130,9 @@ object HongqiHeadUnit {
 
     /** True when settings should use Hongqi copy for HUD / cluster navigation. */
 
-    fun showsHongqiNavigationBranding(context: Context): Boolean =
+    fun showsHs5NavigationBranding(context: Context): Boolean =
 
-        isHeadUnit(context) || (HongqiAmapAdapter.resolvedPackage(context) != null && !isBydHeadUnit(context))
+        isHeadUnit(context) || (Hs5NavPackages.resolvedPackage(context) != null && !isBydHeadUnit(context))
 
 
 

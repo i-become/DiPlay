@@ -13,7 +13,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
-import com.shilapi.xcertplay.hud.HongqiHeadUnit
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
@@ -28,8 +28,8 @@ import java.util.concurrent.Executors
  * already drives the iPhone; factory hard keys are not claimed then (same idea as
  * [GeelyWheelKeys]).
  */
-internal object HongqiWheelKeys {
-    private const val TAG = "DiPlay-HongqiKeys"
+internal object Hs5SteeringKeys {
+    private const val TAG = "Xcert-Hs5-Steering"
     private const val HARD_KEY_ACTION_DOWN = 0
     private const val BIND_RETRY_MS = 5_000L
     private const val REFRESH_DELAY_MS = 250L
@@ -37,7 +37,7 @@ internal object HongqiWheelKeys {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { task ->
-        Thread(task, "diplay-hongqi-keys").apply { isDaemon = true }
+        Thread(task, "xcert-hs5-steering").apply { isDaemon = true }
     }
     private var appContext: Context? = null
     private var controller: CarPlayController? = null
@@ -100,10 +100,10 @@ internal object HongqiWheelKeys {
         scheduleRefresh(force = true)
     }
 
-    internal fun supported(context: Context): Boolean = HongqiHeadUnit.isHeadUnit(context)
+    internal fun supported(context: Context): Boolean = Hs5HeadUnit.isHeadUnit(context)
 
     private fun shouldClaimHardKeys(context: Context): Boolean {
-        if (!HongqiWheelKeyPolicy.shouldRegisterFactoryKeys(context)) return false
+        if (!Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context)) return false
         if (AirPlayPersistence.loadCarBluetoothAudio(context)) return false
         return sessionReady(controller)
     }
@@ -139,13 +139,13 @@ internal object HongqiWheelKeys {
         }
         ensureServiceLocked(context)
         val binder = serviceBinder ?: return
-        val desiredKeys = if (claimKeys) HongqiWheelKeyPolicy.factoryKeyCodes(context) else intArrayOf()
+        val desiredKeys = if (claimKeys) Hs5SteeringKeyPolicy.factoryKeyCodes(context) else intArrayOf()
         if (claimKeys && keysRegistered && !registeredKeyCodes.contentEquals(desiredKeys)) {
             releaseHardKeysLocked(context, binder)
         }
         if (claimKeys && !keysRegistered && desiredKeys.isNotEmpty()) {
             runCatching {
-                HongqiQisiSystemKeysBinder.registerHardKeys(
+                QisiSteeringServiceClient.registerHardKeys(
                     binder,
                     context.packageName,
                     desiredKeys,
@@ -155,7 +155,7 @@ internal object HongqiWheelKeys {
                 registeredKeyCodes = desiredKeys
                 Log.i(TAG, "temporary keys registered count=${desiredKeys.size}")
             }.onFailure { error ->
-                Log.w(TAG, "factory key registration failed: ${error.javaClass.simpleName}")
+                Log.w(TAG, "steering hard-key register failed: ${error.javaClass.simpleName}")
                 bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
             }
         } else if (!claimKeys && keysRegistered) {
@@ -164,7 +164,7 @@ internal object HongqiWheelKeys {
         if (holdFocus && !viewFocusHeld && SystemClock.uptimeMillis() >= viewFocusCooldownUntil) {
             viewFocusCooldownUntil = SystemClock.uptimeMillis() + VIEW_FOCUS_COOLDOWN_MS
             runCatching {
-                val result = HongqiQisiSystemKeysBinder.requestCarPlayViewFocus(binder, viewFocusListener)
+                val result = QisiSteeringServiceClient.requestCarPlayViewFocus(binder, viewFocusListener)
                 viewFocusHeld = result == 1 || result == 2
                 Log.i(TAG, "CarPlay view focus request=$result")
             }.onFailure { error ->
@@ -185,22 +185,22 @@ internal object HongqiWheelKeys {
         if (SystemClock.uptimeMillis() < bindAttemptAt) return
         val conn = object : ServiceConnection {
             override fun onServiceConnected(name: android.content.ComponentName?, service: IBinder?) {
-                synchronized(this@HongqiWheelKeys) {
+                synchronized(this@Hs5SteeringKeys) {
                     binding = false
-                    if (service?.interfaceDescriptor != HongqiQisiSystemKeysBinder.TOKEN) {
-                        Log.w(TAG, "factory key service unexpected binder")
+                    if (service?.interfaceDescriptor != QisiSteeringServiceClient.TOKEN) {
+                        Log.w(TAG, "QiSi key service unexpected binder")
                         bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
                         runCatching { context.unbindService(this) }
                         return
                     }
                     serviceBinder = service
-                    Log.i(TAG, "factory key service connected")
+                    Log.i(TAG, "QiSi steering service bound")
                     scheduleRefresh(force = true)
                 }
             }
 
             override fun onServiceDisconnected(name: android.content.ComponentName?) {
-                synchronized(this@HongqiWheelKeys) {
+                synchronized(this@Hs5SteeringKeys) {
                     serviceBinder = null
                     keysRegistered = false
                     viewFocusHeld = false
@@ -214,12 +214,12 @@ internal object HongqiWheelKeys {
         }
         connection = conn
         binding = runCatching {
-            context.bindService(HongqiQisiSystemKeysBinder.serviceIntent, conn, Context.BIND_AUTO_CREATE)
+            context.bindService(QisiSteeringServiceClient.serviceIntent, conn, Context.BIND_AUTO_CREATE)
         }.getOrDefault(false)
         if (!binding) {
             connection = null
             bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
-            Log.w(TAG, "factory key service bind refused")
+            Log.w(TAG, "QiSi steering service bind denied")
         }
     }
 
@@ -240,7 +240,7 @@ internal object HongqiWheelKeys {
         }
         connection?.let { conn ->
             runCatching { context.unbindService(conn) }
-                .onFailure { Log.w(TAG, "factory key unbind failed: ${it.javaClass.simpleName}") }
+                .onFailure { Log.w(TAG, "QiSi steering unbind failed: ${it.javaClass.simpleName}") }
         }
         connection = null
         serviceBinder = null
@@ -258,15 +258,15 @@ internal object HongqiWheelKeys {
             return
         }
         runCatching {
-            HongqiQisiSystemKeysBinder.unregisterHardKeys(
+            QisiSteeringServiceClient.unregisterHardKeys(
                 binder,
                 context.packageName,
                 keys,
                 hardKeyListener,
             )
-            Log.i(TAG, "temporary keys released to factory")
+            Log.i(TAG, "steering hard keys restored to OEM")
         }.onFailure { error ->
-            Log.w(TAG, "factory key release failed: ${error.javaClass.simpleName}")
+            Log.w(TAG, "steering hard-key release failed: ${error.javaClass.simpleName}")
         }
         keysRegistered = false
         registeredKeyCodes = intArrayOf()
@@ -275,8 +275,8 @@ internal object HongqiWheelKeys {
 
     private fun releaseViewFocusLocked(binder: IBinder) {
         runCatching {
-            HongqiQisiSystemKeysBinder.releaseCarPlayViewFocus(binder)
-            Log.i(TAG, "CarPlay view focus released")
+            QisiSteeringServiceClient.releaseCarPlayViewFocus(binder)
+            Log.i(TAG, "CarPlay UI focus returned to vehicle")
         }.onFailure { error ->
             Log.w(TAG, "CarPlay view focus release failed: ${error.javaClass.simpleName}")
         }
@@ -300,15 +300,15 @@ internal object HongqiWheelKeys {
             return
         }
         if (action != HARD_KEY_ACTION_DOWN) return
-        val role = HongqiQisiSystemKeysBinder.steeringRoleForFactoryKey(keyCode) ?: return
+        val role = QisiSteeringServiceClient.carPlayActionForFactoryKey(keyCode) ?: return
         val sent = when (role) {
             0 -> if (AirPlayPersistence.loadCarPlayWheelMedia(context)) {
-                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.PREVIOUS, "hongqi-wheel")
+                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.PREVIOUS, "hs5-steer")
             } else {
                 false
             }
             1 -> if (AirPlayPersistence.loadCarPlayWheelMedia(context)) {
-                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.NEXT, "hongqi-wheel")
+                CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.NEXT, "hs5-steer")
             } else {
                 false
             }
@@ -359,7 +359,7 @@ internal object HongqiWheelKeys {
             data.enforceInterface("ltd.qisi.systemmanager.IViewFocusChangedListener")
             val type = data.readInt()
             val state = data.readInt()
-            if (state == -1 && type == HongqiQisiSystemKeysBinder.VIEW_FOCUS_CARPLAY) {
+            if (state == -1 && type == QisiSteeringServiceClient.VIEW_FOCUS_CARPLAY) {
                 scheduleRefresh(force = true)
             }
             Log.i(TAG, "CarPlay view focus change=$state")

@@ -30,7 +30,7 @@ class NewUiTopBarLayoutTest {
             NewUiTheme {
                 NewUiShell(
                     destination = NewUiDestination.CONNECTION,
-                    showHongqiBranding = true,
+                    showHs5Branding = true,
                     topBarStatus = NewUiTopBarStatus.placeholder.copy(timeText = "11:35"),
                     onDestinationSelected = {},
                     onOpenHeadUnitHome = {},
@@ -51,7 +51,7 @@ class NewUiTopBarLayoutTest {
             NewUiTheme {
                 NewUiShell(
                     destination = NewUiDestination.CONNECTION,
-                    showHongqiBranding = true,
+                    showHs5Branding = true,
                     topBarStatus = NewUiTopBarStatus.placeholder.copy(timeText = "11:35"),
                     onDestinationSelected = {},
                     onOpenHeadUnitHome = {},
@@ -75,7 +75,7 @@ class NewUiTopBarLayoutTest {
             NewUiTheme {
                 NewUiShell(
                     destination = NewUiDestination.CONNECTION,
-                    showHongqiBranding = true,
+                    showHs5Branding = true,
                     topBarStatus = NewUiTopBarStatus.placeholder.copy(timeText = "11:35"),
                     onDestinationSelected = {},
                     onOpenHeadUnitHome = {},

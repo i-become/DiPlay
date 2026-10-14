@@ -18,6 +18,9 @@ captures/
 # Local agent working notes
 /agent_docs/
 
+# Decompiled third-party APK dumps (local reference only; never commit)
+docs/apk/
+
 # OS files
 .DS_Store
 Thumbs.db
