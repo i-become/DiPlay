@@ -4,4 +4,5 @@ enum class NewUiDiagnosticsSubpage {
     MAIN,
     STORAGE,
     VIEW_REPORT,
+    QR_DOWNLOAD,
 }

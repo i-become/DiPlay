@@ -12,7 +12,9 @@ internal object NewUiAutoConnectPolicy {
         phoneAddress: String?,
         setupError: String?,
         sessionRunning: Boolean,
+        autoConnectEnabled: Boolean,
     ): Boolean {
+        if (!autoConnectEnabled) return false
         if (phoneAddress.isNullOrBlank()) return false
         if (setupError != null) return false
         if (sessionRunning) return false

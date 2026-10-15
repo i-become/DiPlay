@@ -9,8 +9,14 @@ import com.shilapi.xcertplay.host.R
 
 data class NewUiDisplayState(
     val fps: Int,
+    val smoothVideoEnabled: Boolean,
+    val directVideoOutputEnabled: Boolean,
+    val lowLatencyDecoderEnabled: Boolean,
+    val mtkDecoderTuningEnabled: Boolean,
+    val mtkDecoderTuningDescription: String,
     val hudNavigationEnabled: Boolean,
     val clusterMapEnabled: Boolean,
+    val clusterFlyScreenDefaultOnConnect: Boolean,
     val clusterHorizontalGestureEnabled: Boolean,
     val carPlayNightMode: CarPlayNightMode,
 ) {
@@ -26,8 +32,14 @@ data class NewUiDisplayState(
     companion object {
         val placeholder = NewUiDisplayState(
             fps = 60,
+            smoothVideoEnabled = true,
+            directVideoOutputEnabled = true,
+            lowLatencyDecoderEnabled = true,
+            mtkDecoderTuningEnabled = true,
+            mtkDecoderTuningDescription = "",
             hudNavigationEnabled = true,
             clusterMapEnabled = true,
+            clusterFlyScreenDefaultOnConnect = true,
             clusterHorizontalGestureEnabled = true,
             carPlayNightMode = CarPlayNightMode.SYSTEM,
         )
@@ -35,10 +47,21 @@ data class NewUiDisplayState(
 }
 
 internal object NewUiDisplayStateReader {
-    fun read(context: Context): NewUiDisplayState = NewUiDisplayState(
+    fun read(context: Context): NewUiDisplayState {
+        val videoCodecLabel = if (AirPlayPersistence.loadHevcEnabled(context)) "HEVC" else "H.264"
+        return NewUiDisplayState(
             fps = AirPlayPersistence.loadFps(context),
+            smoothVideoEnabled = AirPlayPersistence.loadSmoothVideo(context),
+            directVideoOutputEnabled = AirPlayPersistence.loadDirectVideoOutput(context),
+            lowLatencyDecoderEnabled = AirPlayPersistence.loadLowLatencyDecoder(context),
+            mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(context),
+            mtkDecoderTuningDescription = context.getString(
+                R.string.settings_mtk_decoder_tuning_description,
+                videoCodecLabel,
+            ),
             hudNavigationEnabled = BydOutputSettings.enabled(context),
             clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(context),
+            clusterFlyScreenDefaultOnConnect = AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(context),
             clusterHorizontalGestureEnabled =
                 AirPlayPersistence.loadClusterMapHorizontalGestureEnabled(context),
             carPlayNightMode = AirPlayPersistence.loadCarPlayNightMode(context).let { mode ->
@@ -48,11 +71,28 @@ internal object NewUiDisplayStateReader {
                 }
             },
         )
+    }
 }
 
 internal object NewUiDisplayActions {
     fun saveFps(context: Context, fps: Int) {
         AirPlayPersistence.saveFps(context, if (fps >= 60) 60 else 30)
+    }
+
+    fun saveSmoothVideo(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveSmoothVideo(context, enabled)
+    }
+
+    fun saveDirectVideoOutput(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveDirectVideoOutput(context, enabled)
+    }
+
+    fun saveLowLatencyDecoder(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveLowLatencyDecoder(context, enabled)
+    }
+
+    fun saveMtkDecoderTuning(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveMtkDecoderTuning(context, enabled)
     }
 
     fun saveHudNavigation(context: Context, enabled: Boolean) {
@@ -62,6 +102,10 @@ internal object NewUiDisplayActions {
     fun saveClusterGesture(context: Context, enabled: Boolean) {
         if (enabled && !AirPlayPersistence.loadClusterMapEnabled(context)) return
         AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(context, enabled)
+    }
+
+    fun saveClusterFlyScreenDefaultOnConnect(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveClusterFlyScreenDefaultOnConnect(context, enabled)
     }
 
     fun saveCarPlayNightMode(context: Context, index: Int) {

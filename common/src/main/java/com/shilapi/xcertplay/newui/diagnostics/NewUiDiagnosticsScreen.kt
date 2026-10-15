@@ -48,6 +48,7 @@ fun NewUiDiagnosticsScreen(
     onShareReport: (NewUiDiagnosticFile) -> Unit,
     onDeleteReport: (NewUiDiagnosticFile) -> Unit,
     onEditStorage: () -> Unit,
+    onScanDownload: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -92,6 +93,32 @@ fun NewUiDiagnosticsScreen(
                         .clickable(enabled = !saving, onClick = onSaveReport)
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 )
+            }
+        }
+        NewUiPanel {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onScanDownload)
+                    .padding(horizontal = 22.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NewUiSettingIcon(R.drawable.new_ui_ic_share)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.new_ui_diag_qr_title),
+                        style = NewUiTypography.SettingTitle,
+                        color = NewUiColors.TextPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.new_ui_diag_qr_sub),
+                        style = NewUiTypography.SettingSubtitle,
+                        color = NewUiColors.TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                NewUiChevron(tint = NewUiColors.TextMuted)
             }
         }
         if (usbSaveRoots.isNotEmpty()) {

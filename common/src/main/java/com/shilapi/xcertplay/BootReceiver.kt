@@ -14,14 +14,15 @@ class BootReceiver : BroadcastReceiver() {
         PhoneAudioRoute.attach(context)
         val launchEnabled = AirPlayPersistence.loadAutoStartOnBoot(context)
         StartupDiagnosticSnapshot.received(context, launchEnabled)
-        Hs5WirelessPrewarm.schedule(context)
+        Hs5HongqiStartupWarmup.schedule(context)
         if (!launchEnabled) return
 
         val launch = Intent(context, com.shilapi.xcertplay.newui.NewUiActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_NO_ANIMATION,
             )
         }
         try {

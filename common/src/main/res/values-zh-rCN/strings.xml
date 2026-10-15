@@ -990,4 +990,10 @@
     <string name="new_ui_audio_channel_preview">试听此音频流</string>
     <string name="new_ui_add_phone">添加手机</string>
     <string name="new_ui_diag_save_usb">保存报告到 U 盘 · %1$s（根目录）</string>
+    <string name="new_ui_diag_qr_title">扫码下载诊断报告</string>
+    <string name="new_ui_diag_qr_sub">与车机同一 Wi‑Fi 或热点的手机可下载最新诊断报告。</string>
+    <string name="new_ui_diag_qr_hint">用手机浏览器打开链接，再点「下载报告」。</string>
+    <string name="new_ui_diag_qr_no_network">尚未检测到车机网络地址。请先连接 CarPlay 或 Wi‑Fi 后再试。</string>
+    <string name="new_ui_display_cluster_fly_default">连接 CarPlay 时默认开启飞屏</string>
+    <string name="new_ui_display_cluster_fly_default_sub">每次连接后自动打开仪表飞屏；仍可用三指横滑关闭。</string>
 </resources>

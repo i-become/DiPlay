@@ -83,6 +83,7 @@ object AirPlayPersistence {
     private const val KEY_LOW_LATENCY_DECODER = "low_latency_decoder"
     private const val KEY_FPS_COUNTER = "fps_counter"
     private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
+    private const val KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT = "cluster_fly_screen_default_on_connect"
     private const val KEY_CLUSTER_MAP_HORIZONTAL_GESTURE = "cluster_map_horizontal_gesture_enabled"
     private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
     private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
@@ -692,24 +693,33 @@ object AirPlayPersistence {
             .edit().putBoolean(KEY_CARPLAY_WHEEL_SIRI, enabled).apply()
     }
 
-    fun loadSmoothVideo(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SMOOTH_VIDEO, false)
+    fun loadSmoothVideo(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_SMOOTH_VIDEO)) return true
+        return prefs.getBoolean(KEY_SMOOTH_VIDEO, false)
+    }
 
     fun saveSmoothVideo(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SMOOTH_VIDEO, enabled).apply()
     }
 
     /** MediaTek's legacy low-latency/no-reorder decoder path; opt-in and applied at reconnect. */
-    fun loadMtkDecoderTuning(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_MTK_DECODER_TUNING, false)
+    fun loadMtkDecoderTuning(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_MTK_DECODER_TUNING)) return true
+        return prefs.getBoolean(KEY_MTK_DECODER_TUNING, false)
+    }
 
     fun saveMtkDecoderTuning(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_MTK_DECODER_TUNING, enabled).apply()
     }
 
-    fun loadDirectVideoOutput(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DIRECT_VIDEO_OUTPUT, false)
+    fun loadDirectVideoOutput(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_DIRECT_VIDEO_OUTPUT)) return true
+        return prefs.getBoolean(KEY_DIRECT_VIDEO_OUTPUT, false)
+    }
 
     fun saveDirectVideoOutput(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_DIRECT_VIDEO_OUTPUT, enabled).apply()
@@ -722,8 +732,11 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_FPS_COUNTER, enabled).apply()
     }
 
-    fun loadLowLatencyDecoder(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_LOW_LATENCY_DECODER, false)
+    fun loadLowLatencyDecoder(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_LOW_LATENCY_DECODER)) return true
+        return prefs.getBoolean(KEY_LOW_LATENCY_DECODER, false)
+    }
 
     fun saveLowLatencyDecoder(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LOW_LATENCY_DECODER, enabled).apply()
@@ -839,6 +852,18 @@ object AirPlayPersistence {
             edit.putBoolean(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE, false)
         }
         edit.apply()
+    }
+
+    /** When true, 仪表飞屏 turns on again each time CarPlay connects (unless cluster map is off). */
+    fun loadClusterFlyScreenDefaultOnConnect(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT)) return true
+        return prefs.getBoolean(KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT, true)
+    }
+
+    fun saveClusterFlyScreenDefaultOnConnect(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT, enabled).apply()
     }
 
     /** Three-finger horizontal swipe in CarPlay to turn the cluster map on (left) or off (right). */

@@ -375,6 +375,11 @@ class CarPlayHostActivity : ComponentActivity() {
     private var clusterDashboardPhysicallyPresent = false
     /** Runtime fly-screen visibility; settings keep cluster map enabled while gestures hide the map. */
     private var clusterFlyScreenVisible = false
+
+    private fun clusterFlyScreenVisibleOnLaunch(): Boolean {
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) return false
+        return AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(this)
+    }
     private val clusterStreamNudge = Runnable {
         if (isDestroyed || shuttingDown.get()) return@Runnable
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return@Runnable
@@ -680,7 +685,7 @@ class CarPlayHostActivity : ComponentActivity() {
             finish(); return
         }
         CarPlayHostSettingsBridge.register(this)
-        clusterFlyScreenVisible = AirPlayPersistence.loadClusterMapEnabled(this)
+        clusterFlyScreenVisible = clusterFlyScreenVisibleOnLaunch()
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         getSystemService(android.hardware.display.DisplayManager::class.java)
             ?.registerDisplayListener(clusterDisplayListener, mainHandler)
@@ -4873,7 +4878,11 @@ class CarPlayHostActivity : ComponentActivity() {
                         requestedSmallWindowForStream != smallWindowActive()) {
                         reconnectAfterLoss("Cluster small-window navi ${if (smallWindowActive()) "on" else "off"}")
                     }
-                    clusterFlyScreenVisible = AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)
+                    if (AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity) &&
+                        AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(this@CarPlayHostActivity)
+                    ) {
+                        clusterFlyScreenVisible = true
+                    }
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
                     if (AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) {

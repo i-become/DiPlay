@@ -13,8 +13,13 @@ import com.shilapi.xcertplay.newui.NewUiValueRow
 fun NewUiDisplayScreen(
     state: NewUiDisplayState,
     onPickFps: () -> Unit,
+    onSmoothVideoChanged: (Boolean) -> Unit,
+    onDirectVideoOutputChanged: (Boolean) -> Unit,
+    onLowLatencyDecoderChanged: (Boolean) -> Unit,
+    onMtkDecoderTuningChanged: (Boolean) -> Unit,
     onHudNavigationChanged: (Boolean) -> Unit,
     onClusterMapChanged: (Boolean) -> Unit,
+    onClusterFlyScreenDefaultOnConnectChanged: (Boolean) -> Unit,
     onClusterGestureChanged: (Boolean) -> Unit,
     onNightModeSelected: (Int) -> Unit,
 ) {
@@ -26,6 +31,34 @@ fun NewUiDisplayScreen(
                 subtitle = stringResource(R.string.new_ui_display_fps_sub),
                 value = state.fpsLabel,
                 onClick = onPickFps,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_display,
+                title = stringResource(R.string.smooth_video),
+                subtitle = stringResource(R.string.smooth_video_description),
+                checked = state.smoothVideoEnabled,
+                onCheckedChange = onSmoothVideoChanged,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_display,
+                title = stringResource(R.string.settings_direct_video_output),
+                subtitle = stringResource(R.string.settings_direct_video_output_description),
+                checked = state.directVideoOutputEnabled,
+                onCheckedChange = onDirectVideoOutputChanged,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_display,
+                title = stringResource(R.string.settings_low_latency_decoder),
+                subtitle = stringResource(R.string.settings_low_latency_decoder_description),
+                checked = state.lowLatencyDecoderEnabled,
+                onCheckedChange = onLowLatencyDecoderChanged,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_display,
+                title = stringResource(R.string.settings_mtk_decoder_tuning),
+                subtitle = state.mtkDecoderTuningDescription,
+                checked = state.mtkDecoderTuningEnabled,
+                onCheckedChange = onMtkDecoderTuningChanged,
             )
             NewUiToggleRow(
                 iconRes = R.drawable.ic_dp_navigation,
@@ -40,6 +73,14 @@ fun NewUiDisplayScreen(
                 subtitle = stringResource(R.string.new_ui_display_cluster_map_sub),
                 checked = state.clusterMapEnabled,
                 onCheckedChange = onClusterMapChanged,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_dashboard,
+                title = stringResource(R.string.new_ui_display_cluster_fly_default),
+                subtitle = stringResource(R.string.new_ui_display_cluster_fly_default_sub),
+                checked = state.clusterMapEnabled && state.clusterFlyScreenDefaultOnConnect,
+                enabled = state.clusterMapEnabled,
+                onCheckedChange = onClusterFlyScreenDefaultOnConnectChanged,
             )
             NewUiToggleRow(
                 iconRes = R.drawable.new_ui_ic_gesture_swipe,

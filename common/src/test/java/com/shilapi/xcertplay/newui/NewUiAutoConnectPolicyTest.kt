@@ -23,6 +23,19 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = "AA:BB:CC:DD:EE:FF",
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
+            ),
+        )
+    }
+
+    @Test fun skipsWhenAutoConnectDisabled() {
+        assertFalse(
+            NewUiAutoConnectPolicy.shouldConnectOnColdStart(
+                launcher(),
+                phoneAddress = "AA:BB:CC:DD:EE:FF",
+                setupError = null,
+                sessionRunning = false,
+                autoConnectEnabled = false,
             ),
         )
     }
@@ -34,6 +47,7 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = null,
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
             ),
         )
     }
@@ -45,6 +59,7 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = "AA:BB:CC:DD:EE:FF",
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
             ),
         )
     }
@@ -56,6 +71,7 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = "AA:BB:CC:DD:EE:FF",
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
             ),
         )
     }
@@ -67,6 +83,7 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = "AA:BB:CC:DD:EE:FF",
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
             ),
         )
     }
@@ -78,6 +95,7 @@ class NewUiAutoConnectPolicyTest {
                 phoneAddress = "AA:BB:CC:DD:EE:FF",
                 setupError = null,
                 sessionRunning = false,
+                autoConnectEnabled = true,
             ),
         )
     }

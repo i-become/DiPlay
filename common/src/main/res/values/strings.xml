@@ -1031,4 +1031,10 @@
     <string name="new_ui_audio_channel_preview">Preview this stream</string>
     <string name="new_ui_add_phone">Add phone</string>
     <string name="new_ui_diag_save_usb">Save report to USB · %1$s (root)</string>
+    <string name="new_ui_diag_qr_title">Scan to download report</string>
+    <string name="new_ui_diag_qr_sub">Phone on the same Wi‑Fi or hotspot can download the latest diagnostic report.</string>
+    <string name="new_ui_diag_qr_hint">Open the link in the phone browser, then tap Download report.</string>
+    <string name="new_ui_diag_qr_no_network">No car network address yet. Connect CarPlay or Wi‑Fi first, then try again.</string>
+    <string name="new_ui_display_cluster_fly_default">Fly screen on when CarPlay connects</string>
+    <string name="new_ui_display_cluster_fly_default_sub">Turns 仪表飞屏 on again after each connection. You can still close it with a three-finger swipe.</string>
 </resources>

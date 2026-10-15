@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.CarPlayBackgroundSession
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
+import com.shilapi.xcertplay.Hs5HongqiStartupWarmup
 import com.shilapi.xcertplay.Hs5SteeringKeys
 import androidx.core.content.FileProvider
 import com.shilapi.xcertplay.AppLocale
@@ -65,6 +66,8 @@ import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsRepository
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticReportScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsStorageScreen
+import com.shilapi.xcertplay.newui.diagnostics.DiagnosticReportShareSession
+import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticQrScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsSubpage
 import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
@@ -131,6 +134,8 @@ class NewUiActivity : ComponentActivity() {
     private var topBarStatus by mutableStateOf(NewUiTopBarStatus.placeholder)
     private var pendingWirelessRecovery = false
     private var audioChannelPreview: AudioChannelPreview? = null
+    private var diagnosticShareSession: DiagnosticReportShareSession? = null
+    private var diagnosticShareUrl by mutableStateOf<String?>(null)
 
     private val tick = object : Runnable {
         override fun run() {
@@ -183,6 +188,7 @@ class NewUiActivity : ComponentActivity() {
         AppLocale.enforce(this)
         interfaceOverride?.let { InterfaceSize.enforce(resources, it) }
         DiPlayWindowFullscreen.apply(this)
+        Hs5HongqiStartupWarmup.schedule(applicationContext)
         runCatching { BackgroundUpdateScheduler.schedule(applicationContext) }
         BydNavigationOutputs.onAppOpened(applicationContext)
         PhoneAudioRoute.attach(applicationContext)
@@ -292,6 +298,42 @@ class NewUiActivity : ComponentActivity() {
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
                                 onPickFps = { openDisplayFpsPage() },
+                                onSmoothVideoChanged = { enabled ->
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.smooth_video),
+                                        message = getString(R.string.smooth_video_description),
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.saveSmoothVideo(activity, enabled)
+                                    }
+                                },
+                                onDirectVideoOutputChanged = { enabled ->
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.settings_direct_video_output),
+                                        message = getString(R.string.settings_direct_video_output_description),
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.saveDirectVideoOutput(activity, enabled)
+                                    }
+                                },
+                                onLowLatencyDecoderChanged = { enabled ->
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.settings_low_latency_decoder),
+                                        message = getString(R.string.settings_low_latency_decoder_description),
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.saveLowLatencyDecoder(activity, enabled)
+                                    }
+                                },
+                                onMtkDecoderTuningChanged = { enabled ->
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.settings_mtk_decoder_tuning),
+                                        message = displayState.mtkDecoderTuningDescription,
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.saveMtkDecoderTuning(activity, enabled)
+                                    }
+                                },
                                 onHudNavigationChanged = { enabled ->
                                     applyWithReconnectConfirm(
                                         title = getString(R.string.new_ui_display_hud_nav),
@@ -312,6 +354,10 @@ class NewUiActivity : ComponentActivity() {
                                     ) {
                                         NewUiDisplayActions.saveClusterMap(activity, enabled)
                                     }
+                                },
+                                onClusterFlyScreenDefaultOnConnectChanged = { enabled ->
+                                    NewUiDisplayActions.saveClusterFlyScreenDefaultOnConnect(activity, enabled)
+                                    refreshAll()
                                 },
                                 onClusterGestureChanged = { enabled ->
                                     NewUiDisplayActions.saveClusterGesture(activity, enabled)
@@ -477,6 +523,10 @@ class NewUiActivity : ComponentActivity() {
                                 body = diagnosticReportBody,
                                 onBack = { popDiagnosticsSubpage() },
                             )
+                            NewUiDiagnosticsSubpage.QR_DOWNLOAD -> NewUiDiagnosticQrScreen(
+                                shareUrl = diagnosticShareUrl,
+                                onBack = { popDiagnosticsSubpage() },
+                            )
                             NewUiDiagnosticsSubpage.STORAGE -> NewUiDiagnosticsStorageScreen(
                                 initialPath = AirPlayPersistence.loadDiagnosticReportDirectory(activity).orEmpty(),
                                 defaultPath = activity.defaultDiagnosticDirectory(),
@@ -504,6 +554,7 @@ class NewUiActivity : ComponentActivity() {
                                 onShareReport = { shareDiagnosticReport(it) },
                                 onDeleteReport = { deleteDiagnosticReport(it) },
                                 onEditStorage = { openDiagnosticStoragePage() },
+                                onScanDownload = { openDiagnosticQrSharePage() },
                             )
                         }
                         NewUiDestination.ABOUT -> NewUiSettingsAboutScreen()
@@ -690,6 +741,9 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun popDiagnosticsSubpage() {
+        if (diagnosticsSubpage == NewUiDiagnosticsSubpage.QR_DOWNLOAD) {
+            stopDiagnosticShareSession()
+        }
         diagnosticsSubpage = NewUiDiagnosticsSubpage.MAIN
         syncSubpageBackCallback()
     }
@@ -697,6 +751,26 @@ class NewUiActivity : ComponentActivity() {
     private fun openDiagnosticStoragePage() {
         diagnosticsSubpage = NewUiDiagnosticsSubpage.STORAGE
         syncSubpageBackCallback()
+    }
+
+    private fun openDiagnosticQrSharePage() {
+        stopDiagnosticShareSession()
+        val session = DiagnosticReportShareSession(this)
+        diagnosticShareSession = session
+        if (!session.start(settingsState.versionName)) {
+            diagnosticShareSession = null
+            Toast.makeText(this, R.string.new_ui_diag_qr_no_network, Toast.LENGTH_LONG).show()
+            return
+        }
+        diagnosticShareUrl = session.shareUrl
+        diagnosticsSubpage = NewUiDiagnosticsSubpage.QR_DOWNLOAD
+        syncSubpageBackCallback()
+    }
+
+    private fun stopDiagnosticShareSession() {
+        diagnosticShareSession?.stop()
+        diagnosticShareSession = null
+        diagnosticShareUrl = null
     }
 
     private fun applyIntentNavigation(intent: Intent) {
@@ -741,6 +815,7 @@ class NewUiActivity : ComponentActivity() {
             phoneAddress = DiPlayPreferences.phoneAddress(this),
             setupError = connectionActions.setupError,
             sessionRunning = CarPlayBackgroundSession.hasSession(),
+            autoConnectEnabled = DiPlayPreferences.autoConnect(this),
         )
 
     private fun wirelessForAutoConnect(): Boolean = DiPlayPreferences.autoConnectWireless(this)
@@ -917,6 +992,7 @@ class NewUiActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopDiagnosticShareSession()
         audioChannelPreview?.close()
         audioChannelPreview = null
         super.onDestroy()
