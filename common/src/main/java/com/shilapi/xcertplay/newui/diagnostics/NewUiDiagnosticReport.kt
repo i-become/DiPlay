@@ -13,6 +13,10 @@ internal object NewUiDiagnosticReport {
         appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(context)) "wireless" else "USB"}")
         appendLine("Phone: ${DiPlayPreferences.phoneName(context)} (${DiPlayPreferences.phoneAddress(context) ?: "none"})")
         appendLine("Cluster map: ${AirPlayPersistence.loadClusterMapEnabled(context)}")
+        appendLine(
+            "Cluster fly screen default on connect: ${AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(context)}",
+        )
+        appendLine("Auto-connect on open: ${DiPlayPreferences.autoConnect(context)}")
         appendLine("Generated from new UI shell")
     }
 }
