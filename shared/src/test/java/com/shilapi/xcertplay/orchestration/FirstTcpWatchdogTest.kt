@@ -14,12 +14,19 @@ class FirstTcpWatchdogTest {
     private var timer: (() -> Unit)? = null
     private var failures = 0
     private val identity = AirPlayListenerIdentity(7)
-    private fun watchdog() = FirstTcpWatchdog(identity, { delay, action ->
-        deadline = now + delay
-        timer = action
-        val cancel: () -> Unit = { deadline = null }
-        cancel
-    }, { failures++ }, { now * 1_000_000 })
+    private fun watchdog() = FirstTcpWatchdog(
+        identity,
+        { delay, action ->
+            deadline = now + delay
+            timer = action
+            val cancel: () -> Unit = { deadline = null }
+            cancel
+        },
+        { failures++ },
+        nowNanos = { now * 1_000_000 },
+        timeoutMillis = 30_000L,
+        waitProgressIntervalMillis = 0L,
+    )
     private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
         AirPlayTcpAccepted(owner, internal, now * 1_000_000)
 
@@ -46,7 +53,13 @@ class FirstTcpWatchdogTest {
 
     @Test fun earlyAcceptAvoidsTimerAndDoesNotDeclareSessionActive() {
         val logs = mutableListOf<String>()
-        val watch = FirstTcpWatchdog(identity, { _, _ -> error("Unexpected timer") }, {}, log = logs::add)
+        val watch = FirstTcpWatchdog(
+            identity,
+            { _, _ -> error("Unexpected timer") },
+            {},
+            timeoutMillis = 30_000L,
+            log = logs::add,
+        )
         assertTrue(watch.accepted(event()))
         watch.startSessionSent(1)
         assertFalse(logs.any { it.contains("session established") })
@@ -108,11 +121,51 @@ class FirstTcpWatchdogTest {
         assertEquals(0, failures)
     }
 
+    @Test fun startSessionEmitsWaitProgressOnIntervalUntilTcp() {
+        val logs = mutableListOf<String>()
+        var now = 0L
+        data class Scheduled(var fireAt: Long, val action: () -> Unit)
+        val scheduled = mutableListOf<Scheduled>()
+        fun scheduleTask(delay: Long, action: () -> Unit): () -> Unit {
+            scheduled += Scheduled(now + delay, action)
+            return { scheduled.removeAll { it.action === action } }
+        }
+        val watch = FirstTcpWatchdog(
+            identity,
+            ::scheduleTask,
+            {},
+            nowNanos = { now * 1_000_000 },
+            timeoutMillis = 30_000L,
+            log = logs::add,
+            waitProgressIntervalMillis = 3_000L,
+        )
+        fun fireDue() {
+            scheduled.filter { it.fireAt <= now }.forEach { it.action() }
+            scheduled.removeAll { it.fireAt <= now }
+        }
+        watch.startSessionSent(0)
+        now = 3_000
+        fireDue()
+        assertTrue(logs.any { it == "PROGRESS wait-first-tcp elapsedMs=3000" })
+        now = 6_000
+        fireDue()
+        assertTrue(logs.any { it == "PROGRESS wait-first-tcp elapsedMs=6000" })
+        assertTrue(watch.accepted(event()))
+        now = 9_000
+        fireDue()
+        assertFalse(logs.any { it == "PROGRESS wait-first-tcp elapsedMs=9000" })
+    }
+
     @Test fun concurrentAcceptAndTimeoutHaveExactlyOneOutcome() {
         repeat(50) {
             lateinit var expire: () -> Unit
             val outcomes = AtomicInteger()
-            val watch = FirstTcpWatchdog(identity, { _, action -> expire = action; {} }, { outcomes.incrementAndGet() })
+            val watch = FirstTcpWatchdog(
+                identity,
+                { _, action -> expire = action; {} },
+                { outcomes.incrementAndGet() },
+                timeoutMillis = 30_000L,
+            )
             watch.startSessionSent(0)
             val start = CountDownLatch(1)
             val tcp = thread { start.await(); if (watch.accepted(event())) outcomes.incrementAndGet() }

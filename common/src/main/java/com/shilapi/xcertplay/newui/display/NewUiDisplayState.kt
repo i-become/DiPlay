@@ -17,6 +17,7 @@ data class NewUiDisplayState(
     val hudNavigationEnabled: Boolean,
     val clusterMapEnabled: Boolean,
     val clusterFlyScreenDefaultOnConnect: Boolean,
+    val clusterFlyScreenWindowEnabled: Boolean,
     val clusterHorizontalGestureEnabled: Boolean,
     val carPlayNightMode: CarPlayNightMode,
 ) {
@@ -40,6 +41,7 @@ data class NewUiDisplayState(
             hudNavigationEnabled = true,
             clusterMapEnabled = true,
             clusterFlyScreenDefaultOnConnect = true,
+            clusterFlyScreenWindowEnabled = true,
             clusterHorizontalGestureEnabled = true,
             carPlayNightMode = CarPlayNightMode.SYSTEM,
         )
@@ -62,6 +64,7 @@ internal object NewUiDisplayStateReader {
             hudNavigationEnabled = BydOutputSettings.enabled(context),
             clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(context),
             clusterFlyScreenDefaultOnConnect = AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(context),
+            clusterFlyScreenWindowEnabled = AirPlayPersistence.loadHs5ClusterActivityWindow(context),
             clusterHorizontalGestureEnabled =
                 AirPlayPersistence.loadClusterMapHorizontalGestureEnabled(context),
             carPlayNightMode = AirPlayPersistence.loadCarPlayNightMode(context).let { mode ->
@@ -106,6 +109,11 @@ internal object NewUiDisplayActions {
 
     fun saveClusterFlyScreenDefaultOnConnect(context: Context, enabled: Boolean) {
         AirPlayPersistence.saveClusterFlyScreenDefaultOnConnect(context, enabled)
+    }
+
+    fun saveClusterFlyScreenWindow(context: Context, enabled: Boolean) {
+        AirPlayPersistence.saveHs5ClusterActivityWindow(context, enabled)
+        CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
     }
 
     fun saveCarPlayNightMode(context: Context, index: Int) {

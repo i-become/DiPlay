@@ -14,6 +14,31 @@ import android.os.Build
 
 object Hs5HeadUnit {
 
+    /**
+     * Build-time Hongqi / QiSi detection for code paths that cannot take a [Context] (for example
+     * [com.shilapi.xcertplay.media.MicrophoneUplink]). On these firmwares the voice-recognition
+     * capture source often records silence; voice-communication and [android.media.AudioManager] call
+     * mode match what Siri and WeChat VoIP need.
+     */
+    val detected: Boolean = run {
+        val tags = listOf(
+            Build.BRAND,
+            Build.MANUFACTURER,
+            Build.MODEL,
+            Build.DEVICE,
+            Build.PRODUCT,
+            Build.FINGERPRINT,
+            Build.HARDWARE,
+            Build.BOARD,
+        ).joinToString(" ").lowercase()
+        tags.contains("hongqi") ||
+            tags.contains("hs5") ||
+            tags.contains("qisi") ||
+            tags.contains("neusoft") ||
+            tags.contains("cchq") ||
+            (tags.contains("faw") && !tags.contains("byd"))
+    }
+
     private val oemPackageAllowlist = listOf(
 
         "com.faw.hq",

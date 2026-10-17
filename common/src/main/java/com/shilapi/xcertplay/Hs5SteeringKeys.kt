@@ -13,7 +13,11 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
+import com.shilapi.xcertplay.hud.BydCarPlayCall
+import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.CarPlayCallCard
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
+import com.shilapi.xcertplay.media.CarPlayTelephonyAudio
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
@@ -34,6 +38,7 @@ internal object Hs5SteeringKeys {
     private const val BIND_RETRY_MS = 5_000L
     private const val REFRESH_DELAY_MS = 250L
     private const val VIEW_FOCUS_COOLDOWN_MS = 2_000L
+    private const val CALL_KEY_RETURN_DELAY_MS = 1_500L
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { task ->
@@ -68,6 +73,15 @@ internal object Hs5SteeringKeys {
         controllerGeneration++
         hostGeneration++
         shuttingDown = false
+        BydCarPlayCall.callChanged = { card ->
+            // A long press that ended the call releases after it; the key goes back once that is in.
+            if (card != null) mainHandler.post { scheduleRefresh(force = true) }
+            else mainHandler.postDelayed({ scheduleRefresh(force = true) }, CALL_KEY_RETURN_DELAY_MS)
+        }
+        CarPlayTelephonyAudio.changed = { active ->
+            if (active) mainHandler.post { scheduleRefresh(force = true) }
+            else mainHandler.postDelayed({ scheduleRefresh(force = true) }, CALL_KEY_RETURN_DELAY_MS)
+        }
         scheduleRefresh(force = true)
     }
 
@@ -118,6 +132,10 @@ internal object Hs5SteeringKeys {
         return active.activeAirPlaySessionToken() != null
     }
 
+    /** QiSi compares key arrays by contents; call-key toggles only reorder the same set while probing. */
+    private fun sameKeyRegistration(current: IntArray, desired: IntArray): Boolean =
+        current.size == desired.size && current.toSet() == desired.toSet()
+
     private fun scheduleRefresh(force: Boolean) {
         mainHandler.removeCallbacks(refreshRunnable)
         if (force) mainHandler.post(refreshRunnable)
@@ -139,8 +157,14 @@ internal object Hs5SteeringKeys {
         }
         ensureServiceLocked(context)
         val binder = serviceBinder ?: return
-        val desiredKeys = if (claimKeys) Hs5SteeringKeyPolicy.factoryKeyCodes(context) else intArrayOf()
-        if (claimKeys && keysRegistered && !registeredKeyCodes.contentEquals(desiredKeys)) {
+        val phoneCall = BydNavigationOutputs.carPlayCall() != null || CarPlayTelephonyAudio.active()
+        val flyScreen = CarPlayHostSettingsBridge.flyScreenShown()
+        val desiredKeys = if (claimKeys) {
+            Hs5SteeringKeyPolicy.factoryKeyCodes(context, phoneCall, flyScreen)
+        } else {
+            intArrayOf()
+        }
+        if (claimKeys && keysRegistered && !sameKeyRegistration(registeredKeyCodes, desiredKeys)) {
             releaseHardKeysLocked(context, binder)
         }
         if (claimKeys && !keysRegistered && desiredKeys.isNotEmpty()) {
@@ -299,6 +323,12 @@ internal object Hs5SteeringKeys {
             onPhoneKey(action, active)
             return
         }
+        if (keyCode in Hs5SteeringKeyPolicy.FLY_SCREEN_BACK_CODES) {
+            if (action == HARD_KEY_ACTION_DOWN || action == 1) {
+                CarPlayHostSettingsBridge.closeFlyScreen("wheel key $keyCode action=$action")
+            }
+            return
+        }
         if (action != HARD_KEY_ACTION_DOWN) return
         val role = QisiSteeringServiceClient.carPlayActionForFactoryKey(keyCode) ?: return
         val sent = when (role) {
@@ -322,15 +352,84 @@ internal object Hs5SteeringKeys {
         Log.i(TAG, "factory key=$keyCode action=$action sent=$sent")
     }
 
+    /** QiSi phone key: action 0 is a short press, 1 a long press starting and 2 its release. */
     private fun onPhoneKey(action: Int, active: CarPlayController) {
-        when (action) {
-            2 -> phoneKeyHeld = false
-            1 -> if (!phoneKeyHeld) {
-                phoneKeyHeld = true
-                val sent = active.endCall()
-                Log.i(TAG, "factory key=${KeyEvent.KEYCODE_CALL} action=$action phone=end_or_reject sent=$sent")
+        val call = BydNavigationOutputs.carPlayCall()
+        val voip = CarPlayTelephonyAudio.active()
+        val speechVoip = CarPlayTelephonyAudio.speechOnlyCallActive()
+        val iapVoip = CarPlayTelephonyAudio.voipAcceptUsesIap()
+        val weChatMix = CarPlayTelephonyAudio.speechRecognitionActive()
+        val outcome = when (
+            Hs5PhoneKeyPolicy.onPhoneKey(
+                action,
+                call?.phase,
+                phoneKeyHeld,
+                voip,
+                iapVoip,
+                weChatMix,
+            )
+        ) {
+            Hs5PhoneKeyPolicy.Action.ANSWER -> "answer sent=${active.answerCall()}"
+            Hs5PhoneKeyPolicy.Action.END -> "end sent=${active.endCall()}"
+            Hs5PhoneKeyPolicy.Action.VOIP_ANSWER -> "voip answer sent=${active.answerCall()}"
+            Hs5PhoneKeyPolicy.Action.VOIP_SPEECH_ANSWER -> {
+                val iap = active.acceptCallViaIap()
+                val hook = active.answerCall()
+                "speech voip iap=$iap hook=$hook"
             }
+            Hs5PhoneKeyPolicy.Action.VOIP_END -> {
+                val iap = active.endCallViaIap()
+                val hook = active.endCall()
+                "speech voip end iap=$iap hook=$hook"
+            }
+            Hs5PhoneKeyPolicy.Action.NONE -> "none"
         }
+        when (action) {
+            1 -> phoneKeyHeld = true
+            2 -> phoneKeyHeld = false
+        }
+        Log.i(TAG, "factory key=${KeyEvent.KEYCODE_CALL} action=$action call=${call?.phase} $outcome")
+    }
+
+    internal object Hs5PhoneKeyPolicy {
+        enum class Action { ANSWER, END, VOIP_ANSWER, VOIP_SPEECH_ANSWER, VOIP_END, NONE }
+
+        /**
+         * A short press answers a ringing call and ends a connected or outgoing one; a long press ends
+         * or declines. WeChat VoIP uses speechrecognition audio without iAP2 call state: short press
+         * sends iAP AcceptCall plus the telephony hook; play/pause is not used because it starts music.
+         */
+        fun onPhoneKey(
+            action: Int,
+            phase: CarPlayCallCard.Phase?,
+            held: Boolean,
+            voipAudio: Boolean,
+            iapVoipAccept: Boolean,
+            weChatSpeechMix: Boolean,
+        ): Action =
+            when (action) {
+                0 -> when (phase) {
+                    CarPlayCallCard.Phase.RINGING -> when {
+                        weChatSpeechMix || iapVoipAccept -> Action.VOIP_SPEECH_ANSWER
+                        else -> Action.ANSWER
+                    }
+                    CarPlayCallCard.Phase.ACTIVE, CarPlayCallCard.Phase.DIALING -> when {
+                        weChatSpeechMix -> Action.VOIP_SPEECH_ANSWER
+                        else -> Action.END
+                    }
+                    null -> when {
+                        !voipAudio -> Action.NONE
+                        iapVoipAccept || voipAudio -> Action.VOIP_SPEECH_ANSWER
+                        else -> Action.VOIP_ANSWER
+                    }
+                }
+                1 -> when {
+                    !held && phase != null && !weChatSpeechMix -> Action.END
+                    (iapVoipAccept || weChatSpeechMix) && voipAudio -> Action.VOIP_END
+                    else -> Action.NONE
+                }
+                else -> Action.NONE
+            }
     }
 
     private class HardKeyListener : Binder() {

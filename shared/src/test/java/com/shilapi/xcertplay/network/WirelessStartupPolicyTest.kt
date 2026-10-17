@@ -64,8 +64,22 @@ class WirelessStartupPolicyTest {
         })
         context.getSystemService(WifiManager::class.java).isWifiEnabled = true
         assertTrue(WirelessStartupPolicy.hongqiFastBringUp(context, WirelessHotspotMode.EXISTING_WIFI))
-        assertEquals(2_500L, WirelessStartupPolicy.hotspotReadyMillis(context, WirelessHotspotMode.EXISTING_WIFI))
+        assertEquals(2_000L, WirelessStartupPolicy.hotspotReadyMillis(context, WirelessHotspotMode.EXISTING_WIFI))
         assertEquals(1, WirelessStartupPolicy.stableSamples(context, WirelessHotspotMode.EXISTING_WIFI))
         assertEquals(0L, WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(context, WirelessHotspotMode.EXISTING_WIFI))
+    }
+
+    @Test fun hongqiWifiDirectFastBringUpRightAfterBoot() {
+        shadowOf(context.packageManager).installPackage(PackageInfo().apply {
+            packageName = "ltd.qisi.navi"
+            applicationInfo = ApplicationInfo().apply {
+                packageName = "ltd.qisi.navi"
+                flags = ApplicationInfo.FLAG_SYSTEM
+            }
+        })
+        assertTrue(WirelessStartupPolicy.hongqiFastBringUp(context, WirelessHotspotMode.WIFI_P2P))
+        assertEquals(2_000L, WirelessStartupPolicy.hotspotReadyMillis(context, WirelessHotspotMode.WIFI_P2P))
+        assertEquals(22_000L, WirelessStartupPolicy.firstTcpTimeoutMillis(context))
+        assertEquals(10_000L, WirelessStartupPolicy.rfcommConnectTimeoutMillis(context))
     }
 }

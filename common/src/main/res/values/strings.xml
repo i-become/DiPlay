@@ -219,6 +219,36 @@
     <string name="adapt_pip_resolution_description">Reconnect CarPlay to adapt stream resolution to multi-window or picture-in-picture aspect ratio. Leave disabled for instant 0ms GPU scaling.</string>
     <string name="fullscreen">Fullscreen</string>
     <string name="getting_carplay_ready">Getting CarPlay ready…</string>
+    <string name="carplay_connection_elapsed">Elapsed %1$s</string>
+    <string name="carplay_connection_success_elapsed">Connected in %1$s</string>
+    <string name="carplay_wait_step_00">Preparing connection…</string>
+    <string name="carplay_wait_step_01">Starting accessory authentication</string>
+    <string name="carplay_wait_step_02">Waiting for authentication hardware</string>
+    <string name="carplay_wait_step_03">Requesting authentication access</string>
+    <string name="carplay_wait_step_04">Authentication ready</string>
+    <string name="carplay_wait_step_05">Starting in-car wireless network</string>
+    <string name="carplay_wait_step_06">Wireless network and Bluetooth ready</string>
+    <string name="carplay_wait_step_07">Resolving network address</string>
+    <string name="carplay_wait_step_08">Selecting USB configuration</string>
+    <string name="carplay_wait_step_09">Attaching media transport</string>
+    <string name="carplay_wait_step_10">Starting network discovery</string>
+    <string name="carplay_wait_step_11">Selecting your iPhone</string>
+    <string name="carplay_wait_step_12">Opening Bluetooth control link</string>
+    <string name="carplay_wait_step_13">Bluetooth link connected</string>
+    <string name="carplay_wait_step_14">Opening control channel</string>
+    <string name="carplay_wait_step_15">Starting protocol handshake</string>
+    <string name="carplay_wait_step_16">Identifying accessory to iPhone</string>
+    <string name="carplay_wait_step_17">Authenticating with iPhone</string>
+    <string name="carplay_wait_step_18">Sending service subscriptions</string>
+    <string name="carplay_wait_step_19">iPhone requested Wi‑Fi details</string>
+    <string name="carplay_wait_step_20">Sending Wi‑Fi details to iPhone</string>
+    <string name="carplay_wait_step_21">Phone reported wireless readiness</string>
+    <string name="carplay_wait_step_22">Asking iPhone to join the hotspot</string>
+    <string name="carplay_wait_step_23">iPhone updating Wi‑Fi configuration</string>
+    <string name="carplay_wait_step_24">Waiting for iPhone on Wi‑Fi…</string>
+    <string name="carplay_wait_step_25">Waiting for iPhone on Wi‑Fi…</string>
+    <string name="carplay_wait_step_26">Wireless data link established</string>
+    <string name="carplay_wait_step_27">Preparing the display</string>
     <string name="got_it">Got it</string>
     <string name="handshake_resolution_waiting_for_display">Handshake resolution: waiting for display</string>
     <string name="hevc_h_265_video_transport">HEVC H.265 video transport</string>
@@ -1012,6 +1042,10 @@
     <string name="new_ui_about_thanks">Thank you for your support and feedback. This project stays free, keeps adapting, and learns from the community.</string>
     <string name="new_ui_update_latest">Up to date</string>
     <string name="new_ui_update_available">Update %1$s available</string>
+    <string name="new_ui_diag_log_record_title">Record session log</string>
+    <string name="new_ui_diag_log_record_sub">When on, DiPlay writes a rolling log file included in exported reports. When off, nothing is written to disk.</string>
+    <string name="new_ui_diag_log_clear">Clear recorded logs</string>
+    <string name="new_ui_diag_log_cleared">Recorded logs cleared.</string>
     <string name="new_ui_diag_save_title">Save diagnostic report</string>
     <string name="new_ui_diag_save_sub">Export a text report for troubleshooting.</string>
     <string name="new_ui_diag_storage_title">Save location</string>
@@ -1037,4 +1071,8 @@
     <string name="new_ui_diag_qr_no_network">No car network address yet. Connect CarPlay or Wi‑Fi first, then try again.</string>
     <string name="new_ui_display_cluster_fly_default">Fly screen on when CarPlay connects</string>
     <string name="new_ui_display_cluster_fly_default_sub">Turns 仪表飞屏 on again after each connection. You can still close it with a three-finger swipe.</string>
-</resources>
+    <string name="new_ui_display_cluster_fly_window">Fly screen as its own window (experimental)</string>
+    <string name="new_ui_display_cluster_fly_window_sub">Shows 仪表飞屏 as a separate window on the cluster, so the steering-wheel back key can close it. Turn off if the cluster map stays black.</string>
+    <string name="new_ui_display_key_probe_overlay">Show key codes on CarPlay (experimental)</string>
+    <string name="new_ui_display_key_probe_overlay_sub">Lists recent keys on the CarPlay screen: QiSi hard keys, accessibility-filtered keys, and keys that reach the CarPlay window. Turn on DiPlay wheel keys in accessibility for the widest capture.</string>
+    <string name="new_ui_display_key_probe_overlay_hint">Probe: QiSi registers keys 0–1000 in batches (0=short, 1=long, 2=release). If left keys or the scroll wheel never appear, the Hongqi stack likely keeps them. Turn on DiPlay wheel keys in accessibility and export a report.</string></resources>

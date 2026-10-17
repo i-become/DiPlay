@@ -20,6 +20,7 @@ fun NewUiDisplayScreen(
     onHudNavigationChanged: (Boolean) -> Unit,
     onClusterMapChanged: (Boolean) -> Unit,
     onClusterFlyScreenDefaultOnConnectChanged: (Boolean) -> Unit,
+    onClusterFlyScreenWindowChanged: (Boolean) -> Unit,
     onClusterGestureChanged: (Boolean) -> Unit,
     onNightModeSelected: (Int) -> Unit,
 ) {
@@ -81,6 +82,14 @@ fun NewUiDisplayScreen(
                 checked = state.clusterMapEnabled && state.clusterFlyScreenDefaultOnConnect,
                 enabled = state.clusterMapEnabled,
                 onCheckedChange = onClusterFlyScreenDefaultOnConnectChanged,
+            )
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_dashboard,
+                title = stringResource(R.string.new_ui_display_cluster_fly_window),
+                subtitle = stringResource(R.string.new_ui_display_cluster_fly_window_sub),
+                checked = state.clusterMapEnabled && state.clusterFlyScreenWindowEnabled,
+                enabled = state.clusterMapEnabled,
+                onCheckedChange = onClusterFlyScreenWindowChanged,
             )
             NewUiToggleRow(
                 iconRes = R.drawable.new_ui_ic_gesture_swipe,

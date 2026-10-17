@@ -126,6 +126,14 @@ class TelephonyMicrophoneTest {
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
+    @Test fun speechRecognitionMicCountsAsCallLikeAudioForWheelKeys() {
+        CarPlayTelephonyAudio.clear()
+        sink.onMicrophoneStarted(speechRecognition, config("speechrecognition"))
+        assertTrue(CarPlayTelephonyAudio.active())
+        sink.onMicrophoneStopped(speechRecognition)
+        assertFalse(CarPlayTelephonyAudio.active())
+    }
+
     @Test fun microphoneMetadataAndFinalCountersReachTheAudioDiagnosticCallback() {
         sink.close()
         val diagnostics = CopyOnWriteArrayList<String>()

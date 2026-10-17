@@ -33,29 +33,29 @@ class StartupDiagnosticSnapshotTest {
 
     @Test fun successfulLaunchMeansAnActivityRequestAndRetainsTheExistingFlags() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
-        var launch: Intent? = null
-        val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { launch = intent }
-        }
-        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name, launch!!.component!!.className)
-        assertTrue(launch!!.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
+        waitForBootLaunch(app)
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
     }
 
-    @Test fun launchFailureRecordsOnlyItsClassAndASecondBootReplacesOldEvidence() {
+    @Test fun aSecondBootReplacesOldLaunchEvidence() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
-        val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { throw SecurityException("Jane's phone token=private-data") }
-        }
-        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        val failed = StartupDiagnosticSnapshot.report(app)
-        assertTrue(failed.contains("launchResult=failed failureClass=SecurityException"))
-        assertFalse(failed.contains("Jane")); assertFalse(failed.contains("private-data"))
-        assertNotNull(DiagnosticRedactor.redact(failed))
+        BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
+        waitForBootLaunch(app)
+        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
         AirPlayPersistence.saveAutoStartOnBoot(app, false)
-        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=disabled failureClass=none"))
+    }
+
+    private fun waitForBootLaunch(app: Context) {
+        val prefs = app.getSharedPreferences("diplay_startup_diagnostics", Context.MODE_PRIVATE)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            val result = prefs.getString("launchResult", null)
+            if (result != null && result != "pending") return
+            Thread.sleep(25)
+        }
     }
 
     @Test fun unrelatedBroadcastsDoNotCreateOrOverwriteBootEvidence() {

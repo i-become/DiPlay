@@ -23,6 +23,7 @@ class CarPlayConnectionDiagnosticLogTest {
 
     @Before fun prepareOldControllerListener() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
+        AirPlayPersistence.saveSessionLogRecordingEnabled(activity, true)
         activity.javaClass.getDeclaredMethod("initializeSessionLog").apply { isAccessible = true }.invoke(activity)
         activity.javaClass.getDeclaredField("restartGeneration").apply { isAccessible = true }.set(activity, 2)
         listener = activity.javaClass.getDeclaredMethod("createSessionListener", Int::class.javaPrimitiveType)

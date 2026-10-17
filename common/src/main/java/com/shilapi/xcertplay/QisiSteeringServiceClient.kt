@@ -33,12 +33,26 @@ internal object QisiSteeringServiceClient {
         else -> null
     }
 
+    private const val HARD_KEY_BATCH_SIZE = 64
+
     fun registerHardKeys(binder: IBinder, packageName: String, keyCodes: IntArray, listener: IBinder) {
-        transactKeyOperation(binder, TX_REGISTER_HARD_KEYS, packageName, keyCodes, listener)
+        if (keyCodes.size <= HARD_KEY_BATCH_SIZE) {
+            transactKeyOperation(binder, TX_REGISTER_HARD_KEYS, packageName, keyCodes, listener)
+            return
+        }
+        keyCodes.toList().chunked(HARD_KEY_BATCH_SIZE).forEach { chunk ->
+            transactKeyOperation(binder, TX_REGISTER_HARD_KEYS, packageName, chunk.toIntArray(), listener)
+        }
     }
 
     fun unregisterHardKeys(binder: IBinder, packageName: String, keyCodes: IntArray, listener: IBinder) {
-        transactKeyOperation(binder, TX_UNREGISTER_HARD_KEYS, packageName, keyCodes, listener)
+        if (keyCodes.size <= HARD_KEY_BATCH_SIZE) {
+            transactKeyOperation(binder, TX_UNREGISTER_HARD_KEYS, packageName, keyCodes, listener)
+            return
+        }
+        keyCodes.toList().chunked(HARD_KEY_BATCH_SIZE).forEach { chunk ->
+            transactKeyOperation(binder, TX_UNREGISTER_HARD_KEYS, packageName, chunk.toIntArray(), listener)
+        }
     }
 
     private fun transactKeyOperation(

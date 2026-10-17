@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.media.CarPlayTelephonyAudio
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -181,7 +182,8 @@ object PhoneAudioRoute {
     fun carPlayCallsUseCarAudio(): Boolean = controller?.carPlayCallsUseCarAudio() == true
 
     /** DiPlay's own call microphone shows up in the recording list; it is not another app's call. */
-    internal fun ownCarPlayCallActive(): Boolean = carPlayCallActive
+    internal fun ownCarPlayCallActive(): Boolean =
+        carPlayCallActive || CarPlayTelephonyAudio.active()
 
     private fun enabledFor(context: Context, reason: PhoneAudioReason): Boolean = when (reason) {
         PhoneAudioReason.CARPLAY_CALL -> BydOutputSettings.phoneAudioRoute(context)

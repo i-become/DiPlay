@@ -215,6 +215,36 @@
     <string name="adapt_pip_resolution_description">切换至桌面画中画或分屏悬浮小窗口时，自动断开重连以适应窗口分辨率，消除上下左右黑边。保持关闭可实现 0 毫秒 GPU 秒级自适应且不重连。</string>
     <string name="fullscreen">全屏</string>
     <string name="getting_carplay_ready">正在准备 CarPlay…</string>
+    <string name="carplay_connection_elapsed">已用时 %1$s</string>
+    <string name="carplay_connection_success_elapsed">连接成功，用时 %1$s</string>
+    <string name="carplay_wait_step_00">准备连接…</string>
+    <string name="carplay_wait_step_01">启动配件认证</string>
+    <string name="carplay_wait_step_02">等待认证模块</string>
+    <string name="carplay_wait_step_03">请求认证权限</string>
+    <string name="carplay_wait_step_04">认证就绪</string>
+    <string name="carplay_wait_step_05">启动车载无线网络</string>
+    <string name="carplay_wait_step_06">无线网络与蓝牙就绪</string>
+    <string name="carplay_wait_step_07">获取网络地址</string>
+    <string name="carplay_wait_step_08">选择 USB 配置</string>
+    <string name="carplay_wait_step_09">启动传输服务</string>
+    <string name="carplay_wait_step_10">启动网络发现</string>
+    <string name="carplay_wait_step_11">选择 iPhone</string>
+    <string name="carplay_wait_step_12">连接蓝牙控制通道</string>
+    <string name="carplay_wait_step_13">蓝牙已连接</string>
+    <string name="carplay_wait_step_14">打开控制通道</string>
+    <string name="carplay_wait_step_15">启动协议握手</string>
+    <string name="carplay_wait_step_16">向 iPhone 标识配件</string>
+    <string name="carplay_wait_step_17">与 iPhone 认证</string>
+    <string name="carplay_wait_step_18">同步服务订阅</string>
+    <string name="carplay_wait_step_19">iPhone 请求 Wi‑Fi 信息</string>
+    <string name="carplay_wait_step_20">发送 Wi‑Fi 信息给 iPhone</string>
+    <string name="carplay_wait_step_21">收到手机就绪状态</string>
+    <string name="carplay_wait_step_22">请求 iPhone 加入热点</string>
+    <string name="carplay_wait_step_23">iPhone 正在更新 Wi‑Fi</string>
+    <string name="carplay_wait_step_24">等待 iPhone 连上 Wi‑Fi…</string>
+    <string name="carplay_wait_step_25">等待 iPhone 连上 Wi‑Fi…</string>
+    <string name="carplay_wait_step_26">无线数据链路已建立</string>
+    <string name="carplay_wait_step_27">正在准备画面</string>
     <string name="got_it">知道了</string>
     <string name="handshake_resolution_waiting_for_display">握手分辨率：正在等待显示屏</string>
     <string name="hevc_h_265_video_transport">HEVC H.265 视频传输</string>
@@ -971,6 +1001,10 @@
     <string name="new_ui_about_thanks">感谢每一位车主的支持与反馈！本项目坚持免费分享、持续适配、共同交流。</string>
     <string name="new_ui_update_latest">已是最新版本</string>
     <string name="new_ui_update_available">可更新至 %1$s</string>
+    <string name="new_ui_diag_log_record_title">记录会话日志</string>
+    <string name="new_ui_diag_log_record_sub">开启后 DiPlay 会持续写入日志文件，导出诊断报告时会附带。关闭后不会写入磁盘。</string>
+    <string name="new_ui_diag_log_clear">清空已记录日志</string>
+    <string name="new_ui_diag_log_cleared">已清空记录的日志。</string>
     <string name="new_ui_diag_save_title">保存诊断报告</string>
     <string name="new_ui_diag_save_sub">导出文本报告，便于排查问题。</string>
     <string name="new_ui_diag_storage_title">保存位置</string>
@@ -996,4 +1030,9 @@
     <string name="new_ui_diag_qr_no_network">尚未检测到车机网络地址。请先连接 CarPlay 或 Wi‑Fi 后再试。</string>
     <string name="new_ui_display_cluster_fly_default">连接 CarPlay 时默认开启飞屏</string>
     <string name="new_ui_display_cluster_fly_default_sub">每次连接后自动打开仪表飞屏；仍可用三指横滑关闭。</string>
+    <string name="new_ui_display_cluster_fly_window">飞屏使用独立窗口（实验性）</string>
+    <string name="new_ui_display_cluster_fly_window_sub">把仪表飞屏作为仪表屏上的独立窗口显示，方向盘返回键即可关闭飞屏。若仪表地图黑屏，请关闭此项。</string>
+    <string name="new_ui_display_key_probe_overlay">CarPlay 上显示按键码（实验性）</string>
+    <string name="new_ui_display_key_probe_overlay_sub">在 CarPlay 画面左下角列出最近按键：QiSi 硬键、无障碍过滤到的键、以及进入 CarPlay 窗口的键。请在系统无障碍中开启「DiPlay 方向盘按键」以尽量收全。</string>
+    <string name="new_ui_display_key_probe_overlay_hint">探测：QiSi 已分批注册 0–1000（0=单击，1=长按，2=松开）。左键/滚轮若始终无行，通常只在红旗系统内处理，第三方 App 收不到。请同时打开「DiPlay 方向盘按键」无障碍并导出诊断报告。</string>
 </resources>

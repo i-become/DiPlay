@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiPlay diagnostic report</title>
+<style>
+:root { color-scheme: dark; }
+body { margin:0; padding:24px 20px 40px; background:#101418; color:#e8eaed;
+  font:16px/1.5 -apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif; }
+main { max-width:520px; margin:0 auto; }
+h1 { font-size:22px; margin:0 0 4px; }
+p.sub { color:#9aa0a6; margin:0 0 24px; }
+.card { background:#1b2129; border:1px solid #2a323d; border-radius:16px; padding:18px; margin-bottom:16px; }
+.card p { color:#9aa0a6; font-size:14px; margin:0 0 14px; }
+a.btn { display:block; width:100%; box-sizing:border-box; text-align:center; padding:13px 16px;
+  border-radius:999px; border:0; font-size:16px; font-weight:600; cursor:pointer; text-decoration:none;
+  background:#a8c7fa; color:#0b2540; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p class="sub" id="sub"></p>
+  <div class="card">
+    <p id="body"></p>
+    <a class="btn" id="download" href="download"></a>
+  </div>
+</main>
+<script>
+var L = {
+  en: {title:"DiPlay diagnostic report",sub:"Download the latest report from this head unit.",
+    body:"Use the same Wi‑Fi or hotspot as the car. Nothing is uploaded to the internet.",
+    download:"Download report"},
+  zh: {title:"DiPlay 诊断报告",sub:"从本车机下载最新诊断报告。",
+    body:"请与车机连接同一 Wi‑Fi 或热点。报告不会自动上传到互联网。",
+    download:"下载报告"},
+  "zh-TW": {title:"DiPlay 診斷報告",sub:"從本車機下載最新診斷報告。",
+    body:"請與車機連接同一 Wi‑Fi 或熱點。報告不會自動上傳到網際網路。",
+    download:"下載報告"},
+  es: {title:"Informe de diagnóstico DiPlay",sub:"Descarga el último informe de esta unidad.",
+    body:"Usa la misma Wi‑Fi o hotspot que el coche. No se sube nada a internet.",
+    download:"Descargar informe"},
+  ru: {title:"Диагностический отчёт DiPlay",sub:"Скачайте последний отчёт с этого устройства.",
+    body:"Подключитесь к той же Wi‑Fi или точке доступа, что и автомобиль. В интернет ничего не отправляется.",
+    download:"Скачать отчёт"},
+  uk: {title:"Діагностичний звіт DiPlay",sub:"Завантажте останній звіт з цього пристрою.",
+    body:"Підключіться до тієї самої Wi‑Fi або точки доступу, що й автомобіль. У інтернет нічого не надсилається.",
+    download:"Завантажити звіт"},
+  ar: {title:"تقرير تشخيص DiPlay",sub:"حمّل أحدث تقرير من هذه الوحدة.",
+    body:"استخدم نفس شبكة Wi‑Fi أو نقطة اتصال السيارة. لا يُرفع شيء إلى الإنترنت.",
+    download:"تنزيل التقرير"}
+};
+var lang = (navigator.language || "en").toLowerCase();
+var pack = L[lang] || L[lang.split("-")[0]] || L.en;
+document.getElementById("title").textContent = pack.title;
+document.getElementById("sub").textContent = pack.sub;
+document.getElementById("body").textContent = pack.body;
+document.getElementById("download").textContent = pack.download;
+</script>
+</body>
+</html>

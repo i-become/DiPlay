@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.RemovableStorageVolume
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiSecondaryActionButton
+import com.shilapi.xcertplay.newui.NewUiToggleRow
 import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiLayout
 import com.shilapi.xcertplay.newui.NewUiChevron
@@ -38,10 +39,13 @@ import com.shilapi.xcertplay.newui.NewUiTypography
 
 @Composable
 fun NewUiDiagnosticsScreen(
+    sessionLogRecordingEnabled: Boolean,
     storagePath: String,
     reports: List<NewUiDiagnosticFile>,
     saving: Boolean,
     usbSaveRoots: List<RemovableStorageVolume>,
+    onSessionLogRecordingChanged: (Boolean) -> Unit,
+    onClearSessionLogs: () -> Unit,
     onSaveReport: () -> Unit,
     onSaveReportToUsb: (String) -> Unit,
     onViewReport: (NewUiDiagnosticFile) -> Unit,
@@ -56,6 +60,23 @@ fun NewUiDiagnosticsScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(NewUiLayout.RowGap),
     ) {
+        NewUiPanel {
+            NewUiToggleRow(
+                iconRes = R.drawable.new_ui_ic_file,
+                title = stringResource(R.string.new_ui_diag_log_record_title),
+                subtitle = stringResource(R.string.new_ui_diag_log_record_sub),
+                checked = sessionLogRecordingEnabled,
+                onCheckedChange = onSessionLogRecordingChanged,
+                showDivider = false,
+            )
+            NewUiSecondaryActionButton(
+                label = stringResource(R.string.new_ui_diag_log_clear),
+                onClick = onClearSessionLogs,
+                modifier = Modifier
+                    .padding(horizontal = 22.dp)
+                    .padding(bottom = 20.dp),
+            )
+        }
         NewUiPanel {
             Row(
                 modifier = Modifier

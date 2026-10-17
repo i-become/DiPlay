@@ -17,6 +17,8 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
+import com.shilapi.xcertplay.network.GeelyHeadUnit
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 
 /**
@@ -81,7 +83,7 @@ internal class MicrophoneUplink(
             // The Geely/Lynk head unit only opens the microphone for the voice-communication
             // source; its voice-recognition source records silence, so Siri never hears.
             config.audioType == "speechrecognition" ->
-                if (com.shilapi.xcertplay.network.GeelyHeadUnit.detected) {
+                if (GeelyHeadUnit.detected || Hs5HeadUnit.detected) {
                     MediaRecorder.AudioSource.VOICE_COMMUNICATION
                 } else {
                     MediaRecorder.AudioSource.VOICE_RECOGNITION

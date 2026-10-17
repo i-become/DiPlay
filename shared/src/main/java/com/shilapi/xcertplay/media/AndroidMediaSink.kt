@@ -17,6 +17,8 @@ import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.AudioStreamId
 import com.shilapi.xcertplay.airplay.MediaSink
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
+import com.shilapi.xcertplay.network.GeelyHeadUnit
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.VideoCodec
@@ -501,9 +503,13 @@ class AndroidMediaSink(
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
         audioRenderer(id, format).start()
         if (format.audioType == "media") updateMediaAudio(id, true)
+        if (CarPlayTelephonyAudio.tracksCallLikeAudio(format.audioType)) {
+            CarPlayTelephonyAudio.started(id, format.audioType)
+        }
     }
 
     override fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) {
+        if (format.audioType == CarPlayTelephonyAudio.ALERT && CarPlayTelephonyAudio.telephonyActive()) return
         audioRenderer(id, format).submit(rtp, sample)
     }
 
@@ -513,6 +519,9 @@ class AndroidMediaSink(
             callEchoReferences.remove(id)
         }
         updateMediaAudio(id, false)
+        if (CarPlayTelephonyAudio.tracksCallLikeAudio(id.audioType)) {
+            CarPlayTelephonyAudio.stopped(id)
+        }
     }
 
     private fun updateMediaAudio(id: AudioStreamId, active: Boolean) {
@@ -527,9 +536,12 @@ class AndroidMediaSink(
     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
+            if (CarPlayTelephonyAudio.tracksCallLikeAudio(config.audioType)) {
+                CarPlayTelephonyAudio.started(id, config.audioType)
+            }
             val speakerphoneCall = config.audioType == "telephony" &&
                 appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext)
-            if (config.audioType == "telephony" && !speakerphoneCall) enterCommunicationMode(id)
+            if (!speakerphoneCall && needsCommunicationMode(config.audioType)) enterCommunicationMode(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
                 MicrophoneUplink(config, onAudioDiagnostic,
                     speakerphoneCall = speakerphoneCall,
@@ -550,8 +562,17 @@ class AndroidMediaSink(
         try {
             microphoneUplinks.remove(id)?.close()
         } finally {
+            if (CarPlayTelephonyAudio.tracksCallLikeAudio(id.audioType)) {
+                CarPlayTelephonyAudio.stopped(id)
+            }
             restoreAudioMode(id)
         }
+    }
+
+    private fun needsCommunicationMode(audioType: String): Boolean = when (audioType) {
+        "telephony" -> true
+        "speechrecognition" -> Hs5HeadUnit.detected || GeelyHeadUnit.detected
+        else -> false
     }
 
     private fun enterCommunicationMode(id: AudioStreamId) {
@@ -619,6 +640,7 @@ class AndroidMediaSink(
         audioRenderers.values.forEach(AudioRenderer::close)
         audioRenderers.clear()
         callEchoReferences.clear()
+        CarPlayTelephonyAudio.clear()
         val hadMedia = synchronized(mediaAudioTypes) { mediaAudioTypes.isNotEmpty().also { mediaAudioTypes.clear() } }
         if (hadMedia) onMediaAudioChanged(false)
         try {

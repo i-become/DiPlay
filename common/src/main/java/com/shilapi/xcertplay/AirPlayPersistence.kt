@@ -60,6 +60,7 @@ object AirPlayPersistence {
     private const val KEY_MANUAL_HOTSPOT_CHANNEL = "manual_hotspot_channel"
     private const val KEY_MANUAL_HOTSPOT_SECURITY = "manual_hotspot_security"
     private const val KEY_DEBUG_LOGS_ENABLED = "debug_logs_enabled"
+    private const val KEY_SESSION_LOG_RECORDING = "session_log_recording_enabled"
     private const val KEY_MANUFACTURER = "manufacturer"
     private const val KEY_MODEL = "model"
     private const val KEY_OEM_LABEL = "oem_label"
@@ -84,6 +85,7 @@ object AirPlayPersistence {
     private const val KEY_FPS_COUNTER = "fps_counter"
     private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
     private const val KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT = "cluster_fly_screen_default_on_connect"
+    private const val KEY_HS5_CLUSTER_ACTIVITY_WINDOW = "hs5_cluster_activity_window"
     private const val KEY_CLUSTER_MAP_HORIZONTAL_GESTURE = "cluster_map_horizontal_gesture_enabled"
     private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
     private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
@@ -467,6 +469,16 @@ object AirPlayPersistence {
     fun saveDebugLogsEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_DEBUG_LOGS_ENABLED, enabled)
+            .apply()
+    }
+
+    fun loadSessionLogRecordingEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SESSION_LOG_RECORDING, false)
+
+    fun saveSessionLogRecordingEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SESSION_LOG_RECORDING, enabled)
             .apply()
     }
 
@@ -864,6 +876,16 @@ object AirPlayPersistence {
     fun saveClusterFlyScreenDefaultOnConnect(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT, enabled).apply()
+    }
+
+    /** Hongqi 仪表飞屏 as its own activity on the cluster display instead of a presentation. */
+    fun loadHs5ClusterActivityWindow(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HS5_CLUSTER_ACTIVITY_WINDOW, true)
+
+    fun saveHs5ClusterActivityWindow(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_HS5_CLUSTER_ACTIVITY_WINDOW, enabled).apply()
     }
 
     /** Three-finger horizontal swipe in CarPlay to turn the cluster map on (left) or off (right). */

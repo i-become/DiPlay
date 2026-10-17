@@ -285,6 +285,23 @@ object Iap2ControlMessages {
             }
         }
 
+    fun startCommunicationsUpdates(): Iap2Frame =
+        Iap2Messages.build(Iap2Endpoints.START_COMMUNICATIONS_UPDATES) {
+            void(0)
+            void(4)
+            void(5)
+        }
+
+    fun startCallStateUpdates(): Iap2Frame =
+        Iap2Messages.build(Iap2Endpoints.START_CALL_STATE_UPDATES) {
+            void(0)
+            void(1)
+            void(2)
+            void(3)
+            void(4)
+            void(11)
+        }
+
     fun subscriptions(): List<Iap2Frame> = listOf(
         startNowPlayingUpdates(),
         Iap2Messages.build(Iap2Endpoints.START_ROUTE_GUIDANCE_UPDATES) {
@@ -297,19 +314,8 @@ object Iap2ControlMessages {
             void(5)
             void(6)
         },
-        Iap2Messages.build(Iap2Endpoints.START_COMMUNICATIONS_UPDATES) {
-            void(0)
-            void(4)
-            void(5)
-        },
-        Iap2Messages.build(Iap2Endpoints.START_CALL_STATE_UPDATES) {
-            void(0)
-            void(1)
-            void(2)
-            void(3)
-            void(4)
-            void(11)
-        },
+        startCommunicationsUpdates(),
+        startCallStateUpdates(),
     )
 
     fun locationInformation(nmeaSentence: String): Iap2Frame {

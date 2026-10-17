@@ -41,6 +41,7 @@ class CarPlayVpnConsentTest {
         )
         CarPlayBackgroundSession.clear()
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
+        AirPlayPersistence.saveSessionLogRecordingEnabled(activity, true)
         ReflectionHelpers.setField(activity, "stageStatusView", TextView(activity))
         invoke("initializeSessionLog")
         replaceLauncher { launches += 1 }

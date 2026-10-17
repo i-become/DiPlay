@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.CarPlayBackgroundSession
+import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
 import com.shilapi.xcertplay.Hs5HongqiStartupWarmup
 import com.shilapi.xcertplay.Hs5SteeringKeys
@@ -108,6 +109,7 @@ class NewUiActivity : ComponentActivity() {
     private var diagnosticUsbRoots by mutableStateOf(emptyList<RemovableStorageVolume>())
     private var diagnosticStoragePath by mutableStateOf("")
     private var diagnosticSaving by mutableStateOf(false)
+    private var sessionLogRecordingEnabled by mutableStateOf(false)
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
@@ -359,6 +361,10 @@ class NewUiActivity : ComponentActivity() {
                                     NewUiDisplayActions.saveClusterFlyScreenDefaultOnConnect(activity, enabled)
                                     refreshAll()
                                 },
+                                onClusterFlyScreenWindowChanged = { enabled ->
+                                    NewUiDisplayActions.saveClusterFlyScreenWindow(activity, enabled)
+                                    refreshAll()
+                                },
                                 onClusterGestureChanged = { enabled ->
                                     NewUiDisplayActions.saveClusterGesture(activity, enabled)
                                     refreshAll()
@@ -544,10 +550,17 @@ class NewUiActivity : ComponentActivity() {
                                 },
                             )
                             NewUiDiagnosticsSubpage.MAIN -> NewUiDiagnosticsScreen(
+                                sessionLogRecordingEnabled = sessionLogRecordingEnabled,
                                 storagePath = diagnosticStoragePath,
                                 reports = diagnosticReports,
                                 saving = diagnosticSaving,
                                 usbSaveRoots = diagnosticUsbRoots,
+                                onSessionLogRecordingChanged = { enabled ->
+                                    AirPlayPersistence.saveSessionLogRecordingEnabled(activity, enabled)
+                                    sessionLogRecordingEnabled = enabled
+                                    CarPlayHostSettingsBridge.notifySessionLogRecordingChanged()
+                                },
+                                onClearSessionLogs = { clearRecordedSessionLogs() },
                                 onSaveReport = { saveDiagnosticReport() },
                                 onSaveReportToUsb = { saveDiagnosticReportToUsb(it) },
                                 onViewReport = { openDiagnosticReport(it) },
@@ -643,6 +656,7 @@ class NewUiActivity : ComponentActivity() {
         diagnosticStoragePath = NewUiDiagnosticsRepository.storageHint(this)
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)
         diagnosticUsbRoots = DiagnosticRemovableVolumes.list(this)
+        sessionLogRecordingEnabled = AirPlayPersistence.loadSessionLogRecordingEnabled(this)
         phoneSelectionState = NewUiPhoneSelectionReader.read(this)
         if (connectionSubpage == NewUiConnectionSubpage.CONNECTION_METHOD) {
             manualHotspotOffHint = NewUiConnectionMethodActions.manualHotspotOff(this)
@@ -679,6 +693,11 @@ class NewUiActivity : ComponentActivity() {
     private fun saveDiagnosticReportToUsb(rootPath: String) {
         AirPlayPersistence.saveDiagnosticReportDirectory(this, rootPath)
         saveDiagnosticReport(rootPath)
+    }
+
+    private fun clearRecordedSessionLogs() {
+        CarPlayHostSettingsBridge.clearSessionLogs(this)
+        Toast.makeText(this, R.string.new_ui_diag_log_cleared, Toast.LENGTH_SHORT).show()
     }
 
     private fun openDiagnosticReport(file: NewUiDiagnosticFile) {

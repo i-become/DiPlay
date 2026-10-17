@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,6 +8,14 @@ plugins {
 // Optional local-only input. CI and ordinary source builds contain no accessory identity.
 val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
     .orNull?.let { file(it).canonicalFile }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use { stream -> load(stream) }
+}
+
+fun localOrEnv(env: String, propKey: String): String =
+    providers.environmentVariable(env).orNull ?: localProperties.getProperty(propKey).orEmpty()
 
 android {
     namespace = "com.shilapi.xcertplay"
@@ -17,8 +27,8 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 40
-        versionName = "1.0.3"
+        versionCode = 74
+        versionName = "1.0.38"
 
     }
 
@@ -27,13 +37,14 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(
-                providers.environmentVariable("ANDROID_KEYSTORE_PATH")
-                    .getOrElse("missing-release-keystore.jks"),
-            )
-            storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").getOrElse("")
-            keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").getOrElse("")
-            keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").getOrElse("")
+            val keystorePath = localOrEnv("ANDROID_KEYSTORE_PATH", "storeFile").ifBlank {
+                ".private/diplay-local.jks"
+            }
+            storeFile = file(keystorePath).takeIf { it.isAbsolute && it.isFile }
+                ?: rootProject.file(keystorePath)
+            storePassword = localOrEnv("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+            keyAlias = localOrEnv("ANDROID_KEY_ALIAS", "keyAlias")
+            keyPassword = localOrEnv("ANDROID_KEY_PASSWORD", "keyPassword")
         }
     }
 

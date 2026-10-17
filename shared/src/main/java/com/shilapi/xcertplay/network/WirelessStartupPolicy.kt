@@ -15,7 +15,9 @@ object WirelessStartupPolicy {
      */
     private const val HONGQI_HOTSPOT_READY_MILLIS = 6_000L
     /** HS5/QiSi often boot with Wi-Fi and hotspot already up; interface detection needs less headroom. */
-    private const val HONGQI_FAST_BRINGUP_MILLIS = 2_500L
+    private const val HONGQI_FAST_BRINGUP_MILLIS = 2_000L
+    private const val HONGQI_FIRST_TCP_MILLIS = 22_000L
+    private const val HONGQI_RFCOMM_CONNECT_MILLIS = 10_000L
     /** After boot, Hongqi Wi-Fi / P2P can look ready while the radio is still starting. */
     private const val HONGQI_BOOT_GRACE_MILLIS = 180_000L
     private const val GENERIC_BOOT_GRACE_MILLIS = 120_000L
@@ -74,18 +76,22 @@ object WirelessStartupPolicy {
         if (Hs5HeadUnit.isHeadUnit(context)) HONGQI_BOOT_GRACE_MILLIS else GENERIC_BOOT_GRACE_MILLIS
 
     fun wifiP2pStartTimeoutMillis(context: Context): Long {
-        if (Hs5HeadUnit.isHeadUnit(context) &&
-            SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS
-        ) {
-            return 35_000L
-        }
-        return 20_000L
+        if (!Hs5HeadUnit.isHeadUnit(context)) return 20_000L
+        val boot = SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS
+        return if (boot) 28_000L else 18_000L
     }
+
+    fun firstTcpTimeoutMillis(context: Context): Long =
+        if (Hs5HeadUnit.isHeadUnit(context)) HONGQI_FIRST_TCP_MILLIS else FIRST_TCP_MILLIS
+
+    fun rfcommConnectTimeoutMillis(context: Context): Long =
+        if (Hs5HeadUnit.isHeadUnit(context)) HONGQI_RFCOMM_CONNECT_MILLIS else 15_000L
 
     fun hongqiFastBringUp(context: Context, mode: WirelessHotspotMode): Boolean {
         if (!Hs5HeadUnit.isHeadUnit(context)) return false
-        if (SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS) return false
+        // Wi-Fi Direct / existing Wi-Fi: try the link immediately, including right after boot.
         if (optimisticStationWifi(context, mode)) return true
+        if (SystemClock.elapsedRealtime() < HONGQI_BOOT_GRACE_MILLIS) return false
         return when (mode) {
             WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI -> clientWifiEnabled(context)
             WirelessHotspotMode.MANUAL ->

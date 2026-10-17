@@ -148,12 +148,16 @@ object BydCarPlayCall {
     /** The current call, followed even while the setting is off so the wheel's call keys can act on it. */
     fun current(): CarPlayCallCard? = synchronized(state) { state.current() }
 
+    /** Called on the iAP2 thread whenever the current call appears, changes phase or ends. */
+    @Volatile var callChanged: ((CarPlayCallCard?) -> Unit)? = null
+
     fun onFrame(frame: Iap2Frame) {
         val card = synchronized(state) {
             if (!state.accept(frame)) return
             state.current()
         }
         Log.i(TAG, "CarPlay call ${card?.phase ?: "ended"}")
+        callChanged?.invoke(card)
         PhoneAudioRoute.carPlayCall(card != null)
         val app = context ?: return
         if (BydOutputSettings.carPlayCalls(app)) writer.execute { apply(app, card); if (card == null) arm(app) }
@@ -175,6 +179,7 @@ object BydCarPlayCall {
         sessionActive = false
         PhoneAudioRoute.carPlayCall(false)
         synchronized(state) { state.clear() }
+        callChanged?.invoke(null)
         val app = context ?: return
         writer.execute { resetRetry(null); apply(app, null); disarm(app) }
     }

@@ -19,7 +19,9 @@ captures/
 /agent_docs/
 
 # Decompiled third-party APK dumps (local reference only; never commit)
+docs
 docs/apk/
+dist
 
 # OS files
 .DS_Store

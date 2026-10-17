@@ -28,4 +28,17 @@ internal object CarPlayHostSettingsBridge {
     fun notifyClusterMapSettingsChanged() {
         hostRef?.get()?.reloadClusterMapFromSettings()
     }
+
+    fun flyScreenShown(): Boolean = hostRef?.get()?.flyScreenShown() == true
+
+    /** A wheel key closes the fly screen as the three-finger gesture does; the gesture reopens it. */
+    fun closeFlyScreen(reason: String): Boolean = hostRef?.get()?.closeFlyScreen(reason) == true
+
+    fun notifySessionLogRecordingChanged() {
+        hostRef?.get()?.syncSessionLogRecordingFromSettings()
+    }
+
+    fun clearSessionLogs(context: Context) {
+        hostRef?.get()?.clearRecordedSessionLogs() ?: DiPlaySessionLogFiles.clearAll(context)
+    }
 }

@@ -24,6 +24,7 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.NavigationPlayback
 import com.shilapi.xcertplay.hud.BydNavigationOutputs
 import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 /**
  * Optional: steering-wheel keys zoom CarPlay's dashboard map and work as a CarPlay joystick. BYD's window
@@ -126,6 +127,12 @@ class WheelKeyService : AccessibilityService() {
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         val down = event.action == KeyEvent.ACTION_DOWN
+        if (Hs5HeadUnit.isHeadUnit(this)) {
+            if (event.keyCode in Hs5ClusterActivity.CLOSE_KEYS && Hs5ClusterActivityOutput.isOpen()) {
+                if (!down && !event.isCanceled) Hs5ClusterActivityOutput.closeByDriver("key ${event.keyCode}")
+                return true
+            }
+        }
         val physicalKey = PhysicalWheelKey(event.deviceId, event.keyCode, event.scanCode)
         if (keys.hasConsumedPress(physicalKey)) {
             refreshEligibility()
