@@ -61,6 +61,7 @@ object AirPlayPersistence {
     private const val KEY_MANUAL_HOTSPOT_SECURITY = "manual_hotspot_security"
     private const val KEY_DEBUG_LOGS_ENABLED = "debug_logs_enabled"
     private const val KEY_SESSION_LOG_RECORDING = "session_log_recording_enabled"
+    private const val KEY_DEBUG_SIMULATED_CLUSTER = "debug_simulated_cluster_presentation"
     private const val KEY_MANUFACTURER = "manufacturer"
     private const val KEY_MODEL = "model"
     private const val KEY_OEM_LABEL = "oem_label"
@@ -479,6 +480,17 @@ object AirPlayPersistence {
     fun saveSessionLogRecordingEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_SESSION_LOG_RECORDING, enabled)
+            .apply()
+    }
+
+    /** Uses any presentation display (e.g. developer simulated secondary) as the cluster output. */
+    fun loadDebugSimulatedClusterPresentation(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_DEBUG_SIMULATED_CLUSTER, false)
+
+    fun saveDebugSimulatedClusterPresentation(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_DEBUG_SIMULATED_CLUSTER, enabled)
             .apply()
     }
 
@@ -1001,6 +1013,18 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CLUSTER_CONTENT, null)
             ?.let { name -> CarPlayClusterDisplay.Content.entries.firstOrNull { it.name == name } }
             ?: if (AdbClusterRouter.enabled(context) && !loadLegacyClusterEnabled(context)) CarPlayClusterDisplay.Content.INSTRUMENTS else CarPlayClusterDisplay.Content.MAP
+
+    /** Simulated-cluster debug uses Apple Maps instrument-cluster UI, not the full-map URL. */
+    fun effectiveClusterContent(context: Context): CarPlayClusterDisplay.Content =
+        if (loadDebugSimulatedClusterPresentation(context)) {
+            CarPlayClusterDisplay.Content.INSTRUMENTS
+        } else {
+            loadClusterContent(context)
+        }
+
+    /** Phone bench testing: send $PASCD from GPS (or a demo speed) for Ultra instrument-cluster UI. */
+    fun debugSimulatedClusterVehicleSpeedActive(context: Context): Boolean =
+        loadDebugSimulatedClusterPresentation(context) && loadLocationReportingEnabled(context)
 
     fun saveClusterContent(context: Context, content: CarPlayClusterDisplay.Content) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CLUSTER_CONTENT, content.name).apply()

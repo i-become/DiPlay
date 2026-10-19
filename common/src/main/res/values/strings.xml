@@ -245,9 +245,9 @@
     <string name="carplay_wait_step_21">Phone reported wireless readiness</string>
     <string name="carplay_wait_step_22">Asking iPhone to join the hotspot</string>
     <string name="carplay_wait_step_23">iPhone updating Wi‑Fi configuration</string>
-    <string name="carplay_wait_step_24">Waiting for iPhone on Wi‑Fi…</string>
-    <string name="carplay_wait_step_25">Waiting for iPhone on Wi‑Fi…</string>
-    <string name="carplay_wait_step_26">Wireless data link established</string>
+    <string name="carplay_wait_step_24">Waiting for AirPlay data…</string>
+    <string name="carplay_wait_step_25">Waiting for AirPlay data…</string>
+    <string name="carplay_wait_step_26">Waiting for AirPlay data…</string>
     <string name="carplay_wait_step_27">Preparing the display</string>
     <string name="got_it">Got it</string>
     <string name="handshake_resolution_waiting_for_display">Handshake resolution: waiting for display</string>
@@ -1046,6 +1046,9 @@
     <string name="new_ui_diag_log_record_sub">When on, DiPlay writes a rolling log file included in exported reports. When off, nothing is written to disk.</string>
     <string name="new_ui_diag_log_clear">Clear recorded logs</string>
     <string name="new_ui_diag_log_cleared">Recorded logs cleared.</string>
+    <string name="new_ui_diag_simulated_cluster_title">Use simulated display as cluster (experimental)</string>
+    <string name="new_ui_diag_simulated_cluster_sub">For Developer options secondary displays. Requests Ultra cluster layout; if the iPhone sends map-only video, DiPlay draws simulated left/right gauges (bench preview, not identical to real Ultra). Needs location reporting, cluster map on, and reconnect.</string>
+    <string name="new_ui_diag_simulated_cluster_toast">Simulated cluster setting saved. Reconnect CarPlay if the session is already running.</string>
     <string name="new_ui_diag_save_title">Save diagnostic report</string>
     <string name="new_ui_diag_save_sub">Export a text report for troubleshooting.</string>
     <string name="new_ui_diag_storage_title">Save location</string>

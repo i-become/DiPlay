@@ -189,7 +189,10 @@ class CarPlayHostActivity : ComponentActivity() {
             locationInformationEnabled = locationReportingEnabled,
             vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
             chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
-            vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
+            vehicleSpeedEnabled = locationReportingEnabled && (
+                com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) ||
+                    AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)
+                ),
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -1038,6 +1041,7 @@ class CarPlayHostActivity : ComponentActivity() {
             clusterFlyScreenVisible = true
             ensureClusterPresentation()
             refreshClusterStreamRoutingAfterToggle()
+            applyUltraClusterDashboardIfNeeded()
         }
     }
 
@@ -1241,6 +1245,7 @@ class CarPlayHostActivity : ComponentActivity() {
             applyClusterTurnOverlay()
             Log.i(ClusterMapPresentation.TAG, "cluster presentation shown display=${display.displayId} name=${display.name}")
             appendLog("Cluster map: presentation shown display=${display.displayId} name=${display.name}")
+            applyUltraClusterDashboardIfNeeded()
         } catch (error: RuntimeException) {
             Log.w(ClusterMapPresentation.TAG, "cluster presentation failed", error)
             appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}")
@@ -1336,7 +1341,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun applyClusterTurnOverlay() {
-        val overlay = CarPlayClusterDisplay.usesCustomTurnCard(AirPlayPersistence.loadClusterContent(this))
+        val overlay = CarPlayClusterDisplay.usesCustomTurnCard(AirPlayPersistence.effectiveClusterContent(this))
         // CN: the small-window navi keeps a second card rect, and the card glass has a theme override.
         val smallWindow = smallWindowActive()
         val xPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowCardXPercent(this)
@@ -1405,7 +1410,10 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         syncClusterPresentationStreamState()
         updateClusterMapShown()
-        if (surface != null) nudgeClusterStreamDelivery()
+        if (surface != null) {
+            applyUltraClusterDashboardIfNeeded()
+            nudgeClusterStreamDelivery()
+        }
     }
 
     private var adbClusterConfigured = false
@@ -1437,7 +1445,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (AdbClusterRouter.enabled(this) && ClusterActivityOutput.hasConfirmedRoute()) {
             adbClusterConfigured = true
             clusterStreamOnDisplay = true
-            return DiLink4ClusterDisplay.streamConfig(AirPlayPersistence.loadClusterContent(this),
+            return DiLink4ClusterDisplay.streamConfig(AirPlayPersistence.effectiveClusterContent(this),
                 safeAreaRect = AirPlayPersistence.loadClusterSafeAreaRect(this),
                 markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
                 markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this)).also {
@@ -1460,7 +1468,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
                 if (DiLink4ClusterDisplay.matches(display.name, size.x, size.y)) {
                     return DiLink4ClusterDisplay.streamConfig(
-                        AirPlayPersistence.loadClusterContent(this),
+                        AirPlayPersistence.effectiveClusterContent(this),
                         safeAreaRect = AirPlayPersistence.loadClusterSafeAreaRect(this),
                         markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
                         markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this),
@@ -1475,7 +1483,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     scale,
                     0,
                     0,
-                    AirPlayPersistence.loadClusterContent(this),
+                    AirPlayPersistence.effectiveClusterContent(this),
                     markerXPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerXPercent(this)
                     else AirPlayPersistence.loadClusterMarkerXPercent(this),
                     markerYPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerYPercent(this)
@@ -1498,6 +1506,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 } else requested
                 return effective.also {
                     MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
+                    Log.i(TAG, "Cluster stream config ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}")
                     appendLog("Cluster map: requesting ${it.widthPixels}x${it.heightPixels} on ${size.x}x${size.y} safeArea=${it.safeArea} url=${it.initialUrl}")
                 }
             }
@@ -1509,10 +1518,49 @@ class CarPlayHostActivity : ComponentActivity() {
             widthPixels = 1280,
             heightPixels = 720,
             scalePercent = 100,
-            content = AirPlayPersistence.loadClusterContent(this),
+            content = AirPlayPersistence.effectiveClusterContent(this),
             baseSafeArea = CarPlayClusterDisplay.VIRTUAL_SAFE_AREA_PERCENT,
         ).also {
+            Log.i(TAG, "Cluster virtual stream ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}")
             appendLog("Cluster map: requesting virtual ${it.widthPixels}x${it.heightPixels} (16:9) stream for launcher/center card")
+        }
+    }
+
+    private var lastUltraClusterDashboardSuccessAt = 0L
+    private var ultraClusterDashboardRetryScheduled = false
+
+    private fun applyUltraClusterDashboardIfNeeded(retryAttempt: Int = 0) {
+        if (!AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)) return
+        val url = CarPlayClusterDisplay.Content.INSTRUMENTS.url
+        val active = controller
+        if (active == null) {
+            Log.i(TAG, "Cluster dashboard pending url=$url (no controller yet)")
+            return
+        }
+        val now = SystemClock.uptimeMillis()
+        if (retryAttempt == 0 &&
+            now - lastUltraClusterDashboardSuccessAt < ULTRA_CLUSTER_DASHBOARD_DEBOUNCE_MILLIS
+        ) {
+            Log.i(TAG, "Cluster dashboard debounced url=$url (recent success)")
+            return
+        }
+        active.showDashboardContent(url) { sent ->
+            Log.i(TAG, "Cluster dashboard showUI url=$url sent=$sent attempt=$retryAttempt vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this@CarPlayHostActivity)}")
+            appendLog("Cluster dashboard: request Ultra instruments url=$url sent=$sent")
+            if (sent) {
+                lastUltraClusterDashboardSuccessAt = SystemClock.uptimeMillis()
+                ultraClusterDashboardRetryScheduled = false
+                nudgeClusterStreamDelivery()
+            } else if (retryAttempt < ULTRA_CLUSTER_DASHBOARD_MAX_RETRIES) {
+                val delay = ULTRA_CLUSTER_DASHBOARD_RETRY_BASE_MILLIS * (retryAttempt + 1)
+                if (!ultraClusterDashboardRetryScheduled) {
+                    ultraClusterDashboardRetryScheduled = true
+                    mainHandler.postDelayed({
+                        ultraClusterDashboardRetryScheduled = false
+                        applyUltraClusterDashboardIfNeeded(retryAttempt + 1)
+                    }, delay)
+                }
+            }
         }
     }
 
@@ -5251,6 +5299,14 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         )
         updateDebugOverlays()
+        Log.i(
+            TAG,
+            "Background CarPlay adopted serviceReused=$serviceReused " +
+                "debugSimulatedCluster=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)} " +
+                "effectiveClusterUrl=${AirPlayPersistence.effectiveClusterContent(this).url}",
+        )
+        reloadClusterMapFromSettings()
+        applyUltraClusterDashboardIfNeeded()
         return true
     }
 
@@ -5268,12 +5324,28 @@ class CarPlayHostActivity : ComponentActivity() {
             size
         }
         val airPlayConfig = createAirPlayConfig(effectiveSize)
+        Log.i(
+            TAG,
+            "CarPlay cluster advertised=${airPlayConfig.cluster != null} " +
+                "initialUrl=${airPlayConfig.cluster?.initialUrl} " +
+                "simulatedPresentation=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)} " +
+                "vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)}",
+        )
         val locationProvider: Iap2LocationProvider? =
             when {
                 !config.locationReportingEnabled -> null
                 config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
                     AndroidCarPlayLocationProvider(this),
-                    com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(applicationContext),
+                    if (AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)) {
+                        com.shilapi.xcertplay.transport.LocationVehicleSpeedSource(
+                            this,
+                            demoMetersPerSecondWhenStationary =
+                                com.shilapi.xcertplay.transport.DEBUG_CLUSTER_DEMO_SPEED_METERS_PER_SECOND,
+                            onSpeedSample = SimulatedClusterSpeedHub::publishMetersPerSecond,
+                        )
+                    } else {
+                        com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(applicationContext)
+                    },
                 )
                 else -> AndroidCarPlayLocationProvider(this)
             }
@@ -6292,6 +6364,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 Hs5ClusterActivityOutput.setStreamActive(active)
                 MapMirrors.setStreamActive(active)
                 if (active) {
+                    applyUltraClusterDashboardIfNeeded()
                     mainHandler.removeCallbacks(hideIdleCenterMap)
                     if (AirPlayPersistence.loadClusterMapEnabled(this)) {
                         if (!CenterMapOverlay.shown) CenterMapOverlay.scheduleShow()
@@ -6631,6 +6704,9 @@ class CarPlayHostActivity : ComponentActivity() {
         const val SINK_RELEASE_WAIT_MILLIS = 2_000L
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
         private const val CLUSTER_STREAM_NUDGE_MILLIS = 2_500L
+        private const val ULTRA_CLUSTER_DASHBOARD_DEBOUNCE_MILLIS = 5_000L
+        private const val ULTRA_CLUSTER_DASHBOARD_RETRY_BASE_MILLIS = 800L
+        private const val ULTRA_CLUSTER_DASHBOARD_MAX_RETRIES = 8
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L

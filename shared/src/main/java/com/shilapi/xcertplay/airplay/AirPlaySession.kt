@@ -231,6 +231,7 @@ class AirPlaySession(
         val uiSent = sendCommand(mapOf("type" to "showUI", "params" to mapOf("uuid" to uuid, "url" to url)))
         val sent = uiSent && clusterStream == content.stream && !closed.get() &&
             sendCommand(mapOf("type" to "forceKeyFrame", "params" to mapOf("uuid" to uuid)))
+        Log.i(TAG, "cluster showUI url=$url uiSent=$uiSent sent=$sent stream=${content.stream}")
         return synchronized(clusterContentLock) {
             val current = clusterContent ?: return false
             if (closed.get() || current.stream != content.stream || clusterStream != content.stream) {
@@ -572,7 +573,8 @@ class AirPlaySession(
                     TAG,
                     "airplay /info features=${info["features"]} " +
                         "audioFormats=${(info["audioFormats"] as? List<*>)?.size ?: 0} " +
-                        "audioLatencies=${(info["audioLatencies"] as? List<*>)?.size ?: 0}",
+                        "audioLatencies=${(info["audioLatencies"] as? List<*>)?.size ?: 0} " +
+                        "clusterInitialUrl=${config.cluster?.initialUrl}",
                 )
                 debugLog(
                     "airplay /info videoInCar=${config.videoInCar} " +

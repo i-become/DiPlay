@@ -110,6 +110,7 @@ class NewUiActivity : ComponentActivity() {
     private var diagnosticStoragePath by mutableStateOf("")
     private var diagnosticSaving by mutableStateOf(false)
     private var sessionLogRecordingEnabled by mutableStateOf(false)
+    private var debugSimulatedClusterEnabled by mutableStateOf(false)
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
@@ -551,6 +552,7 @@ class NewUiActivity : ComponentActivity() {
                             )
                             NewUiDiagnosticsSubpage.MAIN -> NewUiDiagnosticsScreen(
                                 sessionLogRecordingEnabled = sessionLogRecordingEnabled,
+                                debugSimulatedClusterEnabled = debugSimulatedClusterEnabled,
                                 storagePath = diagnosticStoragePath,
                                 reports = diagnosticReports,
                                 saving = diagnosticSaving,
@@ -561,6 +563,16 @@ class NewUiActivity : ComponentActivity() {
                                     CarPlayHostSettingsBridge.notifySessionLogRecordingChanged()
                                 },
                                 onClearSessionLogs = { clearRecordedSessionLogs() },
+                                onDebugSimulatedClusterChanged = { enabled ->
+                                    AirPlayPersistence.saveDebugSimulatedClusterPresentation(activity, enabled)
+                                    debugSimulatedClusterEnabled = enabled
+                                    CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
+                                    Toast.makeText(
+                                        activity,
+                                        R.string.new_ui_diag_simulated_cluster_toast,
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                },
                                 onSaveReport = { saveDiagnosticReport() },
                                 onSaveReportToUsb = { saveDiagnosticReportToUsb(it) },
                                 onViewReport = { openDiagnosticReport(it) },
@@ -657,6 +669,7 @@ class NewUiActivity : ComponentActivity() {
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)
         diagnosticUsbRoots = DiagnosticRemovableVolumes.list(this)
         sessionLogRecordingEnabled = AirPlayPersistence.loadSessionLogRecordingEnabled(this)
+        debugSimulatedClusterEnabled = AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)
         phoneSelectionState = NewUiPhoneSelectionReader.read(this)
         if (connectionSubpage == NewUiConnectionSubpage.CONNECTION_METHOD) {
             manualHotspotOffHint = NewUiConnectionMethodActions.manualHotspotOff(this)

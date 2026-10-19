@@ -241,9 +241,9 @@
     <string name="carplay_wait_step_21">收到手机就绪状态</string>
     <string name="carplay_wait_step_22">请求 iPhone 加入热点</string>
     <string name="carplay_wait_step_23">iPhone 正在更新 Wi‑Fi</string>
-    <string name="carplay_wait_step_24">等待 iPhone 连上 Wi‑Fi…</string>
-    <string name="carplay_wait_step_25">等待 iPhone 连上 Wi‑Fi…</string>
-    <string name="carplay_wait_step_26">无线数据链路已建立</string>
+    <string name="carplay_wait_step_24">等待 AirPlay 数据通道…</string>
+    <string name="carplay_wait_step_25">等待 AirPlay 数据通道…</string>
+    <string name="carplay_wait_step_26">等待 AirPlay 数据连接…</string>
     <string name="carplay_wait_step_27">正在准备画面</string>
     <string name="got_it">知道了</string>
     <string name="handshake_resolution_waiting_for_display">握手分辨率：正在等待显示屏</string>
@@ -1005,6 +1005,9 @@
     <string name="new_ui_diag_log_record_sub">开启后 DiPlay 会持续写入日志文件，导出诊断报告时会附带。关闭后不会写入磁盘。</string>
     <string name="new_ui_diag_log_clear">清空已记录日志</string>
     <string name="new_ui_diag_log_cleared">已清空记录的日志。</string>
+    <string name="new_ui_diag_simulated_cluster_title">使用模拟副屏作仪表（实验性）</string>
+    <string name="new_ui_diag_simulated_cluster_sub">适用于开发者选项中的模拟辅助显示。会请求 Ultra 组合布局；若 iPhone 只推中间地图，DiPlay 会在左右叠加模拟速度/转速表（与真车 iPhone 合成画面不同，仅供测试）。需开启位置报告与仪表地图并重连。</string>
+    <string name="new_ui_diag_simulated_cluster_toast">模拟仪表设置已保存。若 CarPlay 已在运行，请重新连接。</string>
     <string name="new_ui_diag_save_title">保存诊断报告</string>
     <string name="new_ui_diag_save_sub">导出文本报告，便于排查问题。</string>
     <string name="new_ui_diag_storage_title">保存位置</string>

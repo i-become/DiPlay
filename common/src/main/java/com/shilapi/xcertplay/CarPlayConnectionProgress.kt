@@ -168,8 +168,8 @@ internal object CarPlayConnectionProgress {
                 (it.contains("wireless bonjour:") && it.contains("stage=TCP_CONNECTED"))
         },
         LogMarker(26) {
-            waitFirstTcpElapsedMs(it)?.let { ms -> ms >= 9_000 } == true ||
-                it.contains("first TCP atNs=")
+            it.contains("first TCP atNs=") ||
+                (it.contains("wireless bonjour:") && it.contains("stage=TCP_CONNECTED"))
         },
         LogMarker(27) {
             it.contains("session established atNs=") ||

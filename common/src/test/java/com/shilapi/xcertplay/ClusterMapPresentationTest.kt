@@ -160,6 +160,17 @@ class ClusterMapPresentationTest {
             ShadowDisplayManager.removeDisplay(other)
         }
     }
+
+    @Test fun debugModeUsesAGenericPresentationDisplay() {
+        val other = display("Simulated secondary")
+        AirPlayPersistence.saveDebugSimulatedClusterPresentation(context, true)
+        try {
+            assertEquals(other, ClusterMapPresentation.findDisplay(context)?.displayId)
+        } finally {
+            AirPlayPersistence.saveDebugSimulatedClusterPresentation(context, false)
+            ShadowDisplayManager.removeDisplay(other)
+        }
+    }
     @Test fun dilink4MeasuredProjectionIsSelected() {
         val id = display(DiLink4ClusterDisplay.NAME, "w1920dp-h720dp-mdpi")
         try {

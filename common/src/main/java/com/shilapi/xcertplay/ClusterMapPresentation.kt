@@ -140,6 +140,10 @@ internal class ClusterMapPresentation(
         turnCardView = ClusterTurnCardView(context).apply { visibility = View.GONE }
         root.addView(turnCardView, FrameLayout.LayoutParams(-1, -1))
         root.addView(ClusterSpeedometerView(context), FrameLayout.LayoutParams(-1, -1))
+        if (AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)) {
+            root.addView(SimulatedUltraLeftSpeedGauge(context), FrameLayout.LayoutParams(-1, -1))
+            root.addView(SimulatedUltraRightGauge(context), FrameLayout.LayoutParams(-1, -1))
+        }
         // Start with the placeholder visible; SurfaceView would otherwise cover the light
         // backdrop with an empty black surface before the first stream notification.
         // SurfaceView ignores fractional alpha before API 34. Keep its decoder surface
@@ -205,6 +209,10 @@ internal class ClusterMapPresentation(
         fun findDisplay(context: Context, theme: DiLink51ClusterLayout.Theme = DiLink51ClusterLayout.theme(context)): Display? {
             val displays = context.getSystemService(DisplayManager::class.java)
                 ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION) ?: return null
+            if (AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)) {
+                val mainId = context.display?.displayId ?: Display.DEFAULT_DISPLAY
+                SimulatedClusterPresentationPick.pick(mainId, displays, ::sizeOf)?.let { return it }
+            }
             val name = DiLink51ClusterLayout.displayName(
                 displays.map { it.name }, android.os.Build.FINGERPRINT, theme,
             )
@@ -247,6 +255,9 @@ internal class ClusterMapPresentation(
 
         fun diagnosticReport(context: Context): String = buildString {
             appendLine("clusterEnabled=${AirPlayPersistence.loadClusterMapEnabled(context)}")
+            appendLine(
+                "debugSimulatedCluster=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)}",
+            )
             appendLine("navigationReceiverAvailable=${com.shilapi.xcertplay.hud.BydOutputSettings.navigationAvailable(context)}")
             appendLine("gaodePackage=${com.shilapi.xcertplay.hud.BydOutputSettings.resolvedGaodePackage(context)}")
             appendLine("hs5ClusterPresentation=${Hs5HeadUnit.hasClusterPresentation(context)}")

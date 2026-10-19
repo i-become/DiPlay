@@ -34,4 +34,27 @@ class ClusterSafeAreaPersistenceTest {
             AirPlayPersistence.loadClusterContent(context))
     }
 
+    @Test fun debugSimulatedClusterVehicleSpeedNeedsLocationReporting() {
+        val context = RuntimeEnvironment.getApplication()
+        AirPlayPersistence.saveDebugSimulatedClusterPresentation(context, true)
+        AirPlayPersistence.saveLocationReportingEnabled(context, false)
+        assertFalse(AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(context))
+        AirPlayPersistence.saveLocationReportingEnabled(context, true)
+        assertTrue(AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(context))
+    }
+
+    @Test fun debugSimulatedClusterUsesInstrumentsContent() {
+        val context = RuntimeEnvironment.getApplication()
+        AirPlayPersistence.saveDebugSimulatedClusterPresentation(context, true)
+        assertEquals(
+            com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.Content.INSTRUMENTS,
+            AirPlayPersistence.effectiveClusterContent(context),
+        )
+        AirPlayPersistence.saveDebugSimulatedClusterPresentation(context, false)
+        assertEquals(
+            com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.Content.MAP,
+            AirPlayPersistence.effectiveClusterContent(context),
+        )
+    }
+
 }

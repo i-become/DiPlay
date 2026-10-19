@@ -238,9 +238,9 @@
     <string name="carplay_wait_step_21">El teléfono informó que está listo</string>
     <string name="carplay_wait_step_22">Pidiendo al iPhone unirse al punto de acceso</string>
     <string name="carplay_wait_step_23">El iPhone actualiza la configuración Wi‑Fi</string>
-    <string name="carplay_wait_step_24">Esperando al iPhone en Wi‑Fi…</string>
-    <string name="carplay_wait_step_25">Esperando al iPhone en Wi‑Fi…</string>
-    <string name="carplay_wait_step_26">Enlace de datos inalámbrico establecido</string>
+    <string name="carplay_wait_step_24">Esperando datos de AirPlay…</string>
+    <string name="carplay_wait_step_25">Esperando datos de AirPlay…</string>
+    <string name="carplay_wait_step_26">Esperando datos de AirPlay…</string>
     <string name="carplay_wait_step_27">Preparando la pantalla</string>
     <string name="got_it">Entendido</string>
     <string name="handshake_resolution_waiting_for_display">Resolución del enlace: esperando la pantalla</string>

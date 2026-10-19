@@ -40,12 +40,14 @@ import com.shilapi.xcertplay.newui.NewUiTypography
 @Composable
 fun NewUiDiagnosticsScreen(
     sessionLogRecordingEnabled: Boolean,
+    debugSimulatedClusterEnabled: Boolean,
     storagePath: String,
     reports: List<NewUiDiagnosticFile>,
     saving: Boolean,
     usbSaveRoots: List<RemovableStorageVolume>,
     onSessionLogRecordingChanged: (Boolean) -> Unit,
     onClearSessionLogs: () -> Unit,
+    onDebugSimulatedClusterChanged: (Boolean) -> Unit,
     onSaveReport: () -> Unit,
     onSaveReportToUsb: (String) -> Unit,
     onViewReport: (NewUiDiagnosticFile) -> Unit,
@@ -75,6 +77,16 @@ fun NewUiDiagnosticsScreen(
                 modifier = Modifier
                     .padding(horizontal = 22.dp)
                     .padding(bottom = 20.dp),
+            )
+        }
+        NewUiPanel {
+            NewUiToggleRow(
+                iconRes = R.drawable.ic_dp_display,
+                title = stringResource(R.string.new_ui_diag_simulated_cluster_title),
+                subtitle = stringResource(R.string.new_ui_diag_simulated_cluster_sub),
+                checked = debugSimulatedClusterEnabled,
+                onCheckedChange = onDebugSimulatedClusterChanged,
+                showDivider = false,
             )
         }
         NewUiPanel {

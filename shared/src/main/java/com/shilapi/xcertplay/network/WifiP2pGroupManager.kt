@@ -120,9 +120,6 @@ class WifiP2pGroupManager(
         val attempt = StartAttempt()
         synchronized(stateLock) {
             check(!closed) { "WifiP2pGroupManager is closed" }
-            if (created && channel != null) {
-                return refreshActiveGroup(timeoutMillis)
-            }
             check(startAttempt == null && !created) {
                 "A Wi-Fi P2P group is already starting or active"
             }
@@ -182,29 +179,9 @@ class WifiP2pGroupManager(
             val existing = requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true)
             diagnostic("Wi-Fi P2P existingGroup=${existing != null}")
             if (existing != null) {
-                val recordedSsid = ownership.getString("owned_ssid", null)
-                if (!P2pOwnership.canReclaim(existing.isGroupOwner, existing.networkName, recordedSsid, ssidPrefix)) {
+                if (!P2pOwnership.canReclaim(existing.isGroupOwner, existing.networkName,
+                        ownership.getString("owned_ssid", null), ssidPrefix)) {
                     throw P2pResetRequiredException()
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val reused = runCatching {
-                        hotspotInfoFromGroup(
-                            attempt = attempt,
-                            channel = p2pChannel,
-                            group = existing,
-                            expectedSsid = null,
-                            deadlineNanos = deadlineNanos,
-                        )
-                    }.getOrNull()
-                    if (reused != null) {
-                        diagnostic("Wi-Fi P2P reusing active owned group ssid=${existing.networkName}")
-                        synchronized(stateLock) {
-                            ensureStartActiveLocked(attempt)
-                            created = true
-                            startAttempt = null
-                        }
-                        return reused
-                    }
                 }
                 diagnostic("Wi-Fi P2P reclaiming retained owned group")
                 removeGroupBlocking(p2pChannel, existing.networkName)
@@ -527,80 +504,6 @@ class WifiP2pGroupManager(
         }
     }
 
-    private fun refreshActiveGroup(timeoutMillis: Long): WirelessHotspotInfo {
-        val channel = synchronized(stateLock) { channel ?: error("Wi-Fi P2P channel is unavailable") }
-        diagnostic("Wi-Fi P2P refresh active group")
-        val attempt = StartAttempt()
-        val deadlineNanos = deadlineAfter(timeoutMillis)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            while (true) {
-                val remainingNanos = remainingNanos(deadlineNanos)
-                if (remainingNanos <= 0) {
-                    throw IOException("Timed out after ${timeoutMillis}ms refreshing Wi-Fi P2P group")
-                }
-                val group = requestGroupInfo(
-                    attempt = attempt,
-                    channel = channel,
-                    timeoutNanos = minOf(remainingNanos, REQUEST_POLL_NANOS),
-                ) ?: continue
-                hotspotInfoFromGroup(
-                    attempt,
-                    channel,
-                    group,
-                    expectedSsid = null,
-                    deadlineNanos,
-                )?.let { return it }
-            }
-        }
-        throw IOException("Wi-Fi P2P refresh is unavailable on this Android version")
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun hotspotInfoFromGroup(
-        attempt: StartAttempt,
-        channel: WifiP2pManager.Channel,
-        group: WifiP2pGroup,
-        expectedSsid: String?,
-        deadlineNanos: Long,
-        credentialsPassphrase: String? = null,
-    ): WirelessHotspotInfo? {
-        if (!group.isGroupOwner) throw IOException("Wi-Fi P2P device became a group client instead of owner")
-        val networkName = group.networkName?.takeIf { it.isNotBlank() } ?: return null
-        if (expectedSsid != null && networkName != expectedSsid) {
-            throw IOException("Wi-Fi Direct returned an unexpected group")
-        }
-        val passphrase = group.passphrase?.takeIf { it.isNotBlank() } ?: credentialsPassphrase ?: return null
-        val interfaceName = group.getInterface()?.takeIf { it.isNotBlank() } ?: return null
-        val frequencyMHz = group.frequency
-        val channelNumber = wifiFrequencyMhzToChannel(frequencyMHz) ?: return null
-        if (frequencyMHz <= 0) return null
-        val band = when {
-            is5Ghz(frequencyMHz) -> "5 GHz"
-            frequencyMHz in 2412..2484 -> "2.4 GHz"
-            else -> throw IOException("Wi-Fi P2P returned an unsupported band at ${frequencyMHz}MHz")
-        }
-        val hostAddress = awaitInterfaceAddress(attempt, interfaceName, deadlineNanos)
-            ?: requestConnectionAddress(
-                attempt = attempt,
-                channel = channel,
-                timeoutNanos = minOf(remainingNanos(deadlineNanos), REQUEST_POLL_NANOS),
-            )
-            ?: return null
-        return WirelessHotspotInfo(
-            ssid = networkName,
-            passphrase = passphrase,
-            security = groupSecurity(group),
-            channel = channelNumber,
-            frequencyMHz = frequencyMHz,
-            bssid = interfaceHardwareAddress(interfaceName)
-                ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
-            interfaceName = interfaceName,
-            hostAddress = hostAddress,
-            bandLabel = band,
-            backend = WirelessHotspotBackend.WIFI_P2P,
-        )
-    }
-
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun awaitUsableGroup(
         attempt: StartAttempt,
@@ -626,21 +529,58 @@ class WifiP2pGroupManager(
                 timeoutNanos = minOf(remainingNanos, REQUEST_POLL_NANOS),
             )
             if (group == null) continue
-            val info = runCatching {
-                hotspotInfoFromGroup(
-                    attempt = attempt,
-                    channel = channel,
-                    group = group,
-                    expectedSsid = credentials?.ssid,
-                    deadlineNanos = deadlineNanos,
-                    credentialsPassphrase = credentials?.passphrase,
-                )
-            }.getOrElse { throw it }
-            if (info == null) {
-                lastReason = "incomplete group details frequencyMHz=${group.frequency}"
+            if (!group.isGroupOwner) {
+                throw IOException("Wi-Fi P2P device became a group client instead of owner")
+            }
+
+            val networkName = group.networkName?.takeIf { it.isNotBlank() }
+            if (credentials != null && networkName != null && networkName != credentials.ssid) {
+                throw IOException("Wi-Fi Direct returned an unexpected group")
+            }
+            val passphrase = group.passphrase?.takeIf { it.isNotBlank() }
+                ?: credentials?.passphrase
+            val interfaceName = group.getInterface()?.takeIf { it.isNotBlank() }
+            val frequencyMHz = group.frequency
+            val channelNumber = wifiFrequencyMhzToChannel(frequencyMHz)
+            if (
+                networkName == null || passphrase == null ||
+                interfaceName == null ||
+                frequencyMHz <= 0 ||
+                channelNumber == null
+            ) {
+                lastReason = "incomplete group details frequencyMHz=$frequencyMHz"
                 continue
             }
-            return info
+            val band = when {
+                is5Ghz(frequencyMHz) -> "5 GHz"
+                frequencyMHz in 2412..2484 -> "2.4 GHz"
+                else -> throw IOException("Wi-Fi P2P returned an unsupported band at ${frequencyMHz}MHz")
+            }
+
+            val hostAddress = awaitInterfaceAddress(attempt, interfaceName, deadlineNanos)
+                ?: requestConnectionAddress(
+                    attempt = attempt,
+                    channel = channel,
+                    timeoutNanos = minOf(remainingNanos(deadlineNanos), REQUEST_POLL_NANOS),
+                )
+            if (hostAddress == null) {
+                lastReason = "interface $interfaceName has no usable IPv6 or IPv4 address"
+                continue
+            }
+
+            return WirelessHotspotInfo(
+                ssid = networkName,
+                passphrase = passphrase,
+                security = groupSecurity(group),
+                channel = channelNumber,
+                frequencyMHz = frequencyMHz,
+                bssid = interfaceHardwareAddress(interfaceName)
+                    ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
+                interfaceName = interfaceName,
+                hostAddress = hostAddress,
+                bandLabel = band,
+                backend = WirelessHotspotBackend.WIFI_P2P,
+            )
         }
     }
 

@@ -238,9 +238,9 @@
     <string name="carplay_wait_step_21">Телефон сообщил о готовности</string>
     <string name="carplay_wait_step_22">Запрос iPhone подключиться к точке доступа</string>
     <string name="carplay_wait_step_23">iPhone обновляет настройки Wi‑Fi</string>
-    <string name="carplay_wait_step_24">Ожидание iPhone в Wi‑Fi…</string>
-    <string name="carplay_wait_step_25">Ожидание iPhone в Wi‑Fi…</string>
-    <string name="carplay_wait_step_26">Беспроводной канал данных установлен</string>
+    <string name="carplay_wait_step_24">Ожидание канала AirPlay…</string>
+    <string name="carplay_wait_step_25">Ожидание канала AirPlay…</string>
+    <string name="carplay_wait_step_26">Ожидание AirPlay…</string>
     <string name="carplay_wait_step_27">Подготовка изображения</string>
     <string name="got_it">Понятно</string>
     <string name="handshake_resolution_waiting_for_display">Разрешение рукопожатия: ожидание дисплея</string>

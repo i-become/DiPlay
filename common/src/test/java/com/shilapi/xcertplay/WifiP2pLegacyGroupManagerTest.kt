@@ -48,6 +48,18 @@ class WifiP2pLegacyGroupManagerTest {
         shadowOf(wifi.connectionInfo).setSupplicantState(SupplicantState.COMPLETED)
     }
 
+    @Test fun legacySecondStartReusesGroupWithoutRecreating() {
+        val logs = mutableListOf<String>()
+        WifiP2pGroupManager(context, logs::add, preferredChannel = 149).use { manager ->
+            val first = background { manager.start(5000) }
+            val second = background { manager.start(5000) }
+            assertEquals(first.ssid, second.ssid)
+            assertEquals(1, radio.systemCreations)
+            assertEquals(149, second.channel)
+            assertTrue(logs.any { it.contains("legacy refresh reusing active group frequencyMHz=5745") })
+        }
+    }
+
     @Test fun selectedChannelIsRequestedThroughTheHiddenApiAndReportedUnverified() {
         val logs = mutableListOf<String>()
         WifiP2pGroupManager(context, logs::add, preferredChannel = 149).use { manager ->
