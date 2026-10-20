@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay HS5 · 关于</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>body{margin:0;font-family:-apple-system,"SF Pro Display","PingFang SC",sans-serif}</style>
+</head>
+<body>
+<div id="screen-root" class="w-[1920px] h-[720px] flex flex-col bg-[#071426] text-[#f2f7ff] overflow-hidden">
+  <header class="shrink-0 h-[96px] flex items-center justify-between px-10 border-b border-[#263c5a]/90">
+    <div class="flex items-center gap-12 h-full">
+      <div class="flex items-center gap-3"><div class="w-1 h-9 bg-[#c8102e] rounded-full"></div><span class="text-[26px] font-semibold">CarPlay <span class="text-[#8faed5] font-normal">HS5</span></span></div>
+      <nav class="flex items-center gap-2 h-full py-2">
+        <a id="nav-connect" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">连接</a>
+        <a id="nav-display" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">显示</a>
+        <a id="nav-settings" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">设置</a>
+        <a id="nav-diagnostics" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">诊断</a>
+        <a id="nav-about" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] bg-[#087bff] text-[22px] font-semibold">关于</a>
+      </nav>
+    </div>
+    <span id="status-clock" class="text-[20px] text-[#8faed5]">14:20</span>
+  </header>
+  <main class="flex-1 min-h-0 flex gap-8 px-10 py-7 overflow-hidden">
+    <section class="w-[55%] overflow-y-auto pr-2">
+      <h1 class="text-[32px] font-bold mb-2">关于</h1>
+      <p class="text-[15px] text-[#8faed5] mb-6">CarPlay HS5 无线扩展 · 版本 1.0.51</p>
+      <article class="mb-5">
+        <h2 class="text-[20px] font-semibold mb-2">使用前须知</h2>
+        <p class="text-[15px] text-[#8faed5] leading-relaxed">请在合法、安全驾驶前提下使用无线 CarPlay。部分功能依赖车辆硬件、系统权限与 iPhone 版本。</p>
+      </article>
+      <article class="mb-5">
+        <h2 class="text-[20px] font-semibold mb-2">连接与网络</h2>
+        <p class="text-[15px] text-[#8faed5] leading-relaxed">支持 Wi‑Fi Direct、车载热点等方式。若连接异常，可在「诊断」中保存报告以便排查。</p>
+      </article>
+      <article class="mb-5">
+        <h2 class="text-[20px] font-semibold mb-2">显示与副屏</h2>
+        <p class="text-[15px] text-[#8faed5] leading-relaxed">仪表地图与飞屏能力因车型而异；红旗 HS5 可在「显示」中单独配置。</p>
+      </article>
+      <p class="text-[15px] text-[#f2f7ff] mt-4">感谢使用与支持。</p>
+    </section>
+    <section class="w-[45%] flex flex-col justify-center gap-6">
+      <div class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 p-8 flex gap-8 justify-center">
+        <div class="text-center">
+          <div class="w-[160px] h-[160px] rounded-2xl bg-white/10 border border-[#263c5a] flex items-center justify-center mb-3">
+            <iconify-icon icon="lucide:qr-code" class="text-6xl text-[#8faed5]"></iconify-icon>
+          </div>
+          <p class="text-[15px] font-semibold">支持 / 打赏</p>
+          <p class="text-[13px] text-[#8faed5] mt-1">扫码查看</p>
+        </div>
+        <div class="text-center">
+          <div class="w-[160px] h-[160px] rounded-2xl bg-white/10 border border-[#263c5a] flex items-center justify-center mb-3">
+            <iconify-icon icon="lucide:qr-code" class="text-6xl text-[#8faed5]"></iconify-icon>
+          </div>
+          <p class="text-[15px] font-semibold">社区 / 更新</p>
+          <p class="text-[13px] text-[#8faed5] mt-1">扫码关注</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

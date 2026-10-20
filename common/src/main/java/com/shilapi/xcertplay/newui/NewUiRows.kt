@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,6 +45,140 @@ fun NewUiSettingIcon(@DrawableRes iconRes: Int, modifier: Modifier = Modifier) {
             tint = NewUiColors.Accent,
             modifier = Modifier.size(24.dp),
         )
+    }
+}
+
+@Composable
+fun NewUiCompactToggleRow(
+    title: String,
+    subtitle: String = "",
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    showDivider: Boolean = true,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = NewUiLayout.CompactRowHeight)
+                .clickable(enabled = enabled) { if (enabled) onCheckedChange(!checked) }
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = NewUiTypography.CompactSettingTitle,
+                    color = if (enabled) NewUiColors.TextPrimary else NewUiColors.TextMuted,
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        style = NewUiTypography.SettingSubtitle,
+                        color = NewUiColors.TextSecondary,
+                    )
+                }
+            }
+            NewUiToggle(
+                checked = checked,
+                onCheckedChange = { if (enabled) onCheckedChange(it) },
+            )
+        }
+        if (showDivider) {
+            HorizontalDivider(
+                color = NewUiSurfaces.glassDivider.copy(alpha = 0.4f),
+                thickness = 1.dp,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun NewUiCompactNavRow(
+    title: String,
+    subtitle: String? = null,
+    trailing: String? = null,
+    onClick: () -> Unit,
+    showDivider: Boolean = true,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = NewUiLayout.CompactRowHeight)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = NewUiTypography.CompactSettingTitle, color = NewUiColors.TextPrimary)
+                subtitle?.let {
+                    Text(it, style = NewUiTypography.SettingSubtitle, color = NewUiColors.TextSecondary)
+                }
+            }
+            if (trailing != null) {
+                Text(
+                    trailing,
+                    style = NewUiTypography.ActionSubtitle,
+                    color = NewUiColors.TextSecondary,
+                    modifier = Modifier.padding(end = 4.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            NewUiChevron(tint = NewUiColors.TextMuted)
+        }
+        if (showDivider) {
+            HorizontalDivider(
+                color = NewUiSurfaces.glassDivider.copy(alpha = 0.4f),
+                thickness = 1.dp,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun NewUiCompactValueRow(
+    title: String,
+    subtitle: String? = null,
+    value: String,
+    onClick: () -> Unit,
+    showDivider: Boolean = true,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = NewUiLayout.CompactRowHeight)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = NewUiTypography.CompactSettingTitle, color = NewUiColors.TextPrimary)
+                subtitle?.let {
+                    Text(it, style = NewUiTypography.SettingSubtitle, color = NewUiColors.TextSecondary)
+                }
+            }
+            Text(
+                value,
+                style = NewUiTypography.ActionSubtitle,
+                color = NewUiColors.TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            NewUiChevron(tint = NewUiColors.TextMuted, modifier = Modifier.padding(start = 4.dp))
+        }
+        if (showDivider) {
+            HorizontalDivider(
+                color = NewUiSurfaces.glassDivider.copy(alpha = 0.4f),
+                thickness = 1.dp,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
     }
 }
 

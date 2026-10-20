@@ -36,6 +36,7 @@ import com.shilapi.xcertplay.airplay.VideoInCar
 import com.shilapi.xcertplay.airplay.VideoPlaybackDelivery
 import com.shilapi.xcertplay.hud.BydBluetoothSuspend
 import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.iap2.message.Iap2CommunicationsMessages
 import com.shilapi.xcertplay.iap2.session.Iap2Session
 import com.shilapi.xcertplay.mfi.Iap2MfiAuthenticationClient
@@ -1280,10 +1281,7 @@ class CarPlayController(
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
             }
-            val preferredFamily = HotspotAddressPolicy.parseFamily(
-                appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
-                    .getString(HOTSPOT_FAMILY_PREFERENCE_KEY, null),
-            )
+            val preferredFamily = wirelessHotspotAddressPreference()
             val addressRecovery = HotspotAddressRecovery(
                 sample = { hotspotCandidates(hotspotInfo, fallbackToSnapshot = false) },
                 cancelled = { isStaleWirelessRun(generation) },
@@ -2674,6 +2672,19 @@ class CarPlayController(
             ?: airPlayConfig.btMac
     }
 
+    /**
+     * Wi-Fi Direct on HS5 reliably exposes IPv4; IPv6 link-local often never completes mDNS/TCP
+     * (see FIRST_TCP_TIMEOUT in field logs). Other head units keep the saved flip preference.
+     */
+    private fun wirelessHotspotAddressPreference(): String? {
+        val stored = HotspotAddressPolicy.parseFamily(
+            appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
+                .getString(HOTSPOT_FAMILY_PREFERENCE_KEY, null),
+        )
+        if (Hs5HeadUnit.isHeadUnit(appContext)) return HotspotAddressPolicy.FAMILY_IPV4
+        return stored
+    }
+
     private fun flipWirelessAddressFamily(generation: Int) = synchronized(wirelessResourceLock) {
         if (isStaleWirelessRun(generation)) return@synchronized
         val published = wirelessPublishedAddress
@@ -2689,11 +2700,16 @@ class CarPlayController(
             )
             return@synchronized
         }
+        val persisted = if (Hs5HeadUnit.isHeadUnit(appContext) && next == HotspotAddressPolicy.FAMILY_IPV6) {
+            HotspotAddressPolicy.FAMILY_IPV4
+        } else {
+            next
+        }
         appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(HOTSPOT_FAMILY_PREFERENCE_KEY, next)
+            .putString(HOTSPOT_FAMILY_PREFERENCE_KEY, persisted)
             .apply()
-        debugLog("wireless address family flip published=$from next=$next")
+        debugLog("wireless address family flip published=$from next=$persisted")
     }
 
     private fun hotspotCandidates(info: WirelessHotspotInfo, fallbackToSnapshot: Boolean = true): List<InetAddress> {

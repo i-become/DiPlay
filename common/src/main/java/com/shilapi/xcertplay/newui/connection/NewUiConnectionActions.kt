@@ -12,7 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.CarPlayBackgroundSession
+import com.shilapi.xcertplay.ConnectionProgressUiState
 import com.shilapi.xcertplay.CarPlayHostActivity
+import com.shilapi.xcertplay.DiPlayLauncher
 import com.shilapi.xcertplay.messageResource
 import com.shilapi.xcertplay.network.CarHotspotTethering
 import com.shilapi.xcertplay.DiPlayBootstrap
@@ -55,10 +57,11 @@ class NewUiConnectionActions(
     }
 
     fun openCarPlay() {
-        if (CarPlayBackgroundSession.hasSession()) {
-            startCarPlayHost()
-        } else {
-            connect(wireless = true)
+        if (DiPlayPreferences.phoneAddress(activity) == null) return
+        when {
+            CarPlayBackgroundSession.active -> openCarPlayProjection()
+            CarPlayBackgroundSession.hasSession() -> Unit
+            else -> connect(wireless = true)
         }
     }
 
@@ -99,19 +102,21 @@ class NewUiConnectionActions(
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
-        val open = {
-            AirPlayPersistence.saveWirelessEnabled(activity, wireless)
-            startCarPlayHost()
-        }
         if (CarPlayBackgroundSession.hasSession()) {
-            CarPlayBackgroundSession.stop { activity.runOnUiThread { open() } }
-        } else {
-            open()
+            if (CarPlayBackgroundSession.active) {
+                openCarPlayProjection()
+                return
+            }
+            DiPlayLauncher.startConnectionHub(activity)
+            return
         }
+        AirPlayPersistence.saveWirelessEnabled(activity, wireless)
+        startCarPlayHost(connectionHub = true)
     }
 
     fun disconnect(onComplete: () -> Unit) {
         CarPlayBackgroundSession.stop {
+            ConnectionProgressUiState.reset()
             activity.runOnUiThread(onComplete)
         }
     }
@@ -180,10 +185,21 @@ class NewUiConnectionActions(
     fun hasPreciseLocation(): Boolean =
         activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    private fun startCarPlayHost() {
-        activity.startActivity(
-            Intent(activity, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-        )
+    private fun startCarPlayHost(connectionHub: Boolean) {
+        if (connectionHub) {
+            DiPlayLauncher.startConnectionHub(activity)
+        } else {
+            activity.startActivity(
+                Intent(activity, CarPlayHostActivity::class.java)
+                    .putExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+            )
+            activity.overridePendingTransition(0, 0)
+        }
+    }
+
+    private fun openCarPlayProjection() {
+        DiPlayLauncher.openCarPlayProjection(activity)
     }
 
     private fun carHotspotOff(): Boolean =

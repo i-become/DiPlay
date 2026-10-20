@@ -34,28 +34,16 @@ class StartupDiagnosticSnapshotTest {
     @Test fun successfulLaunchMeansAnActivityRequestAndRetainsTheExistingFlags() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
         BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
-        waitForBootLaunch(app)
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
     }
 
     @Test fun aSecondBootReplacesOldLaunchEvidence() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
         BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
-        waitForBootLaunch(app)
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
         AirPlayPersistence.saveAutoStartOnBoot(app, false)
         BootReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=disabled failureClass=none"))
-    }
-
-    private fun waitForBootLaunch(app: Context) {
-        val prefs = app.getSharedPreferences("diplay_startup_diagnostics", Context.MODE_PRIVATE)
-        val deadline = System.currentTimeMillis() + 5_000
-        while (System.currentTimeMillis() < deadline) {
-            val result = prefs.getString("launchResult", null)
-            if (result != null && result != "pending") return
-            Thread.sleep(25)
-        }
     }
 
     @Test fun unrelatedBroadcastsDoNotCreateOrOverwriteBootEvidence() {

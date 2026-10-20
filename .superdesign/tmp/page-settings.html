@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay HS5 · 设置</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>body{margin:0;font-family:-apple-system,"SF Pro Display","PingFang SC",sans-serif}.tog{width:68px;height:38px;border-radius:999px;background:#34445b;position:relative;flex-shrink:0}.tog.on{background:#087bff}.tog.on span{transform:translateX(28px)}.tog span{position:absolute;top:3px;left:3px;width:32px;height:32px;border-radius:999px;background:#fff;transition:transform .2s}</style>
+</head>
+<body>
+<div id="screen-root" class="w-[1920px] h-[720px] flex flex-col bg-[#071426] text-[#f2f7ff] overflow-hidden">
+  <header class="shrink-0 h-[96px] flex items-center justify-between px-10 border-b border-[#263c5a]/90">
+    <div class="flex items-center gap-12 h-full">
+      <div class="flex items-center gap-3"><div class="w-1 h-9 bg-[#c8102e] rounded-full"></div><span class="text-[26px] font-semibold">CarPlay <span class="text-[#8faed5] font-normal">HS5</span></span></div>
+      <nav class="flex items-center gap-2 h-full py-2">
+        <a id="nav-connect" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">连接</a>
+        <a id="nav-display" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">显示</a>
+        <a id="nav-settings" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] bg-[#087bff] text-[22px] font-semibold">设置</a>
+        <a id="nav-diagnostics" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">诊断</a>
+        <a id="nav-about" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">关于</a>
+      </nav>
+    </div>
+    <span id="status-clock" class="text-[20px] text-[#8faed5]">14:20</span>
+  </header>
+  <main class="flex-1 min-h-0 px-10 py-7 overflow-hidden">
+    <h1 class="text-[32px] font-bold mb-5">设置</h1>
+    <div class="grid grid-cols-2 gap-6 h-[calc(100%-3.5rem)] min-h-0">
+      <section class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 overflow-y-auto">
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">随系统启动</div><div class="text-[14px] text-[#8faed5]">开机自动运行 CarPlay</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">车载蓝牙音频</div></div><div class="tog"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">方向盘 · 媒体键</div><div class="text-[14px] text-[#8faed5]">转发至 CarPlay</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">方向盘 · Siri</div><div class="text-[14px] text-[#8faed5]">长按唤醒</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">音频焦点</div><div class="text-[14px] text-[#8faed5]">与系统混音策略</div></div><div class="tog on"><span></span></div></div>
+        <button type="button" id="row-media-ch" class="w-full flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40 text-left"><div class="text-[18px] font-semibold">媒体声道</div><span class="text-[16px] text-[#8faed5] flex items-center gap-1">音乐 · 默认 <iconify-icon icon="lucide:chevron-right"></iconify-icon></span></button>
+        <button type="button" id="row-nav-ch" class="w-full flex items-center justify-between px-6 h-[68px] text-left"><div class="text-[18px] font-semibold">导航声道</div><span class="text-[16px] text-[#8faed5] flex items-center gap-1">导航 · 默认 <iconify-icon icon="lucide:chevron-right"></iconify-icon></span></button>
+      </section>
+      <section class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 overflow-y-auto">
+        <button type="button" id="row-permissions" class="w-full flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40 text-left"><div class="text-[18px] font-semibold">权限</div><iconify-icon icon="lucide:chevron-right" class="text-[#8faed5]"></iconify-icon></button>
+        <button type="button" id="row-vehicle-icon" class="w-full flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40 text-left"><div class="text-[18px] font-semibold">车辆图标</div><span class="text-[16px] text-[#8faed5] flex items-center gap-1">默认 <iconify-icon icon="lucide:chevron-right"></iconify-icon></span></button>
+        <button type="button" id="row-vehicle-name" class="w-full flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40 text-left"><div class="text-[18px] font-semibold">车辆名称</div><span class="text-[16px] text-[#8faed5] flex items-center gap-1">My Car <iconify-icon icon="lucide:chevron-right"></iconify-icon></span></button>
+        <button type="button" id="row-language" class="w-full flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40 text-left"><div class="text-[18px] font-semibold">语言</div><span class="text-[16px] text-[#8faed5] flex items-center gap-1">简体中文 <iconify-icon icon="lucide:chevron-right"></iconify-icon></span></button>
+        <button type="button" id="row-update" class="w-full flex items-center justify-between px-6 h-[68px] text-left"><div><div class="text-[18px] font-semibold">检查更新</div><div class="text-[14px] text-[#8faed5]">已是最新版本</div></div><iconify-icon icon="lucide:chevron-right" class="text-[#8faed5]"></iconify-icon></button>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

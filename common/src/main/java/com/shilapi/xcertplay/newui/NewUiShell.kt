@@ -2,15 +2,12 @@ package com.shilapi.xcertplay.newui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,24 +19,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.annotation.DrawableRes
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.newui.NewUiSurfaces
 
 @Composable
 fun NewUiShell(
@@ -52,58 +46,34 @@ fun NewUiShell(
 ) {
     Box(Modifier.fillMaxSize()) {
         NewUiScreenBackground(Modifier.fillMaxSize())
-        Column(
-            Modifier.fillMaxSize(),
-        ) {
-            Column(Modifier.fillMaxWidth()) {
-                NewUiTopBarGlass(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    NewUiTopBar(
-                        showHs5Branding = showHs5Branding,
-                        status = topBarStatus,
-                    )
-                }
-                HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth(),
-                    thickness = 1.dp,
-                    color = NewUiColors.Divider,
-                )
-            }
-            BoxWithConstraints(
+        Column(Modifier.fillMaxSize()) {
+            NewUiTopTabHeader(
+                destination = destination,
+                showHs5Branding = showHs5Branding,
+                topBarStatus = topBarStatus,
+                onDestinationSelected = onDestinationSelected,
+                onOpenHeadUnitHome = onOpenHeadUnitHome,
+            )
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                thickness = 1.dp,
+                color = NewUiColors.Divider.copy(alpha = 0.9f),
+            )
+            androidx.compose.foundation.layout.BoxWithConstraints(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(top = NewUiLayout.MainGap, bottom = NewUiLayout.ScreenPaddingBottom),
+                    .padding(
+                        start = NewUiLayout.ScreenPaddingH,
+                        end = NewUiLayout.ScreenPaddingH,
+                        top = NewUiLayout.PageContentPaddingTop,
+                        bottom = NewUiLayout.ScreenPaddingBottom,
+                    ),
             ) {
                 val metrics = NewUiWindowMetrics.from(maxWidth, maxHeight)
                 CompositionLocalProvider(LocalNewUiWindowMetrics provides metrics) {
-                    Row(Modifier.fillMaxSize()) {
-                        NewUiSidebar(
-                            destination = destination,
-                            onDestinationSelected = onDestinationSelected,
-                            onOpenHeadUnitHome = onOpenHeadUnitHome,
-                            sidebarWidth = metrics.sidebarWidth,
-                            itemHeight = metrics.sidebarItemHeight,
-                        )
-                        Column(
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(
-                                    start = NewUiLayout.ContentPaddingStart,
-                                    end = if (metrics.compactWidth) {
-                                        NewUiLayout.ContentPaddingEnd - 8.dp
-                                    } else {
-                                        NewUiLayout.ContentPaddingEnd
-                                    },
-                                    top = NewUiLayout.MainGap,
-                                ),
-                        ) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) {
-                                content()
-                            }
-                        }
+                    Box(Modifier.fillMaxSize()) {
+                        content()
                     }
                 }
             }
@@ -112,226 +82,127 @@ fun NewUiShell(
 }
 
 @Composable
-private fun NewUiSidebar(
+private fun NewUiTopTabHeader(
     destination: NewUiDestination,
+    showHs5Branding: Boolean,
+    topBarStatus: NewUiTopBarStatus,
     onDestinationSelected: (NewUiDestination) -> Unit,
     onOpenHeadUnitHome: () -> Unit,
-    sidebarWidth: Dp,
-    itemHeight: Dp,
 ) {
-    Column(
+    Row(
         modifier = Modifier
-            .width(sidebarWidth)
-            .fillMaxHeight()
-            .padding(
-                start = NewUiLayout.SidebarPaddingStart,
-                top = NewUiLayout.SidebarPaddingTop,
-                bottom = NewUiLayout.SidebarPaddingTop,
-            ),
-        verticalArrangement = Arrangement.spacedBy(NewUiLayout.SidebarItemGap),
+            .fillMaxWidth()
+            .requiredHeight(NewUiLayout.TopBarToDividerHeight)
+            .padding(horizontal = NewUiLayout.TopBarPaddingH)
+            .testTag(NewUiTestTags.TopBarBand),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        NewUiDestination.entries.forEach { item ->
-            NewUiSidebarItem(
-                item = item,
-                selected = item == destination,
-                itemHeight = itemHeight,
-                onClick = { onDestinationSelected(item) },
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NewUiLayout.TopBarBrandGap),
+        ) {
+            if (showHs5Branding) {
+                NewUiBrandLockup()
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(NewUiLayout.NavTabGap),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.height(NewUiLayout.TopBarHeight),
+            ) {
+                NewUiDestination.entries.forEach { item ->
+                    NewUiTopNavTab(
+                        label = stringResource(item.labelRes),
+                        selected = item == destination,
+                        onClick = { onDestinationSelected(item) },
+                    )
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .height(NewUiLayout.TopBarHeight)
+                    .width(NewUiLayout.TopBarHomeHitWidth)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onOpenHeadUnitHome),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_dp_home),
+                    contentDescription = stringResource(R.string.new_ui_nav_head_unit),
+                    colorFilter = ColorFilter.tint(NewUiColors.TextSecondary),
+                    modifier = Modifier.size(NewUiLayout.TopBarHomeIconSize),
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = topBarStatus.timeText,
+                style = NewUiTypography.TopTime,
+                color = NewUiColors.TextSecondary,
             )
         }
-        Spacer(Modifier.weight(1f))
-        NewUiSidebarHeadUnitItem(
-            itemHeight = itemHeight,
-            onClick = onOpenHeadUnitHome,
+    }
+}
+
+@Composable
+private fun NewUiBrandLockup() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .width(NewUiLayout.HongqiAccentBarWidth)
+                .height(NewUiLayout.HongqiAccentBarHeight)
+                .clip(RoundedCornerShape(999.dp))
+                .background(NewUiColors.HongqiRed),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = stringResource(R.string.new_ui_product_name),
+            style = NewUiTypography.BrandHongqi,
+            color = NewUiColors.TextPrimary,
+        )
+        Text(
+            text = " ${stringResource(R.string.new_ui_brand_hs5)}",
+            style = NewUiTypography.BrandHongqi.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal),
+            color = NewUiColors.TextSecondary,
         )
     }
 }
 
 @Composable
-private fun NewUiSidebarHeadUnitItem(
-    itemHeight: Dp,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(NewUiLayout.SidebarSelectedRadius)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(itemHeight)
-            .clip(shape)
-            .background(NewUiSurfaces.sidebarIdleBrush(), shape)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 16.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(
-                painter = painterResource(R.drawable.ic_dp_home),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(NewUiColors.TextSecondary),
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = stringResource(R.string.new_ui_nav_head_unit),
-                style = NewUiTypography.NavItem,
-                color = NewUiColors.TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun NewUiSidebarItem(
-    item: NewUiDestination,
+private fun NewUiTopNavTab(
+    label: String,
     selected: Boolean,
-    itemHeight: Dp,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(NewUiLayout.SidebarSelectedRadius)
+    val reduceMotion = rememberNewUiReduceMotion()
+    val duration = if (reduceMotion) 0 else NewUiMotion.NavTabDurationMs
+    val shape = RoundedCornerShape(NewUiLayout.NavTabRadius)
+    val background by animateColorAsState(
+        targetValue = if (selected) NewUiColors.Accent else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = tween(duration, easing = NewUiMotion.EaseOut),
+        label = "navTabBg",
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (selected) NewUiColors.TextPrimary else NewUiColors.TextSecondary,
+        animationSpec = tween(duration, easing = NewUiMotion.EaseOut),
+        label = "navTabLabel",
+    )
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(itemHeight)
+            .height(NewUiLayout.NavTabHeight)
             .clip(shape)
-            .then(
-                if (selected) {
-                    Modifier
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = shape,
-                            ambientColor = NewUiColors.PrimaryGlowSoft,
-                            spotColor = NewUiColors.PrimaryGlowStrong,
-                        )
-                        .background(NewUiSurfaces.sidebarSelectedBrush(), shape)
-                        .border(1.dp, NewUiColors.PrimaryBlue, shape)
-                } else {
-                    Modifier.background(NewUiSurfaces.sidebarIdleBrush(), shape)
-                },
-            )
-            .clickable(onClick = onClick),
+            .background(background, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = NewUiLayout.NavTabPaddingH),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 16.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(
-                painter = painterResource(item.iconRes),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(
-                    if (selected) NewUiColors.TextPrimary else NewUiColors.TextSecondary,
-                ),
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = stringResource(item.labelRes),
-                style = NewUiTypography.NavItem,
-                color = if (selected) NewUiColors.TextPrimary else NewUiColors.TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(
+            text = label,
+            style = NewUiTypography.NavTab,
+            color = labelColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
-}
-
-@Composable
-private fun NewUiTopBar(
-    showHs5Branding: Boolean,
-    status: NewUiTopBarStatus,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .requiredHeight(NewUiLayout.TopBarToDividerHeight)
-            .testTag(NewUiTestTags.TopBarBand),
-    ) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .fillMaxWidth()
-                .height(NewUiLayout.TopBarHeight)
-                .padding(horizontal = NewUiLayout.TopBarPaddingH),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start,
-            ) {
-                if (showHs5Branding) {
-                    Image(
-                        painter = painterResource(R.drawable.new_ui_hongqi_badge),
-                        contentDescription = stringResource(R.string.new_ui_brand_hongqi),
-                        contentScale = ContentScale.FillHeight,
-                        modifier = Modifier
-                            .height(NewUiLayout.TopBarHeight)
-                            .aspectRatio(NewUiLayout.TopBarHongqiBadgeAspectRatio),
-                    )
-                    TopBarDivider()
-                }
-                Text(
-                    text = stringResource(R.string.new_ui_product_name),
-                    style = NewUiTypography.BrandProduct,
-                    color = NewUiColors.TextPrimary,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                NewUiTopBarStatIcon(
-                    iconRes = R.drawable.new_ui_ic_stat_location,
-                    active = status.locationActive,
-                )
-                Spacer(Modifier.width(14.dp))
-                NewUiTopBarStatIcon(
-                    iconRes = R.drawable.new_ui_ic_stat_bluetooth,
-                    active = status.bluetoothActive,
-                )
-                Spacer(Modifier.width(14.dp))
-                NewUiTopBarStatIcon(
-                    iconRes = R.drawable.new_ui_ic_stat_wifi,
-                    active = status.wifiConnected,
-                )
-                Spacer(Modifier.width(14.dp))
-                NewUiTopBarStatIcon(
-                    iconRes = R.drawable.new_ui_ic_stat_signal,
-                    active = status.hotspotActive,
-                )
-                Spacer(Modifier.width(18.dp))
-                Text(
-                    text = status.timeText,
-                    style = NewUiTypography.TopTime,
-                    color = NewUiColors.TextPrimary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NewUiTopBarStatIcon(
-    @DrawableRes iconRes: Int,
-    active: Boolean,
-) {
-    Image(
-        painter = painterResource(iconRes),
-        contentDescription = null,
-        modifier = Modifier.size(18.dp),
-        colorFilter = ColorFilter.tint(
-            if (active) NewUiColors.TextPrimary else NewUiColors.TextSecondary.copy(alpha = 0.4f),
-        ),
-    )
-}
-
-@Composable
-private fun TopBarDivider() {
-    Text(
-        text = "|",
-        color = NewUiColors.TextSecondary,
-        modifier = Modifier.padding(horizontal = 12.dp),
-    )
 }

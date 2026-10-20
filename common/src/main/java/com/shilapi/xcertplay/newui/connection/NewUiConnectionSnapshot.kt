@@ -2,6 +2,8 @@ package com.shilapi.xcertplay.newui.connection
 
 import android.content.Context
 import com.shilapi.xcertplay.CarPlayBackgroundSession
+import com.shilapi.xcertplay.CarPlayConnectionProgress
+import com.shilapi.xcertplay.ConnectionProgressUiState
 import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
@@ -14,6 +16,7 @@ enum class NewUiConnectionPhase {
     READY,
     CONNECTING,
     CONNECTED,
+    FAILED,
 }
 
 data class NewUiConnectionSnapshot(
@@ -26,8 +29,14 @@ data class NewUiConnectionSnapshot(
     val canConnect: Boolean,
     val sessionRunning: Boolean,
     val hasSelectedPhone: Boolean,
+    val progressLitCount: Int,
+    val progressStepTitle: String,
+    val progressStepSubtitle: String?,
+    val failureBanner: String?,
 ) {
     val isConnected: Boolean get() = phase == NewUiConnectionPhase.CONNECTED
+
+    val isFailed: Boolean get() = phase == NewUiConnectionPhase.FAILED
 
     companion object {
         /** Used before [android.app.Activity.onCreate]; must not touch [Context]-backed prefs. */
@@ -41,6 +50,10 @@ data class NewUiConnectionSnapshot(
             canConnect = true,
             sessionRunning = false,
             hasSelectedPhone = false,
+            progressLitCount = 0,
+            progressStepTitle = "",
+            progressStepSubtitle = null,
+            failureBanner = null,
         )
     }
 }
@@ -51,9 +64,11 @@ internal object NewUiConnectionSnapshotReader {
         val carPlayActive = CarPlayBackgroundSession.active
         val phoneAddress = DiPlayPreferences.phoneAddress(context)
         val phoneName = DiPlayPreferences.phoneName(context)
+        val connectionFailed = ConnectionProgressUiState.failed() && !carPlayActive
         val phase = when {
             setupError != null -> NewUiConnectionPhase.NEEDS_SETUP
             carPlayActive -> NewUiConnectionPhase.CONNECTED
+            connectionFailed -> NewUiConnectionPhase.FAILED
             sessionRunning -> NewUiConnectionPhase.CONNECTING
             DiPlayPreferences.phoneAddress(context) != null -> NewUiConnectionPhase.READY
             else -> NewUiConnectionPhase.READY
@@ -61,8 +76,15 @@ internal object NewUiConnectionSnapshotReader {
         val statusTitle = when {
             setupError != null -> context.getString(R.string.setup_needs_attention)
             carPlayActive -> context.getString(R.string.new_ui_status_connected)
+            connectionFailed -> context.getString(R.string.new_ui_status_failed)
             sessionRunning -> context.getString(R.string.connecting_to_your_iphone)
             else -> context.getString(R.string.ready_when_you_are)
+        }
+        val failureBanner = if (connectionFailed) {
+            ConnectionProgressUiState.failureDetail()
+                ?: context.getString(R.string.new_ui_connection_failed_banner)
+        } else {
+            null
         }
         val linkSummary = if (carPlayActive || sessionRunning) {
             val mode = wirelessModeLabel(context, AirPlayPersistence.loadWirelessHotspotMode(context))
@@ -72,16 +94,47 @@ internal object NewUiConnectionSnapshotReader {
             null
         }
         val connectionMethodLabel = wirelessModeLabel(context, AirPlayPersistence.loadWirelessHotspotMode(context))
+        val progressLit = when {
+            carPlayActive -> CarPlayConnectionProgress.STEP_COUNT
+            connectionFailed || sessionRunning -> ConnectionProgressUiState.litCount()
+            else -> 0
+        }
+        val (progressTitle, progressSubtitle) = when {
+            setupError != null -> context.getString(R.string.setup_needs_attention) to null
+            carPlayActive -> context.getString(R.string.new_ui_connection_progress_complete_title) to
+                context.getString(R.string.new_ui_connection_progress_complete_sub)
+            connectionFailed && progressLit > 0 -> {
+                context.getString(CarPlayConnectionProgress.stepTitleRes(progressLit)) to
+                    (ConnectionProgressUiState.failureDetail()
+                        ?: context.getString(R.string.new_ui_connection_progress_failed_sub))
+            }
+            connectionFailed -> context.getString(R.string.new_ui_status_failed) to
+                context.getString(R.string.new_ui_connection_failed_banner)
+            sessionRunning && progressLit > 0 -> {
+                context.getString(CarPlayConnectionProgress.stepTitleRes(progressLit)) to
+                    context.getString(R.string.connecting_to_your_iphone)
+            }
+            sessionRunning -> context.getString(R.string.connecting_to_your_iphone) to null
+            else -> context.getString(R.string.new_ui_connection_progress_idle_hint) to
+                context.getString(
+                    R.string.new_ui_connection_progress_steps_hint,
+                    CarPlayConnectionProgress.STEP_COUNT,
+                )
+        }
         return NewUiConnectionSnapshot(
             phase = phase,
             statusTitle = statusTitle,
-            phoneName = phoneName,
+            phoneName = phoneName.ifBlank { context.getString(R.string.connect_phone) },
             linkSummary = linkSummary,
             connectionMethodLabel = connectionMethodLabel,
             locationReportingEnabled = AirPlayPersistence.loadLocationReportingEnabled(context),
             canConnect = setupError == null,
             sessionRunning = sessionRunning,
             hasSelectedPhone = phoneAddress != null,
+            progressLitCount = progressLit,
+            progressStepTitle = progressTitle,
+            progressStepSubtitle = progressSubtitle,
+            failureBanner = failureBanner,
         )
     }
 

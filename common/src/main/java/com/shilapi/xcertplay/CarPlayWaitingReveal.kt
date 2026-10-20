@@ -148,7 +148,7 @@ internal class CarPlayWaitingReveal(
 
         overlay.visibility = View.GONE
 
-        connectionPanel.visibility = View.VISIBLE
+        connectionPanel.visibility = View.GONE
 
     }
 

@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.newui.display
 
 import android.content.Context
 import com.shilapi.xcertplay.AirPlayPersistence
+import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
 import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.CarPlayNightMode
 import com.shilapi.xcertplay.hud.BydOutputSettings
@@ -21,7 +22,8 @@ data class NewUiDisplayState(
     val clusterHorizontalGestureEnabled: Boolean,
     val carPlayNightMode: CarPlayNightMode,
 ) {
-    val fpsLabel: String get() = if (fps >= 60) "60 FPS" else "30 FPS"
+    val fpsLabel: String
+        get() = "${AirPlayDisplaySettings.sanitizeFps(fps)} FPS"
 
     val nightModeIndex: Int
         get() = when (carPlayNightMode) {
@@ -79,7 +81,7 @@ internal object NewUiDisplayStateReader {
 
 internal object NewUiDisplayActions {
     fun saveFps(context: Context, fps: Int) {
-        AirPlayPersistence.saveFps(context, if (fps >= 60) 60 else 30)
+        AirPlayPersistence.saveFps(context, fps)
     }
 
     fun saveSmoothVideo(context: Context, enabled: Boolean) {

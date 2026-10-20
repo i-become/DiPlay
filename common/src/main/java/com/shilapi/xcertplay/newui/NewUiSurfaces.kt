@@ -54,13 +54,9 @@ object NewUiSurfaces {
 
 
 
-    fun panelBrush(): Brush = Brush.verticalGradient(
+    fun panelBrush(): Brush = Brush.linearGradient(
 
-        0f to NewUiColors.CardSecondary,
-
-        0.28f to NewUiColors.CardNormal,
-
-        1f to NewUiColors.CardNormal,
+        listOf(NewUiColors.CardPanel, NewUiColors.CardPanel),
 
     )
 

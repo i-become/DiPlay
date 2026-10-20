@@ -26,6 +26,7 @@ import android.app.AlertDialog
 import android.os.Looper
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.MockedConstruction
@@ -43,6 +44,7 @@ import org.robolectric.android.util.concurrent.PausedExecutorService
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 @LooperMode(LooperMode.Mode.PAUSED)
+@Ignore("Legacy CarPlay host settings overlay removed; settings live in NewUiActivity.")
 class CarPlayHostSettingsTest {
     private lateinit var activity: CarPlayHostActivity
     private lateinit var controllers: MockedConstruction<CarPlayController>

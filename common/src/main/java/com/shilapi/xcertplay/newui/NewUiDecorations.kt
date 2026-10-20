@@ -30,47 +30,15 @@ import com.shilapi.xcertplay.host.R
 
 fun NewUiScreenBackground(modifier: Modifier = Modifier) {
 
-    Box(modifier.fillMaxSize()) {
+    Box(
 
-        Image(
+        modifier
 
-            painter = painterResource(R.drawable.new_ui_shell_background),
+            .fillMaxSize()
 
-            contentDescription = null,
+            .background(NewUiColors.Canvas),
 
-            contentScale = ContentScale.Crop,
-
-            modifier = Modifier.fillMaxSize(),
-
-        )
-
-        Box(
-
-            Modifier
-
-                .fillMaxSize()
-
-                .background(
-
-                    Brush.verticalGradient(
-
-                        0f to Color(0x55000000),
-
-                        0.2f to NewUiColors.BackgroundVeilLight,
-
-                        0.52f to NewUiColors.BackgroundVeilMid,
-
-                        0.82f to NewUiColors.BackgroundVeilLight,
-
-                        1f to NewUiColors.BackgroundVeilBottom,
-
-                    ),
-
-                ),
-
-        )
-
-    }
+    )
 
 }
 

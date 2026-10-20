@@ -10,10 +10,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -33,23 +37,32 @@ fun NewUiFormField(
             color = NewUiColors.TextMuted,
             modifier = Modifier.padding(bottom = 6.dp),
         )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text),
-            textStyle = NewUiTypography.ActionSubtitle.copy(color = NewUiColors.TextPrimary),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = NewUiColors.Accent,
-                unfocusedBorderColor = NewUiColors.CardBorder,
-                cursorColor = NewUiColors.Accent,
-                focusedContainerColor = NewUiColors.DropdownBackground,
-                unfocusedContainerColor = NewUiColors.DropdownBackground,
-            ),
-            shape = shape,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // Wi‑Fi names/passwords are always typed LTR; @ _ etc. must not flip bidi or the cursor jumps.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text,
+                    autoCorrect = false,
+                ),
+                textStyle = NewUiTypography.ActionSubtitle.copy(
+                    color = NewUiColors.TextPrimary,
+                    textDirection = TextDirection.Ltr,
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NewUiColors.Accent,
+                    unfocusedBorderColor = NewUiColors.CardBorder,
+                    cursorColor = NewUiColors.Accent,
+                    focusedContainerColor = NewUiColors.DropdownBackground,
+                    unfocusedContainerColor = NewUiColors.DropdownBackground,
+                ),
+                shape = shape,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (trailingLabel != null && onTrailingClick != null) {
             Text(
                 trailingLabel,

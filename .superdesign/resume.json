@@ -1,0 +1,84 @@
+{
+  "projectId": "39839b53-6199-4aec-abff-348506995bd9",
+  "projectUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9",
+  "targets": {
+    "connection-redesign": {
+      "title": "HS5 Connection page redesign explorations",
+      "viewport": { "width": 1920, "height": 720 },
+      "variants": [
+        {
+          "id": "A-apple-minimal",
+          "draftId": "d791917d-a4c6-4f43-9d65-dd8512cf8d6f",
+          "previewUrl": "https://p.superdesign.dev/draft/d791917d-a4c6-4f43-9d65-dd8512cf8d6f",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-d791917d-a4c6-4f43-9d65-dd8512cf8d6f"
+        },
+        {
+          "id": "B-liquid-glass",
+          "draftId": "869a53fd-a9d7-4dbd-b6d4-6267d3457619",
+          "previewUrl": "https://p.superdesign.dev/draft/869a53fd-a9d7-4dbd-b6d4-6267d3457619",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-869a53fd-a9d7-4dbd-b6d4-6267d3457619"
+        },
+        {
+          "id": "C-hongqi-premium",
+          "draftId": "f798c77a-5529-4d77-8748-f3c0809a4190",
+          "previewUrl": "https://p.superdesign.dev/draft/f798c77a-5529-4d77-8748-f3c0809a4190",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-f798c77a-5529-4d77-8748-f3c0809a4190"
+        }
+      ],
+      "stateVariants": [
+        {
+          "id": "connecting",
+          "draftId": "1a567658-4ae9-4699-83f1-00d0e1ed5125",
+          "previewUrl": "https://p.superdesign.dev/draft/1a567658-4ae9-4699-83f1-00d0e1ed5125"
+        },
+        {
+          "id": "connected",
+          "draftId": "ec8179bc-b39b-480f-b5d4-960ee573d30e",
+          "previewUrl": "https://p.superdesign.dev/draft/ec8179bc-b39b-480f-b5d4-960ee573d30e"
+        },
+        {
+          "id": "failed",
+          "draftId": "deda48a5-80b2-49e4-8605-0d0a1a9d60ae",
+          "previewUrl": "https://p.superdesign.dev/draft/deda48a5-80b2-49e4-8605-0d0a1a9d60ae"
+        }
+      ]
+    },
+    "shell-pages-A-apple-minimal": {
+      "title": "HS5 top-tab shell · Apple Minimal main pages",
+      "viewport": { "width": 1920, "height": 720 },
+      "designDirection": "A-apple-minimal",
+      "htmlSources": {
+        "display": ".superdesign/tmp/page-display.html",
+        "settings": ".superdesign/tmp/page-settings.html",
+        "diagnostics": ".superdesign/tmp/page-diagnostics.html",
+        "about": ".superdesign/tmp/page-about.html"
+      },
+      "pages": [
+        {
+          "id": "display",
+          "draftId": "42cc31cb-1166-48d7-8b80-0029abd33b19",
+          "previewUrl": "https://p.superdesign.dev/draft/42cc31cb-1166-48d7-8b80-0029abd33b19",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-42cc31cb-1166-48d7-8b80-0029abd33b19"
+        },
+        {
+          "id": "settings",
+          "draftId": "dcb1c23d-1b52-4c53-9b5d-a80f87dfd7f8",
+          "previewUrl": "https://p.superdesign.dev/draft/dcb1c23d-1b52-4c53-9b5d-a80f87dfd7f8",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-dcb1c23d-1b52-4c53-9b5d-a80f87dfd7f8"
+        },
+        {
+          "id": "diagnostics",
+          "draftId": "d7cec21c-5c5d-4497-a43b-cd836d874366",
+          "previewUrl": "https://p.superdesign.dev/draft/d7cec21c-5c5d-4497-a43b-cd836d874366",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-d7cec21c-5c5d-4497-a43b-cd836d874366"
+        },
+        {
+          "id": "about",
+          "draftId": "ba4b6344-b7a1-46aa-b465-14e1bab404ec",
+          "previewUrl": "https://p.superdesign.dev/draft/ba4b6344-b7a1-46aa-b465-14e1bab404ec",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-ba4b6344-b7a1-46aa-b465-14e1bab404ec"
+        }
+      ]
+    }
+  }
+}

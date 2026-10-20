@@ -1,0 +1,198 @@
+package com.shilapi.xcertplay.newui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.shilapi.xcertplay.CarPlayConnectionProgress
+import com.shilapi.xcertplay.host.R
+
+enum class NewUiProgressVisual {
+    IDLE,
+    ACTIVE,
+    COMPLETE,
+    FAILED,
+}
+
+@Composable
+fun NewUiConnectionProgressBlock(
+    litCount: Int,
+    stepTitle: String,
+    stepSubtitle: String?,
+    visual: NewUiProgressVisual,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(NewUiLayout.ProgressBlockRadius)
+    val borderColor = when (visual) {
+        NewUiProgressVisual.COMPLETE -> NewUiColors.StatusReady.copy(alpha = 0.35f)
+        NewUiProgressVisual.FAILED -> NewUiColors.HongqiRed.copy(alpha = 0.35f)
+        else -> NewUiColors.Divider.copy(alpha = 0.5f)
+    }
+    val backgroundBrush = when (visual) {
+        NewUiProgressVisual.COMPLETE -> Brush.verticalGradient(
+            0f to NewUiColors.StatusReady.copy(alpha = 0.08f),
+            1f to Color.Transparent,
+        )
+        NewUiProgressVisual.FAILED -> Brush.verticalGradient(
+            0f to NewUiColors.HongqiRed.copy(alpha = 0.10f),
+            1f to Color.Transparent,
+        )
+        else -> Brush.verticalGradient(
+            0f to Color.White.copy(alpha = 0.06f),
+            1f to Color.Transparent,
+        )
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(backgroundBrush)
+            .border(1.dp, borderColor, shape)
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.new_ui_connection_progress_heading),
+                style = NewUiTypography.ProgressLabel,
+                color = NewUiColors.TextSecondary,
+            )
+            if (visual != NewUiProgressVisual.IDLE && litCount > 0) {
+                Text(
+                    text = stringResource(
+                        R.string.new_ui_connection_progress_counter,
+                        litCount,
+                        CarPlayConnectionProgress.STEP_COUNT,
+                    ),
+                    style = NewUiTypography.ProgressCounter,
+                    color = when (visual) {
+                        NewUiProgressVisual.COMPLETE -> NewUiColors.StatusReady
+                        NewUiProgressVisual.FAILED -> NewUiColors.HongqiRed.copy(alpha = 0.9f)
+                        else -> NewUiColors.Accent.copy(alpha = 0.85f)
+                    },
+                )
+            }
+        }
+        NewUiConnectionProgressDots(
+            litCount = litCount,
+            visual = visual,
+            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
+        )
+        Text(
+            text = stepTitle,
+            style = NewUiTypography.ProgressStepTitle,
+            color = when (visual) {
+                NewUiProgressVisual.COMPLETE -> NewUiColors.StatusReady.copy(alpha = 0.95f)
+                NewUiProgressVisual.FAILED -> NewUiColors.HongqiRed.copy(alpha = 0.85f)
+                NewUiProgressVisual.ACTIVE -> NewUiColors.TextPrimary
+                NewUiProgressVisual.IDLE -> NewUiColors.TextSecondary
+            },
+        )
+        stepSubtitle?.let { sub ->
+            Text(
+                text = sub,
+                style = NewUiTypography.SettingSubtitle,
+                color = NewUiColors.TextSecondary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun NewUiConnectionProgressDots(
+    litCount: Int,
+    visual: NewUiProgressVisual,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.widthIn(max = 640.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(CarPlayConnectionProgress.STEP_COUNT) { index ->
+            NewUiConnectionProgressDot(
+                index = index,
+                litCount = litCount,
+                visual = visual,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewUiConnectionProgressDot(
+    index: Int,
+    litCount: Int,
+    visual: NewUiProgressVisual,
+) {
+    val reduceMotion = rememberNewUiReduceMotion()
+    val duration = if (reduceMotion) 0 else NewUiMotion.ProgressDotDurationMs
+    val lit = visual != NewUiProgressVisual.FAILED && index < litCount
+    val failedDot = visual == NewUiProgressVisual.FAILED &&
+        litCount > 0 &&
+        index == litCount.coerceAtMost(CarPlayConnectionProgress.STEP_COUNT - 1)
+    val active = lit && index == litCount - 1 && visual == NewUiProgressVisual.ACTIVE
+    val targetSize = if (active || failedDot) 7.dp else 6.dp
+    val targetColor = when {
+        failedDot -> NewUiColors.HongqiRed
+        visual == NewUiProgressVisual.FAILED && index < litCount -> NewUiColors.Accent
+        visual == NewUiProgressVisual.COMPLETE && lit -> NewUiColors.StatusReady
+        lit && active -> NewUiColors.ProgressDotActive
+        lit -> NewUiColors.Accent
+        else -> NewUiColors.ProgressDotIdle
+    }
+    val color by animateColorAsState(
+        targetValue = targetColor,
+        animationSpec = tween(duration, easing = NewUiMotion.EaseOut),
+        label = "progressDotColor",
+    )
+    val size by animateDpAsState(
+        targetValue = targetSize,
+        animationSpec = tween(duration, easing = NewUiMotion.EaseOut),
+        label = "progressDotSize",
+    )
+    Box(
+        Modifier
+            .then(
+                if (active) {
+                    Modifier.shadow(
+                        elevation = 4.dp,
+                        shape = CircleShape,
+                        ambientColor = NewUiColors.ProgressDotActive.copy(alpha = 0.85f),
+                        spotColor = NewUiColors.ProgressDotActive.copy(alpha = 0.85f),
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .size(size)
+            .clip(CircleShape)
+            .background(color),
+    )
+}

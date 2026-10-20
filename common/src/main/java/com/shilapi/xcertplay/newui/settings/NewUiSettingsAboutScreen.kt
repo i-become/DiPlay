@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,58 +30,74 @@ import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiLayout
+import com.shilapi.xcertplay.newui.NewUiMainPageTitle
+import com.shilapi.xcertplay.newui.NewUiSplitPage
 import com.shilapi.xcertplay.newui.NewUiTypography
+import com.shilapi.xcertplay.newui.newUiGlassPanel
 
 @Composable
 fun NewUiSettingsAboutScreen(
     @DrawableRes paymentQrRes: Int = R.drawable.new_ui_about_payment_qr,
     @DrawableRes communityQrRes: Int = R.drawable.new_ui_about_douyin_qr,
 ) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = NewUiLayout.ScreenPaddingBottom),
-    ) {
-        Text(
-            stringResource(R.string.about),
-            style = NewUiTypography.ActionTitle,
-            color = NewUiColors.TextPrimary,
-            modifier = Modifier.padding(bottom = NewUiLayout.MainGap),
-        )
-        Text(
-            stringResource(R.string.new_ui_about_doc_title),
-            style = NewUiTypography.ActionTitle,
-            color = NewUiColors.TextPrimary,
-            modifier = Modifier.padding(bottom = NewUiLayout.MainGap),
-        )
-        AboutSection(
-            titleRes = R.string.new_ui_about_sec1_title,
-            bodyRes = R.string.new_ui_about_sec1_body,
-        )
-        AboutSection(
-            titleRes = R.string.new_ui_about_sec2_title,
-            bodyRes = R.string.new_ui_about_sec2_body,
-        )
-        AboutSection(
-            titleRes = R.string.new_ui_about_sec3_title,
-            bodyRes = R.string.new_ui_about_sec3_body,
-        )
-        AboutSection(
-            titleRes = R.string.new_ui_about_sec4_title,
-            bodyRes = R.string.new_ui_about_sec4_body,
-        )
-        DualQrSection(
-            paymentQrRes = paymentQrRes,
-            communityQrRes = communityQrRes,
-            paymentCaptionRes = R.string.new_ui_about_payment_caption,
-            communityCaptionRes = R.string.new_ui_about_sec4_scan_hint,
-        )
-        Text(
-            stringResource(R.string.new_ui_about_thanks),
-            style = NewUiTypography.SettingSubtitle,
-            color = NewUiColors.TextPrimary,
-            modifier = Modifier.padding(top = NewUiLayout.MainGap),
+    Column(Modifier.fillMaxSize()) {
+        NewUiSplitPage(
+            leftWeight = 0.55f,
+            rightWeight = 0.45f,
+            left = {
+                Column(
+                    Modifier
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(end = 8.dp),
+                ) {
+                    NewUiMainPageTitle(stringResource(R.string.about))
+                    Text(
+                        stringResource(R.string.new_ui_about_doc_title),
+                        style = NewUiTypography.SettingSubtitle,
+                        color = NewUiColors.TextSecondary,
+                        modifier = Modifier.padding(bottom = NewUiLayout.MainGap),
+                    )
+                    AboutSection(
+                        titleRes = R.string.new_ui_about_sec1_title,
+                        bodyRes = R.string.new_ui_about_sec1_body,
+                    )
+                    AboutSection(
+                        titleRes = R.string.new_ui_about_sec2_title,
+                        bodyRes = R.string.new_ui_about_sec2_body,
+                    )
+                    AboutSection(
+                        titleRes = R.string.new_ui_about_sec3_title,
+                        bodyRes = R.string.new_ui_about_sec3_body,
+                    )
+                    AboutSection(
+                        titleRes = R.string.new_ui_about_sec4_title,
+                        bodyRes = R.string.new_ui_about_sec4_body,
+                    )
+                    Text(
+                        stringResource(R.string.new_ui_about_thanks),
+                        style = NewUiTypography.SettingSubtitle,
+                        color = NewUiColors.TextPrimary,
+                        modifier = Modifier.padding(top = NewUiLayout.MainGap),
+                    )
+                }
+            },
+            right = {
+                Column(
+                    Modifier
+                        .fillMaxHeight()
+                        .newUiGlassPanel(cornerRadius = NewUiLayout.PageCardRadius)
+                        .padding(32.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    DualQrSection(
+                        paymentQrRes = paymentQrRes,
+                        communityQrRes = communityQrRes,
+                        paymentCaptionRes = R.string.new_ui_about_payment_caption,
+                        communityCaptionRes = R.string.new_ui_about_sec4_scan_hint,
+                    )
+                }
+            },
         )
     }
 }
@@ -111,10 +128,8 @@ private fun DualQrSection(
     @StringRes communityCaptionRes: Int,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterHorizontally),
     ) {
         QrColumn(
             qrRes = paymentQrRes,
@@ -138,12 +153,13 @@ private fun QrColumn(
     @StringRes captionRes: Int,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
+    val qrSize = NewUiLayout.AboutQrSize
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(qrSize)
                 .clip(shape)
                 .background(NewUiColors.SwitchThumb, shape),
             contentAlignment = Alignment.Center,
@@ -154,8 +170,8 @@ private fun QrColumn(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .padding(8.dp),
+                    .height(qrSize)
+                    .padding(NewUiLayout.AboutQrInnerPadding),
             )
         }
         Text(

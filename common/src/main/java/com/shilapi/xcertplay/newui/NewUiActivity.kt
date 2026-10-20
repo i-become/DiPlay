@@ -16,12 +16,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.CarPlayBackgroundSession
 import com.shilapi.xcertplay.CarPlayHostSettingsBridge
+import com.shilapi.xcertplay.ConnectionProgressUiState
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
 import com.shilapi.xcertplay.Hs5HongqiStartupWarmup
 import com.shilapi.xcertplay.Hs5SteeringKeys
@@ -111,6 +117,7 @@ class NewUiActivity : ComponentActivity() {
     private var diagnosticSaving by mutableStateOf(false)
     private var sessionLogRecordingEnabled by mutableStateOf(false)
     private var debugSimulatedClusterEnabled by mutableStateOf(false)
+    private var carPlayWasActive = false
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
@@ -241,7 +248,17 @@ class NewUiActivity : ComponentActivity() {
                     },
                     onOpenHeadUnitHome = { NewUiHeadUnitIntents.openHome(activity) },
                 ) {
-                    when (destination) {
+                    val reduceMotion = rememberNewUiReduceMotion()
+                    val pageFadeMs = if (reduceMotion) 0 else NewUiMotion.PageCrossfadeMs
+                    AnimatedContent(
+                        targetState = destination,
+                        transitionSpec = {
+                            fadeIn(tween(pageFadeMs, easing = NewUiMotion.EaseOut)) togetherWith
+                                fadeOut(tween(pageFadeMs, easing = NewUiMotion.EaseOut))
+                        },
+                        label = "newUiMainNav",
+                    ) { tab ->
+                        when (tab) {
                         NewUiDestination.CONNECTION -> when (connectionSubpage) {
                             NewUiConnectionSubpage.CONNECTION_METHOD -> NewUiConnectionMethodScreen(
                                 initial = connectionMethodDraft,
@@ -583,6 +600,7 @@ class NewUiActivity : ComponentActivity() {
                             )
                         }
                         NewUiDestination.ABOUT -> NewUiSettingsAboutScreen()
+                        }
                     }
                 }
             }
@@ -661,7 +679,20 @@ class NewUiActivity : ComponentActivity() {
 
     private fun refreshAll() {
         connectionActions.refreshSetupError()
+        if (!CarPlayBackgroundSession.hasSession() && !ConnectionProgressUiState.failed()) {
+            ConnectionProgressUiState.reset()
+        }
+        val carPlayNowActive = CarPlayBackgroundSession.active
         snapshot = NewUiConnectionSnapshotReader.read(this, connectionActions.setupError)
+        if (
+            !carPlayWasActive &&
+            carPlayNowActive &&
+            destination == NewUiDestination.CONNECTION &&
+            connectionSubpage == NewUiConnectionSubpage.MAIN
+        ) {
+            DiPlayLauncher.openCarPlayProjection(this)
+        }
+        carPlayWasActive = carPlayNowActive
         topBarStatus = NewUiTopBarStatusReader.read(this)
         displayState = NewUiDisplayStateReader.read(this)
         settingsState = NewUiSettingsStateReader.read(this)

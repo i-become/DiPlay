@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay HS5 · 显示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>body{margin:0;font-family:-apple-system,"SF Pro Display","PingFang SC",sans-serif}.tog{width:68px;height:38px;border-radius:999px;background:#34445b;position:relative}.tog.on{background:#087bff}.tog.on span{transform:translateX(28px)}.tog span{position:absolute;top:3px;left:3px;width:32px;height:32px;border-radius:999px;background:#fff;transition:transform .2s}</style>
+</head>
+<body>
+<div id="screen-root" class="w-[1920px] h-[720px] flex flex-col bg-[#071426] text-[#f2f7ff] overflow-hidden">
+  <header class="shrink-0 h-[96px] flex items-center justify-between px-10 border-b border-[#263c5a]/90">
+    <div class="flex items-center gap-12 h-full">
+      <div class="flex items-center gap-3"><div class="w-1 h-9 bg-[#c8102e] rounded-full"></div><span class="text-[26px] font-semibold">CarPlay <span class="text-[#8faed5] font-normal">HS5</span></span></div>
+      <nav class="flex items-center gap-2 h-full py-2">
+        <a id="nav-connect" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">连接</a>
+        <a id="nav-display" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] bg-[#087bff] text-[22px] font-semibold">显示</a>
+        <a id="nav-settings" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">设置</a>
+        <a id="nav-diagnostics" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">诊断</a>
+        <a id="nav-about" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">关于</a>
+      </nav>
+    </div>
+    <span id="status-clock" class="text-[20px] text-[#8faed5]">14:20</span>
+  </header>
+  <main class="flex-1 min-h-0 px-10 py-7 overflow-hidden">
+    <h1 class="text-[32px] font-bold mb-5 tracking-tight">显示与副屏</h1>
+    <div class="grid grid-cols-2 gap-6 h-[calc(100%-3.5rem)] min-h-0">
+      <section class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 overflow-y-auto">
+        <button type="button" id="row-fps" class="w-full flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40 text-left">
+          <div><div class="text-[18px] font-semibold">帧率</div><div class="text-[14px] text-[#8faed5]">CarPlay 画面刷新率</div></div>
+          <span class="text-[17px] text-[#8faed5] flex items-center gap-2">60 FPS <iconify-icon icon="lucide:chevron-right"></iconify-icon></span>
+        </button>
+        <div class="flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">平滑视频</div><div class="text-[14px] text-[#8faed5]">按 iPhone 帧时间显示</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">直接视频输出</div><div class="text-[14px] text-[#8faed5]">SurfaceView 低延迟路径</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">低延迟解码</div><div class="text-[14px] text-[#8faed5]">优先更快出画</div></div><div class="tog"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[72px]"><div><div class="text-[18px] font-semibold">MTK 解码调优</div><div class="text-[14px] text-[#8faed5]">联发科车机专用</div></div><div class="tog on"><span></span></div></div>
+      </section>
+      <section class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 overflow-y-auto">
+        <div class="flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">HUD 导航</div><div class="text-[14px] text-[#8faed5]">向原车 HUD 发送转向</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[72px] border-b border-[#263c5a]/40"><div><div class="text-[18px] font-semibold">仪表地图</div><div class="text-[14px] text-[#8faed5]">Cluster 地图投屏</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[64px] border-b border-[#263c5a]/40 opacity-90"><div><div class="text-[17px] font-semibold">连接时默认飞屏</div><div class="text-[13px] text-[#8faed5]">依赖仪表地图</div></div><div class="tog on"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[64px] border-b border-[#263c5a]/40"><div><div class="text-[17px] font-semibold">飞屏窗口</div><div class="text-[13px] text-[#8faed5]">独立 cluster 窗口</div></div><div class="tog"><span></span></div></div>
+        <div class="flex items-center justify-between px-6 h-[64px] border-b border-[#263c5a]/40"><div><div class="text-[17px] font-semibold">仪表横滑手势</div><div class="text-[13px] text-[#8faed5]">地图左右切换</div></div><div class="tog on"><span></span></div></div>
+        <div class="px-6 py-5">
+          <div class="text-[18px] font-semibold mb-1">CarPlay 主题</div>
+          <div class="text-[14px] text-[#8faed5] mb-3">日/夜外观</div>
+          <div class="flex gap-2">
+            <button type="button" id="theme-system" class="px-5 h-[44px] rounded-xl bg-[#087bff] text-[16px] font-semibold">跟随系统</button>
+            <button type="button" id="theme-day" class="px-5 h-[44px] rounded-xl bg-white/5 text-[#8faed5] text-[16px]">白天</button>
+            <button type="button" id="theme-night" class="px-5 h-[44px] rounded-xl bg-white/5 text-[#8faed5] text-[16px]">夜间</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

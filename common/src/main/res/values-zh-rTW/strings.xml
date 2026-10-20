@@ -366,6 +366,7 @@
     <string name="s_2_pair_your_iphone">2 · 配對你的 iPhone</string>
     <string name="s_300_ms_default">300 毫秒 · 預設</string>
     <string name="s_30_fps_lighter_load">30 fps · 較低負載</string>
+    <string name="s_50_fps_balanced">50 fps · 均衡</string>
     <string name="s_3_connect">3 · 連線</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. 點一下下方的「檢查並啟用」。這會啟用儀表板地圖和自動主題跟隨。進行中的 CarPlay 工作階段會重新連線一次，之後即可中斷電腦連線。</string>
     <string name="s_500_ms">500 毫秒</string>
@@ -920,6 +921,9 @@
     <string name="new_ui_nav_about">關於</string>
     <string name="new_ui_nav_head_unit">車機</string>
     <string name="new_ui_status_connected">已連線</string>
+    <string name="new_ui_status_failed">連線失敗</string>
+    <string name="new_ui_connection_failed_banner">無法完成連線。請檢查無線連線方式，或點按重新連線。</string>
+    <string name="new_ui_connection_progress_failed_sub">連線在此步驟逾時</string>
     <string name="new_ui_status_ready_for">已為 %1$s 就緒</string>
     <string name="new_ui_link_wifi_direct">Wi‑Fi Direct</string>
     <string name="new_ui_link_car_hotspot">車機熱點</string>

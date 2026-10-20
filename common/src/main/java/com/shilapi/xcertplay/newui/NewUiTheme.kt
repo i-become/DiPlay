@@ -104,6 +104,20 @@ object NewUiColors {
 
     val StatusDotIdle = SwitchTrackOff
 
+    val CardPanel = Color(0xF20D1C30)
+
+    val StatusReady = Color(0xFF34D399)
+
+    val StatusReadySoft = Color(0xFF6EE7B7)
+
+    val StatusConnecting = Color(0xFF93C5FD)
+
+    val ProgressDotIdle = Color(0xFF2A3F5C)
+
+    val ProgressDotActive = Color(0xFF60A5FA)
+
+    val ActionPanelFill = Color(0xE6101F33)
+
 }
 
 
@@ -129,6 +143,26 @@ object NewUiTypography {
     val StatusLabel = TextStyle(fontFamily = UiFont, fontSize = 18.sp, fontWeight = FontWeight.Medium)
 
     val PhoneName = TextStyle(fontFamily = UiFont, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+
+    val PhoneNameHero = TextStyle(fontFamily = UiFont, fontSize = 52.sp, fontWeight = FontWeight.Bold)
+
+    val PageTitle = TextStyle(fontFamily = UiFont, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+
+    val NavTab = TextStyle(fontFamily = UiFont, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+
+    val PrimaryActionTitle = TextStyle(fontFamily = UiFont, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+
+    val SecondaryActionTitle = TextStyle(fontFamily = UiFont, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+
+    val CompactSettingTitle = TextStyle(fontFamily = UiFont, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+
+    val ProgressLabel = TextStyle(fontFamily = UiFont, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+
+    val ProgressCounter = TextStyle(fontFamily = UiFont, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+
+    val ProgressStepTitle = TextStyle(fontFamily = UiFont, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+
+    val PhaseStatus = TextStyle(fontFamily = UiFont, fontSize = 20.sp, fontWeight = FontWeight.Medium)
 
     val LinkDetail = TextStyle(fontFamily = UiFont, fontSize = 16.sp, fontWeight = FontWeight.Normal)
 

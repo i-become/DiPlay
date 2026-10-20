@@ -18,7 +18,9 @@ internal object Hs5WirelessPrewarm {
     fun schedule(context: Context) {
         val app = context.applicationContext
         if (!Hs5HeadUnit.isHeadUnit(app)) return
-        if (!AirPlayPersistence.loadWirelessEnabled(app)) return
+        val wirelessPlanned = AirPlayPersistence.loadWirelessEnabled(app) ||
+            DiPlayPreferences.autoConnectWireless(app)
+        if (!wirelessPlanned) return
         val mode = AirPlayPersistence.loadWirelessHotspotMode(app)
         if (!running.compareAndSet(false, true)) return
         Thread({

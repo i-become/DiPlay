@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay HS5 · 连接 · 已连接</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>
+    body { margin: 0; font-family: -apple-system, "SF Pro Display", "PingFang SC", sans-serif; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: #087bff; flex-shrink: 0; box-shadow: 0 0 4px rgba(8,123,255,0.4); }
+    .action-btn { min-height: 100px; border-radius: 24px; }
+  </style>
+</head>
+<body>
+<div id="screen-root" class="w-[1920px] h-[720px] flex flex-col bg-[#071426] text-[#f2f7ff] overflow-hidden">
+  <header class="shrink-0 h-[96px] flex items-center justify-between px-10 border-b border-[#263c5a]/90">
+    <div class="flex items-center gap-12"><div class="flex items-center gap-3"><div class="w-1 h-9 bg-[#c8102e] rounded-full"></div><span class="text-[26px] font-semibold">CarPlay <span class="text-[#8faed5] font-normal">HS5</span></span></div>
+    <nav class="flex gap-2"><a id="nav-tab-connect" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] bg-[#087bff] text-[22px] font-semibold">连接</a><a id="nav-tab-display" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px]">显示</a><a id="nav-tab-settings" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px]">设置</a><a id="nav-tab-diagnostics" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px]">诊断</a><a id="nav-tab-about" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px]">关于</a></nav></div>
+    <span id="status-clock" class="text-[20px] text-[#8faed5]">14:20</span>
+  </header>
+  <main class="flex-1 min-h-0 flex gap-10 px-10 py-8">
+    <section class="w-[58%] flex flex-col rounded-[32px] border border-[#263c5a]/80 bg-[#0d1c30]/95 px-8 py-7">
+      <div class="flex items-center gap-3 mb-3"><span class="w-3 h-3 rounded-full bg-emerald-400"></span><span class="text-[20px] text-emerald-300 font-medium">CarPlay 已连接</span></div>
+      <h1 class="text-[52px] font-bold mb-2">iPhone 15 Pro</h1>
+      <p class="text-[17px] text-[#8faed5] mb-6">Wi‑Fi Direct · 192.168.49.1</p>
+      <button type="button" id="link-method-row" class="flex items-center justify-between h-[68px] px-5 mb-6 rounded-[20px] bg-white/[0.04] border border-[#263c5a]/60"><div class="flex gap-4 items-center"><iconify-icon icon="lucide:wifi" class="text-[28px] text-[#087bff]"></iconify-icon><div><div class="text-[17px] font-semibold">连接方式</div><div class="text-[15px] text-[#8faed5]">Wi‑Fi Direct</div></div></div><iconify-icon icon="lucide:chevron-right" class="text-2xl text-[#8faed5]"></iconify-icon></button>
+      <div class="rounded-[24px] bg-gradient-to-b from-emerald-500/[0.08] to-transparent border border-emerald-500/20 px-6 py-5 mb-6">
+        <div class="flex items-center justify-between mb-4"><span class="text-[14px] font-medium text-[#8faed5] tracking-wide">连接进度</span><span class="text-[15px] font-semibold text-emerald-400 tabular-nums">27 / 27</span></div>
+        <div id="dots-row" class="flex flex-nowrap items-center gap-[6px] mb-4 max-w-[640px]"></div>
+        <p class="text-[24px] font-semibold text-emerald-100 leading-tight">CarPlay 已就绪</p>
+        <p class="text-[15px] text-[#8faed5] mt-2">全部阶段已完成，可打开 CarPlay 画面</p>
+      </div>
+      <div class="mt-auto flex items-center justify-between h-[72px] px-5 rounded-[20px] bg-white/[0.04] border border-[#263c5a]/50"><div class="flex gap-4 items-center"><iconify-icon icon="lucide:map-pin" class="text-[26px] text-emerald-400"></iconify-icon><div><div class="text-[17px] font-semibold">向 iPhone 报告位置</div><div class="text-[14px] text-[#8faed5]">用于导航与 CarPlay 位置同步</div></div></div><div class="w-[68px] h-[38px] rounded-full bg-[#087bff] flex px-1 items-center"><span class="w-[32px] h-[32px] bg-white rounded-full ml-auto"></span></div></div>
+    </section>
+    <section class="w-[42%] flex flex-col gap-5 justify-center py-2">
+      <button type="button" id="btn-enter-carplay" class="action-btn flex-[1.15] flex items-center justify-between px-9 bg-[#087bff] shadow-[0_16px_40px_-12px_rgba(8,123,255,0.55)]"><div class="flex gap-5 items-center"><iconify-icon icon="simple-icons:apple" class="text-[52px]"></iconify-icon><span class="text-[34px] font-bold">打开 CarPlay</span></div><iconify-icon icon="lucide:chevron-right" class="text-[36px] opacity-50"></iconify-icon></button>
+      <button type="button" id="btn-switch-phone" class="action-btn flex-1 flex items-center justify-between px-9 bg-[#101f33]/90 border border-[#263c5a]"><div class="flex gap-5 items-center"><iconify-icon icon="lucide:smartphone" class="text-[34px] text-[#087bff]"></iconify-icon><div><span class="text-[26px] font-semibold block">切换 iPhone</span><span class="text-[15px] text-[#8faed5]">选择已配对的手机</span></div></div><iconify-icon icon="lucide:chevron-right" class="text-[28px] text-[#8faed5]/60"></iconify-icon></button>
+      <button type="button" id="btn-disconnect" class="action-btn flex-1 flex items-center justify-between px-9 bg-[#101f33]/90 border border-[#263c5a]"><div class="flex gap-5 items-center"><iconify-icon icon="lucide:unplug" class="text-[34px] text-[#f87171]"></iconify-icon><div><span class="text-[26px] font-semibold text-[#fecaca] block">断开连接</span><span class="text-[15px] text-[#8faed5]">结束当前会话</span></div></div><iconify-icon icon="lucide:chevron-right" class="text-[28px] text-[#8faed5]/60"></iconify-icon></button>
+    </section>
+  </main>
+</div>
+<script>
+(function () {
+  var row = document.getElementById("dots-row");
+  for (var i = 0; i < 27; i++) {
+    var d = document.createElement("span");
+    d.className = "inline-block w-[6px] h-[6px] rounded-full shrink-0 bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.35)]";
+    row.appendChild(d);
+  }
+})();
+</script>
+</body>
+</html>

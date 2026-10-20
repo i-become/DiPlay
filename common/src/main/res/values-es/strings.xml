@@ -356,6 +356,7 @@
     <string name="s_2_pair_your_iphone">2 · Empareja tu iPhone</string>
     <string name="s_300_ms_default">300 ms · predeterminado</string>
     <string name="s_30_fps_lighter_load">30 img/s · carga más ligera</string>
+    <string name="s_50_fps_balanced">50 img/s · equilibrado</string>
     <string name="s_3_connect">3 · Conéctate</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. Toca «Comprobar y activar» abajo. Esto activa el mapa del cuadro y el seguimiento automático del tema. Una sesión de CarPlay activa se reconectará una vez. Después puedes desconectar el ordenador.</string>
     <string name="s_500_ms">500 ms</string>
@@ -860,6 +861,9 @@
     <string name="new_ui_nav_about">About</string>
     <string name="new_ui_nav_head_unit">Head unit</string>
     <string name="new_ui_status_connected">Connected</string>
+    <string name="new_ui_status_failed">Connection failed</string>
+    <string name="new_ui_connection_failed_banner">Could not finish the connection. Check your wireless method or tap Retry connection.</string>
+    <string name="new_ui_connection_progress_failed_sub">Connection stopped at this step</string>
     <string name="new_ui_status_ready_for">Ready for %1$s</string>
     <string name="new_ui_link_wifi_direct">Wi‑Fi Direct</string>
     <string name="new_ui_link_car_hotspot">Car hotspot</string>
