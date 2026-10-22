@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
@@ -28,7 +30,7 @@ internal object FceClusterBridge {
     fun initialize(appContext: Context) = synchronized(lock) {
         if (context != null) return@synchronized
         context = appContext.applicationContext
-        Log.i(TAG, "FCE cluster output ready")
+        DiagnosticLogging.logcat { Log.i(TAG, "FCE cluster output ready") }
         if (!tickStarted) {
             tickStarted = true
             Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -65,7 +67,7 @@ internal object FceClusterBridge {
             output.standby()
             if (!standbyLogged && output.active) {
                 standbyLogged = true
-                Log.i(TAG, "cluster navigation view active without a maneuver")
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster navigation view active without a maneuver") }
             }
             return
         }
@@ -76,7 +78,7 @@ internal object FceClusterBridge {
         output.update(guidance)
         if (!guidanceLogged && output.active) {
             guidanceLogged = true
-            Log.i(TAG, "cluster guidance sent $guidance (apple type ${apple.type})")
+            DiagnosticLogging.logcat { Log.i(TAG, "cluster guidance sent $guidance (apple type ${apple.type})") }
         }
     }
 

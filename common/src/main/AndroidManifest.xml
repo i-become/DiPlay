@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
+        <package android:name="ltd.qisi.adapterservice" />
         <package android:name="com.byd.carsettings" />
         <package android:name="com.autonavi.amapauto" />
         <package android:name="com.autonavi.amapauto.custom" />
@@ -41,6 +42,14 @@
         </intent>
     </queries>
     <application>
+        <receiver
+            android:name="com.shilapi.xcertplay.update.UpdateInstallStatusReceiver"
+            android:exported="false" />
+        <activity
+            android:name="com.shilapi.xcertplay.update.UpdateInstallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <provider
             android:name="com.shilapi.xcertplay.DiPlayBootInitProvider"
             android:authorities="${applicationId}.boot-init"

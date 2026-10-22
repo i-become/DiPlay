@@ -94,6 +94,38 @@ class CarPlayBonjourDualStackTest {
         }
     }
 
+    @Test fun startupRecoveryReannouncesTheSameServiceAndRefreshesBothBrowsersWithoutClosing() {
+        setup()
+        val v4 = mock(JmDNS::class.java)
+        val v6 = mock(JmDNS::class.java)
+        mockStatic(JmDNS::class.java).use { factory ->
+            factory.`when`<JmDNS> { JmDNS.create(ipv4, "carplay-020000000002") }.thenReturn(v4)
+            factory.`when`<JmDNS> { JmDNS.create(ipv6, "carplay-020000000002") }.thenReturn(v6)
+            val bonjour = CarPlayBonjour(context, config, identity, ipv4.hostAddress, true,
+                additionalAddresses = listOf(ipv6))
+            assertFalse(bonjour.refreshDiscovery())
+            bonjour.start()
+            val services = ReflectionHelpers.getField<List<ServiceInfo>>(bonjour, "publishedServices")
+            val originalTxt = services.map { it.textBytes.toList() }
+            val seen = ReflectionHelpers.getField<MutableSet<String>>(bonjour, "seenServices")
+            seen.add("phone|true")
+            assertTrue(bonjour.refreshDiscovery())
+            assertTrue(seen.isEmpty())
+            assertEquals(originalTxt, services.map { it.textBytes.toList() })
+            for (dns in listOf(v4, v6)) {
+                verify(dns, times(1)).registerService(any(ServiceInfo::class.java))
+                verify(dns, times(2)).addServiceListener(eq("_carplay-ctrl._tcp.local."), any(ServiceListener::class.java))
+                verify(dns).removeServiceListener(eq("_carplay-ctrl._tcp.local."), any(ServiceListener::class.java))
+                verify(dns, never()).close()
+                verify(dns, never()).unregisterAllServices()
+            }
+            bonjour.close()
+            assertFalse(bonjour.refreshDiscovery())
+            verify(v4).close()
+            verify(v6).close()
+        }
+    }
+
     @Test fun dualLanThenSingleP2pThenDualLanServesAirPlayInfo() {
         val controller = Robolectric.buildService(CarPlayVpnService::class.java).create()
         val events = java.util.concurrent.CopyOnWriteArrayList<String>()

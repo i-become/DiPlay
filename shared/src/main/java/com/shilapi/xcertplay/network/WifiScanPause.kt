@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -118,14 +120,17 @@ private object ProcessWifiScanPause : WifiScanPauseControl {
 
     fun recover(app: Context) {
         enqueue(app) { state ->
-            if (state.recoveryPending()) Log.i(WifiScanPause.TAG, "Wi-Fi scan recovery restored=${state.recover()}")
+            if (state.recoveryPending()) {
+                val restored = state.recover()
+                DiagnosticLogging.logcat { Log.i(WifiScanPause.TAG, "Wi-Fi scan recovery restored=$restored") }
+            }
         }
     }
 
     private fun enqueue(app: Context, action: (WifiScanPauseSession) -> Unit) {
         worker.execute {
             val state = state(app)
-            runCatching { action(state) }.onFailure { Log.w(WifiScanPause.TAG, "Wi-Fi scan recovery will retry", it) }
+            runCatching { action(state) }.onFailure { DiagnosticLogging.logcat { Log.w(WifiScanPause.TAG, "Wi-Fi scan recovery will retry", it) } }
             if (state.recoveryPending()) {
                 if (retry == null) retry = worker.schedule({
                     retry = null

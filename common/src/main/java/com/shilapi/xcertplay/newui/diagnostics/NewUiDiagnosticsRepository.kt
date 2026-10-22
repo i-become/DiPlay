@@ -2,7 +2,6 @@ package com.shilapi.xcertplay.newui.diagnostics
 
 import android.content.Context
 import com.shilapi.xcertplay.AirPlayPersistence
-import com.shilapi.xcertplay.DiagnosticExportStore
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,7 +26,7 @@ data class NewUiDiagnosticFile(
 
 internal object NewUiDiagnosticsRepository {
     fun reportDirectories(context: Context): List<File> {
-        val custom = DiagnosticExportStore.preferredReportDirectory(context)
+        val custom = AirPlayPersistence.loadDiagnosticReportDirectory(context)?.let(::File)
         val defaults = listOfNotNull(
             context.getExternalFilesDir(null)?.let { File(it, "diagnostic-reports") },
             File(context.filesDir, "diagnostic-reports"),

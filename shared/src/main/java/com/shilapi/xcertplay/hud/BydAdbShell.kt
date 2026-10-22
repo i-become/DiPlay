@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -34,7 +36,7 @@ internal class BydAdbShell(private val tag: String) {
             retryAtMillis = now + RETRY_MILLIS
             if (!unavailableLogged) {
                 unavailableLogged = true
-                Log.w(tag, "ADB access $access")
+                DiagnosticLogging.logcat { Log.w(tag, "ADB access $access") }
             }
             return null
         }

@@ -3,18 +3,29 @@ package com.shilapi.xcertplay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
 /** Queued entries retain only their exact file target and a redacted, bounded metadata string. */
 internal object AsyncDiagnosticLog {
     private data class Entry(val target: SessionLogFile, val line: String)
-    private val writer = BoundedDiagnosticWriter<Entry> { it.target.append(it.line) }
+    @Volatile private var writer: BoundedDiagnosticWriter<Entry>? = null
 
-    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
-        if (target == null) return
-        val safe = DiagnosticRedactor.redact(message) ?: return
-        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
-        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe")) }
+    @Synchronized private fun activeWriter(): BoundedDiagnosticWriter<Entry>? {
+        if (!DiagnosticLogging.enabled) return null
+        return writer ?: BoundedDiagnosticWriter<Entry> { it.target.append(it.line) }.also { next ->
+            writer = next
+            DiagnosticLogging.onDisabled {
+                synchronized(this) { next.cancel(); if (writer === next) writer = null }
+            }
+        }
     }
 
-    internal fun awaitIdle(timeoutMillis: Long): Boolean = writer.awaitIdle(timeoutMillis)
+    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
+        if (!DiagnosticLogging.enabled || target == null || !target.recordingActive) return
+        val safe = DiagnosticRedactor.redact(message) ?: return
+        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
+        runCatching { activeWriter()?.enqueue(Entry(target, "$timestamp  $safe")) }
+    }
+
+    internal fun awaitIdle(timeoutMillis: Long): Boolean = writer?.awaitIdle(timeoutMillis) ?: true
 }

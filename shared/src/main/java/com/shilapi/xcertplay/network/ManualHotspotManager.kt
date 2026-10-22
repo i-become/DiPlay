@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.wifi.SoftApConfiguration
@@ -137,12 +139,12 @@ class ManualHotspotManager(
         }
 
         if (channel == 0) {
-            Log.w(
+            DiagnosticLogging.logcat { Log.w(
                 TAG,
                 "Could not read the active hotspot channel from Android public APIs; " +
                     "reporting iAP2 channel 0 (auto) instead of configured channel " +
                     "$expectedChannel",
-            )
+            ) }
         }
         val observedBandLabel = wifiBandLabel(apConfiguration?.band)
         return WirelessHotspotInfo(

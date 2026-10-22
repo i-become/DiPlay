@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
@@ -55,7 +57,7 @@ class UsbAutoConfirmService : AccessibilityService() {
             }
             if (confirmed) {
                 lastClickTime = now
-                Log.i(TAG, "Successfully auto-confirmed DiPlay USB permission dialog")
+                DiagnosticLogging.logcat { Log.i(TAG, "Successfully auto-confirmed DiPlay USB permission dialog") }
             }
         } finally {
             @Suppress("DEPRECATION")

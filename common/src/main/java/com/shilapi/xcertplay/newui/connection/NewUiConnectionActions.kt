@@ -60,6 +60,7 @@ class NewUiConnectionActions(
         if (DiPlayPreferences.phoneAddress(activity) == null) return
         when {
             CarPlayBackgroundSession.active -> openCarPlayProjection()
+            ConnectionProgressUiState.disconnected() -> connect(wireless = true)
             CarPlayBackgroundSession.hasSession() -> Unit
             else -> connect(wireless = true)
         }
@@ -103,6 +104,15 @@ class NewUiConnectionActions(
             return
         }
         if (CarPlayBackgroundSession.hasSession()) {
+            if (ConnectionProgressUiState.disconnected()) {
+                // Wait for the old sockets/decoder to close before opening a new host.
+                CarPlayBackgroundSession.stop {
+                    activity.runOnUiThread {
+                        if (!activity.isFinishing && !activity.isDestroyed) connect(wireless)
+                    }
+                }
+                return
+            }
             if (CarPlayBackgroundSession.active) {
                 openCarPlayProjection()
                 return
@@ -111,12 +121,13 @@ class NewUiConnectionActions(
             return
         }
         AirPlayPersistence.saveWirelessEnabled(activity, wireless)
+        ConnectionProgressUiState.reset()
         startCarPlayHost(connectionHub = true)
     }
 
     fun disconnect(onComplete: () -> Unit) {
+        ConnectionProgressUiState.markDisconnected()
         CarPlayBackgroundSession.stop {
-            ConnectionProgressUiState.reset()
             activity.runOnUiThread(onComplete)
         }
     }

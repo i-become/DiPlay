@@ -22,6 +22,8 @@ import java.util.concurrent.ExecutorService
 @Config(sdk = [29])
 @LooperMode(LooperMode.Mode.PAUSED)
 class CarPlayHostResolutionTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private lateinit var activity: CarPlayHostActivity
 
     @Before fun setUp() {

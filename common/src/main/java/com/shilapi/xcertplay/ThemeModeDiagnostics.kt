@@ -2,10 +2,11 @@ package com.shilapi.xcertplay
 
 import android.content.res.Configuration
 
-/** Samples only Android's existing theme signal; never infers a theme from vehicle state. */
+/** Records the Android theme signal alongside the independently selected CarPlay appearance. */
 internal class ThemeModeDiagnostics {
     enum class Source(val label: String, val force: Boolean = false) {
         CARPLAY_MODE("carplay-mode"),
+        VEHICLE_LIGHT("vehicle-position-light", true),
         CREATE("create", true),
         START("start", true),
         STOP("stop", true),

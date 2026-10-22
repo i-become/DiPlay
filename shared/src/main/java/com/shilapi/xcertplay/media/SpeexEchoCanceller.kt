@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 import java.io.Closeable
 
@@ -50,7 +52,7 @@ internal class SpeexEchoCanceller private constructor(
 
         val available: Boolean by lazy {
             runCatching { System.loadLibrary("speex_echo"); true }
-                .onFailure { Log.w(TAG, "echo canceller library unavailable", it) }
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "echo canceller library unavailable", it) } }
                 .getOrDefault(false)
         }
 

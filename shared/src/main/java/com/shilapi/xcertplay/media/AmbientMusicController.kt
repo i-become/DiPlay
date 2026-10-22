@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.util.Log
 import com.shilapi.xcertplay.hud.BydAmbientLightClient
@@ -49,13 +51,13 @@ object AmbientMusicController {
         },
         dispatch = { executor.execute(it) },
         now = { android.os.SystemClock.uptimeMillis() },
-        log = { Log.i("DiPlay-Ambient", it) },
+        log = { DiagnosticLogging.logcat { Log.i("DiPlay-Ambient", it) } },
         applied = { desired ->
             appliedCount++
             val now = android.os.SystemClock.uptimeMillis()
             if (now - lastLogMillis >= 5_000) {
                 lastLogMillis = now
-                Log.i("DiPlay-Ambient", "applied=$appliedCount area=${desired.first} color=${desired.second} brightness=${desired.third} colorMode=${settings.colorMode} estimatedBpm=${colors.estimatedBpm?.toInt() ?: 0}")
+                DiagnosticLogging.logcat { Log.i("DiPlay-Ambient", "applied=$appliedCount area=${desired.first} color=${desired.second} brightness=${desired.third} colorMode=${settings.colorMode} estimatedBpm=${colors.estimatedBpm?.toInt() ?: 0}") }
             }
         },
     )
@@ -70,7 +72,7 @@ object AmbientMusicController {
             ticking = null
         } else if (ticking == null) {
             ticking = executor.scheduleWithFixedDelay({ runCatching { tick() }.onFailure {
-                Log.w("DiPlay-Ambient", "lamp update failed", it)
+                DiagnosticLogging.logcat { Log.w("DiPlay-Ambient", "lamp update failed", it) }
                 lampSession.recover()
             } }, 50, 50, TimeUnit.MILLISECONDS)
         }

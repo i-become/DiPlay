@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaCodecList
@@ -72,8 +74,8 @@ object CarPlayRotation {
             candidate <= maxOf(widths, heights) && candidate.toLong() * candidate <= widths.toLong() * heights &&
                 configures(decoder.name, mime, candidate).also { probed = it }
         }
-        Log.i(TAG, "square ${side ?: "unsupported"} for a $longSide px screen, picture $picture, hevc=$hevc " +
-            "decoder=${decoder?.name} softwareSelected=${software != null} configuredByDecoder=$probed")
+        DiagnosticLogging.logcat { Log.i(TAG, "square ${side ?: "unsupported"} for a $longSide px screen, picture $picture, hevc=$hevc " +
+            "decoder=${decoder?.name} softwareSelected=${software != null} configuredByDecoder=$probed") }
         return side
     }
 
@@ -124,7 +126,7 @@ object CarPlayRotation {
             codec.configure(MediaFormat.createVideoFormat(mime, side, side), null, null, 0)
             true
         } catch (error: Exception) {
-            Log.i(TAG, "decoder $decoder declined a ${side}x$side square: ${error.message}")
+            DiagnosticLogging.logcat { Log.i(TAG, "decoder $decoder declined a ${side}x$side square: ${error.message}") }
             false
         } finally {
             runCatching { codec?.release() }

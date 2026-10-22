@@ -35,7 +35,6 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiChevron
 import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiCompactNavRow
-import com.shilapi.xcertplay.newui.NewUiCompactToggleRow
 import com.shilapi.xcertplay.newui.NewUiLayout
 import com.shilapi.xcertplay.newui.NewUiSecondaryActionButton
 import com.shilapi.xcertplay.newui.NewUiSettingIcon
@@ -47,14 +46,12 @@ import com.shilapi.xcertplay.newui.newUiGlassPanel
 @Composable
 fun NewUiDiagnosticsScreen(
     sessionLogRecordingEnabled: Boolean,
-    debugSimulatedClusterEnabled: Boolean,
     storagePath: String,
     reports: List<NewUiDiagnosticFile>,
     saving: Boolean,
     usbSaveRoots: List<RemovableStorageVolume>,
     onSessionLogRecordingChanged: (Boolean) -> Unit,
     onClearSessionLogs: () -> Unit,
-    onDebugSimulatedClusterChanged: (Boolean) -> Unit,
     onSaveReport: () -> Unit,
     onSaveReportToUsb: (String) -> Unit,
     onViewReport: (NewUiDiagnosticFile) -> Unit,
@@ -104,29 +101,6 @@ fun NewUiDiagnosticsScreen(
                         .padding(top = 16.dp, bottom = 16.dp),
                 )
                 HorizontalDivider(color = NewUiColors.Divider.copy(alpha = 0.4f))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.new_ui_diag_simulated_cluster_title),
-                            style = NewUiTypography.CompactSettingTitle,
-                            color = NewUiColors.TextPrimary,
-                        )
-                        Text(
-                            stringResource(R.string.new_ui_diag_simulated_cluster_sub),
-                            style = NewUiTypography.SettingSubtitle,
-                            color = NewUiColors.TextSecondary,
-                        )
-                    }
-                    NewUiToggle(
-                        checked = debugSimulatedClusterEnabled,
-                        onCheckedChange = onDebugSimulatedClusterChanged,
-                    )
-                }
                 val saveShape = RoundedCornerShape(12.dp)
                 Box(
                     modifier = Modifier
@@ -135,7 +109,7 @@ fun NewUiDiagnosticsScreen(
                         .heightIn(min = 56.dp)
                         .clip(saveShape)
                         .background(NewUiColors.Accent)
-                        .clickable(enabled = !saving, onClick = onSaveReport),
+                        .clickable(enabled = !saving && sessionLogRecordingEnabled, onClick = onSaveReport),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -151,7 +125,7 @@ fun NewUiDiagnosticsScreen(
                 NewUiCompactNavRow(
                     title = stringResource(R.string.new_ui_diag_qr_title),
                     subtitle = stringResource(R.string.new_ui_diag_qr_sub),
-                    onClick = onScanDownload,
+                    onClick = { if (sessionLogRecordingEnabled) onScanDownload() },
                 )
                 NewUiCompactNavRow(
                     title = stringResource(R.string.new_ui_diag_storage_title),
@@ -169,7 +143,7 @@ fun NewUiDiagnosticsScreen(
                     usbSaveRoots.forEach { volume ->
                         NewUiSecondaryActionButton(
                             label = stringResource(R.string.new_ui_diag_save_usb, volume.label),
-                            enabled = !saving,
+                            enabled = !saving && sessionLogRecordingEnabled,
                             onClick = { onSaveReportToUsb(volume.rootPath) },
                             modifier = Modifier
                                 .fillMaxWidth()

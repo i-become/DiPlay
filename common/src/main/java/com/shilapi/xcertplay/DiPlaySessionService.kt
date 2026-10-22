@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -25,7 +27,7 @@ class DiPlaySessionService : Service() {
     // Boot warm-up only: the process keeps foreground priority until CarPlay starts or this runs out.
     private val warmupTimeout = Runnable {
         if (!sessionStarted) {
-            Log.i(TAG, "boot warm-up ended without a CarPlay session")
+            DiagnosticLogging.logcat { Log.i(TAG, "boot warm-up ended without a CarPlay session") }
             stopSelf()
         }
     }
@@ -109,7 +111,7 @@ class DiPlaySessionService : Service() {
                     context,
                     Intent(context, DiPlaySessionService::class.java).setAction(ACTION_WARMUP),
                 )
-            }.onFailure { Log.w(TAG, "boot warm-up could not start: ${it.javaClass.simpleName}") }
+            }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "boot warm-up could not start: ${it.javaClass.simpleName}") } }
         }
     }
 }

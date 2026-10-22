@@ -1,12 +1,14 @@
 package com.shilapi.xcertplay.airplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 /** Receive-thread timing only: no payloads, endpoint addresses, or route data. */
 internal class StreamReceiveStats(
     private val label: String,
     private val report: (String) -> Unit,
     private val nowNs: () -> Long = System::nanoTime,
 ) {
-    private var windowStart = nowNs()
+    private var windowStart = if (DiagnosticLogging.enabled) nowNs() else 0L
     private var readStart = windowStart
     private var processingStart = windowStart
     private var packets = 0
@@ -31,9 +33,10 @@ internal class StreamReceiveStats(
     private var decryptSumNs = 0L
     private var maxDecryptNs = 0L
 
-    fun reading() { readStart = nowNs() }
+    fun reading() { if (DiagnosticLogging.enabled) readStart = nowNs() }
 
     fun received(size: Int, sequence: Int? = null, timestamp: Int? = null) {
+        if (!DiagnosticLogging.enabled) return
         processingStart = nowNs()
         val readNs = processingStart - readStart
         maxReadNs = maxOf(maxReadNs, readNs)
@@ -69,6 +72,7 @@ internal class StreamReceiveStats(
 
     /** One payload opened in [durationNs]; reported only for streams that call it. */
     fun decrypted(durationNs: Long, size: Int) {
+        if (!DiagnosticLogging.enabled) return
         decryptSamples++
         decryptBytes += size
         decryptSumNs += durationNs
@@ -76,11 +80,13 @@ internal class StreamReceiveStats(
     }
 
     fun processed() {
+        if (!DiagnosticLogging.enabled) return
         maxProcessNs = maxOf(maxProcessNs, nowNs() - processingStart)
         flush()
     }
 
     fun flush(ended: Boolean = false) {
+        if (!DiagnosticLogging.enabled) return
         val now = nowNs()
         if (!ended && now - windowStart < 5_000_000_000L) return
         runCatching { report("Receive: $label packets=$packets bytes=$bytes readMaxMs=${maxReadNs / 1_000_000} " +

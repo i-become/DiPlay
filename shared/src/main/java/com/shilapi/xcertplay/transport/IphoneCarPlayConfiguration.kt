@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.hardware.usb.UsbConfiguration
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
@@ -31,11 +33,11 @@ object IphoneCarPlayConfiguration {
         val configurations = (0 until device.configurationCount).map(device::getConfiguration)
         val chosen = configurations.firstOrNull { usbMuxInterface(it) != null && hasCdcNcm(it) && hasAppleEthernet(it) }
             ?: configurations.firstOrNull { usbMuxInterface(it) != null && hasCdcNcm(it) }
-        Log.i(
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "carplay config chosen=${chosen?.id} " +
                 "available=${configurations.map { it.id }} detail=${chosen?.let(::describe)}",
-        )
+        ) }
         return chosen
     }
 

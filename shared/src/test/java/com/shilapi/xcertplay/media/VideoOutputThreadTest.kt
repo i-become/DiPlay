@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class VideoOutputThreadTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private val sps = byteArrayOf(0x67, 0x42, 0xC0.toByte(), 0x1E)
     private val pps = byteArrayOf(0x68, 0xCE.toByte())
     private val avcC = byteArrayOf(1, 0x42, 0xC0.toByte(), 0x1E, 0xFF.toByte(), 0xE1.toByte(), 0, sps.size.toByte()) +
@@ -90,6 +92,28 @@ class VideoOutputThreadTest {
             sink.close()
             sink.awaitVideoReleased(5_000)
         }
+    }
+
+    @Test fun disablingRecordingKeepsFirstFrameNotificationAndVideoRendering() {
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false)
+        val reports = CopyOnWriteArrayList<String>()
+        val rendered = CountDownLatch(1)
+        val sink = AndroidMediaSink(surface = null, vendorLowLatencyDecoder = true)
+        try {
+            sink.setVideoDiagnosticHandler(MAIN) { message ->
+                reports += message
+                if (message == "first frame rendered") rendered.countDown()
+            }
+            sink.setSurface(MAIN, Surface(SurfaceTexture(0)))
+            sink.onVideoConfig(MAIN, avcC)
+            sink.onVideoFrame(MAIN, idr)
+            assertTrue("first frame notification still reaches the connection UI", rendered.await(5, TimeUnit.SECONDS))
+            assertEquals(listOf("first frame rendered"), reports.toList())
+        } finally {
+            sink.close()
+            assertTrue(sink.awaitVideoReleased(5_000))
+        }
+        assertTrue(uncaught.toString(), uncaught.isEmpty())
     }
 
     private fun mainDecoder(sink: AndroidMediaSink): Any =

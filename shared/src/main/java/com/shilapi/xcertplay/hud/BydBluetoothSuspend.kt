@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -54,8 +56,8 @@ object BydBluetoothSuspend {
             val ticket = state.begin(owner) ?: return
             pending?.cancel(false)
             pending = worker.schedule({
-                if (state.suspend(ticket)) Log.i(TAG, "car Bluetooth pause verified")
-                else Log.w(TAG, "car Bluetooth pause cancelled or unavailable; recovery retained if needed")
+                if (state.suspend(ticket)) DiagnosticLogging.logcat { Log.i(TAG, "car Bluetooth pause verified") }
+                else DiagnosticLogging.logcat { Log.w(TAG, "car Bluetooth pause cancelled or unavailable; recovery retained if needed") }
             }, delayMillis.coerceAtLeast(0), TimeUnit.MILLISECONDS)
         }
     }
@@ -102,7 +104,7 @@ object BydBluetoothSuspend {
     }
 
     private fun restore(state: BluetoothSuspendLease, ticket: Long) {
-        if (!state.restore(ticket)) Log.w(TAG, "Bluetooth recovery incomplete or superseded")
+        if (!state.restore(ticket)) DiagnosticLogging.logcat { Log.w(TAG, "Bluetooth recovery incomplete or superseded") }
     }
 
     private fun radioEnabled(context: Context): Boolean? = runCatching {

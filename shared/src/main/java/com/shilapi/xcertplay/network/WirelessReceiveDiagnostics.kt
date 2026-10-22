@@ -30,6 +30,7 @@ internal class WirelessReceiveDiagnostics(
     private var previousSampleNs: Long? = null
 
     fun snapshot(): String {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return ""
         val now = nowNs()
         val elapsed = previousSampleNs?.let { ((now - it).coerceAtLeast(0)) / 1_000_000 }
         previousSampleNs = now

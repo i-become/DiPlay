@@ -872,6 +872,10 @@
     <string name="update_verifying">Verifying…</string>
     <string name="update_install">Install %1$s</string>
     <string name="update_failed">Update failed</string>
+    <string name="update_install_preparing">Preparing the update for the system installer…</string>
+    <string name="update_install_requested">The update was submitted to the system. Waiting for the installation result…</string>
+    <string name="update_install_permission">Allow DiPlay to install apps in the system settings, then tap Install again. If no permission screen appears, export a diagnostic report.</string>
+    <string name="update_install_missing">The downloaded APK is unavailable. Check for updates and download it again.</string>
     <string name="update_available_home">Update available</string>
     <string name="update_saved_to">Saved to %1$s</string>
     <string name="backup_title">Back up settings</string>
@@ -994,7 +998,7 @@
     <string name="new_ui_shell_display_fly_window_sub">Separate cluster window</string>
     <string name="new_ui_shell_display_gesture_sub">Swipe map left or right</string>
     <string name="new_ui_shell_display_theme_title">CarPlay theme</string>
-    <string name="new_ui_shell_display_theme_sub">Day, night, or system</string>
+    <string name="new_ui_shell_display_theme_sub">Automatic: position lights on for night, off for day. Falls back to ambient light and system appearance if unavailable.</string>
     <string name="new_ui_shell_settings_boot_sub">Run CarPlay at boot</string>
     <string name="new_ui_shell_settings_wheel_media_sub">Forward to CarPlay</string>
     <string name="new_ui_shell_settings_wheel_siri_sub">Long-press for Siri</string>
@@ -1050,7 +1054,7 @@
     <string name="new_ui_display_theme_applied">CarPlay theme updated. Open CarPlay or reconnect if the screen does not change.</string>
     <string name="new_ui_display_carplay_theme">CarPlay appearance</string>
     <string name="new_ui_display_carplay_theme_sub">Day, night, or follow the system.</string>
-    <string name="new_ui_theme_follow_system">Follow system</string>
+    <string name="new_ui_theme_follow_system">Automatic</string>
     <string name="new_ui_theme_day">Day</string>
     <string name="new_ui_theme_night">Night</string>
     <string name="new_ui_settings_boot_start">Start with the car</string>
@@ -1070,6 +1074,8 @@
     <string name="new_ui_about_sec3_body">This is third-party compatibility software. Install and use it only if you understand the risks.\n\nBehavior may vary with head-unit model, system version, hardware, and other apps. You assume risks such as crashes, incompatibility, data issues, or system problems.\n\nDevelopers are not liable for unexpected effects from your installation, use, modification, or misuse, except where law requires otherwise. Adjust settings only when parked safely; do not use the head unit while driving.</string>
     <string name="new_ui_about_sec4_title">4. Updates and community</string>
     <string name="new_ui_about_sec4_body">Hongqi HS5 owners are welcome to join our community for releases, compatibility notes, and tips.</string>
+    <string name="new_ui_about_sec5_title">5. Acknowledgements</string>
+    <string name="new_ui_about_sec5_body">Thanks to Douyin @YiMeng谁的梦还没醒 (1768868288) for providing the vehicle position-light interface.</string>
     <string name="new_ui_about_sec4_scan_hint">Scan in Douyin to join the owner group and get updates.</string>
     <string name="new_ui_about_payment_caption">Voluntary tip · WeChat or Alipay</string>
     <string name="new_ui_about_qr_placeholder">Douyin QR placeholder</string>
@@ -1077,7 +1083,7 @@
     <string name="new_ui_update_latest">Up to date</string>
     <string name="new_ui_update_available">Update %1$s available</string>
     <string name="new_ui_diag_log_record_title">Record session log</string>
-    <string name="new_ui_diag_log_record_sub">When on, DiPlay writes a rolling log file included in exported reports. When off, nothing is written to disk.</string>
+    <string name="new_ui_diag_log_record_sub">Enable to record logs and diagnostic samples and create reports. Disable to stop recording and background diagnostic sampling.</string>
     <string name="new_ui_diag_log_clear">Clear recorded logs</string>
     <string name="new_ui_diag_log_cleared">Recorded logs cleared.</string>
     <string name="new_ui_diag_simulated_cluster_title">Use simulated display as cluster (experimental)</string>
@@ -1113,4 +1119,14 @@
     <string name="new_ui_display_cluster_fly_window_sub">Shows 仪表飞屏 as a separate window on the cluster, so the steering-wheel back key can close it. Turn off if the cluster map stays black.</string>
     <string name="new_ui_display_key_probe_overlay">Show key codes on CarPlay (experimental)</string>
     <string name="new_ui_display_key_probe_overlay_sub">Lists recent keys on the CarPlay screen: QiSi hard keys, accessibility-filtered keys, and keys that reach the CarPlay window. Turn on DiPlay wheel keys in accessibility for the widest capture.</string>
-    <string name="new_ui_display_key_probe_overlay_hint">Probe: QiSi registers keys 0–1000 in batches (0=short, 1=long, 2=release). If left keys or the scroll wheel never appear, the Hongqi stack likely keeps them. Turn on DiPlay wheel keys in accessibility and export a report.</string></resources>
+    <string name="new_ui_display_key_probe_overlay_hint">Probe: QiSi registers keys 0–1000 in batches (0=short, 1=long, 2=release). If left keys or the scroll wheel never appear, the Hongqi stack likely keeps them. Turn on DiPlay wheel keys in accessibility and export a report.</string>
+    <string name="new_ui_status_disconnected">Disconnected</string>
+    <string name="update_install_confirm">Confirm the update in the system installer.</string>
+    <string name="update_install_success">The update was installed.</string>
+    <string name="update_install_cancelled">Installation was cancelled. Tap Install to try again.</string>
+    <string name="update_install_blocked">The system blocked installation. Check app installation permission and head-unit restrictions.</string>
+    <string name="update_install_conflict">The update conflicts with an installed app. Export a diagnostic report for the system reason.</string>
+    <string name="update_install_incompatible">This APK cannot be installed on this head unit. Download a compatible release again.</string>
+    <string name="update_install_storage">There is not enough storage to install the update.</string>
+    <string name="update_install_failure">Installation failed. The system reason was recorded; export a diagnostic report.</string>
+</resources>

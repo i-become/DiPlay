@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.AlertDialog
 import android.Manifest
 import android.content.ActivityNotFoundException
@@ -141,6 +143,7 @@ class CarPlayHostActivity : ComponentActivity() {
     )
 
     private var newUiConnectionHub = false
+    private var preparingConnectionBeforeUi = false
     private var lastHubReturnUptime = 0L
     private var connectionPanel: View? = null
     private var waitingReveal: CarPlayWaitingReveal? = null
@@ -222,13 +225,13 @@ class CarPlayHostActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             awaitingWirelessPermissions = false
             wirelessPermissionsReady = hasRequiredWirelessPermissions()
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 if (wirelessPermissionsReady) {
                     "Wireless startup permissions granted"
                 } else {
                     "Wireless startup permissions denied"
                 },
-            )
+            ) }
             updateHotspotStatusBlock()
             maybeStartCarPlay()
         }
@@ -236,7 +239,7 @@ class CarPlayHostActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             microphoneAvailable = granted
             microphonePermissionResolved = true
-            appendLog(if (granted) "Microphone permission granted" else "Microphone permission denied")
+            DiagnosticLogging.record { appendLog(if (granted) "Microphone permission granted" else "Microphone permission denied") }
             requestStartupPrerequisites()
         }
     private val locationPermission =
@@ -244,7 +247,7 @@ class CarPlayHostActivity : ComponentActivity() {
             awaitingLocationPermission = false
             locationPermissionAvailable = hasFineLocationPermission()
             if (locationPermissionAvailable) {
-                appendLog("Location permission granted")
+                DiagnosticLogging.record { appendLog("Location permission granted") }
             } else if (locationReportingEnabled) {
                 locationReportingEnabled = false
                 if (!menuOpen) {
@@ -256,13 +259,13 @@ class CarPlayHostActivity : ComponentActivity() {
                 locationReportingSwitch?.isChecked = false
                 val approximateOnly =
                     grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-                appendLog(
+                DiagnosticLogging.record { appendLog(
                     if (approximateOnly) {
                         "Precise location permission denied; location reporting disabled"
                     } else {
                         "Location permission denied; location reporting disabled"
                     },
-                )
+                ) }
             }
             updateResolutionMenu()
             if (!menuOpen) requestStartupPrerequisites()
@@ -288,7 +291,7 @@ class CarPlayHostActivity : ComponentActivity() {
             externalActivityInProgress = false
             if (result.resultCode == RESULT_OK) {
                 updateAirPlayIconPreview()
-                appendLog("Custom AirPlay icon updated")
+                DiagnosticLogging.record { appendLog("Custom AirPlay icon updated") }
             }
         }
 
@@ -419,7 +422,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return@Runnable
         syncClusterPresentationStreamState()
         if (SCREEN_TYPE_ALT in activeScreenStreamTypes) return@Runnable
-        appendLog("Cluster map: alt stream still inactive; nudging iPhone redraw")
+        DiagnosticLogging.record { appendLog("Cluster map: alt stream still inactive; nudging iPhone redraw") }
         controller?.resumeDashboardMapDrawing()
         sink?.nudgeVideoKeyframe(SCREEN_TYPE_ALT)
     }
@@ -505,13 +508,15 @@ class CarPlayHostActivity : ComponentActivity() {
             light = AndroidAmbientLight(this),
             scheduler = MainThreadNightModeScheduler(),
             initialNight = darkMode,
+            vehicleLightEnabled = HongqiPositionLights.enabled(),
+            initialVehicleNight = HongqiPositionLights.night(),
             onNightChanged = { night ->
                 darkMode = night
                 if (hostAppearanceResumed) AppAppearanceRuntime.publishHost(this, night)
                 refreshAppAppearance()
                 paintWaitingScreen()
                 applyClusterTurnOverlay()
-                appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
+                DiagnosticLogging.record { appendLog("CarPlay switched to ${if (night) "night" else "day"} mode") }
                 logThemeState(nightModeDiagnosticSource, resources.configuration)
                 syncAirPlayDarkMode(nightModeDiagnosticSource)
             },
@@ -648,7 +653,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     currentSurfaceTexture = texture
                 }
             }
-            appendLog(if (existing === surface) "Texture surface reused" else "Texture surface created")
+            DiagnosticLogging.record { appendLog(if (existing === surface) "Texture surface reused" else "Texture surface created") }
             attachSurface(surface)
             updateVideoLayout(width, height)
             scheduleDisplaySize(width, height)
@@ -663,7 +668,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (currentSurfaceTexture !== texture) return true
             currentSurface?.let(videoSurfaceOwner::clear)
             currentSurfaceTexture = null
-            appendLog("Texture surface destroyed")
+            DiagnosticLogging.record { appendLog("Texture surface destroyed") }
             return true
         }
 
@@ -675,7 +680,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (isDestroyed || holder !== fallbackVideoView?.holder) return
             val surface = holder.surface
             videoSurfaceOwner.replace(surface, releaseOnDetach = false)
-            appendLog("SurfaceView video surface created valid=${surface.isValid}")
+            DiagnosticLogging.record { appendLog("SurfaceView video surface created valid=${surface.isValid}") }
             attachSurface(surface)
             // A still CarPlay screen sends no frames, so ask for one instead of showing the parked gap.
             if (smoothVideo) sink?.refreshPicture(SCREEN_TYPE_MAIN)
@@ -699,12 +704,13 @@ class CarPlayHostActivity : ComponentActivity() {
                 .map { owner -> owner.beginSurfaceDetach(surface, parkMain = smoothVideo && owner === live) }
             val confirmed = detaches.map { it.await() }.all { it }
             videoSurfaceOwner.clear(surface)
-            appendLog("SurfaceView video surface destroyed detachConfirmed=$confirmed")
+            DiagnosticLogging.record { appendLog("SurfaceView video surface destroyed detachConfirmed=$confirmed") }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_CREATED)
         NavigationWidgetUpdater.attach(applicationContext)
         CarPlayCallKeys.install(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
@@ -740,7 +746,14 @@ class CarPlayHostActivity : ComponentActivity() {
         airPlayIdentity = AirPlayPersistence.loadIdentity(this)
         loadPersistedSettings()
         locationPermissionAvailable = hasFineLocationPermission()
-        setContentView(buildContentView())
+        val connectBeforeUi = !CarPlayBackgroundSession.hasSession() &&
+            com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)
+        if (connectBeforeUi) {
+            prepareConnectionBeforeUi()
+        } else {
+            setContentView(buildContentView())
+            CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_UI_ATTACHED)
+        }
         applyFullscreenMode()
         onBackPressedDispatcher.addCallback(
             this,
@@ -757,10 +770,10 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         )
 
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                 "transport=${if (wirelessEnabled) "wireless" else "wired"}",
-        )
+        ) }
         val reusedBackgroundSession = adoptBackgroundSession()
         microphoneAvailable =
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -772,9 +785,69 @@ class CarPlayHostActivity : ComponentActivity() {
         } else {
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
-        if (newUiConnectionHub && !intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
+        if (!connectBeforeUi && newUiConnectionHub && !intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
             mainHandler.post { returnToNewUiConnectionHub() }
         }
+    }
+
+    private fun prepareConnectionBeforeUi() {
+        preparingConnectionBeforeUi = true
+        val remembered = startupDisplayConfiguration()?.let { AirPlayPersistence.loadStartupDisplay(this, it) }
+        if (remembered != null) {
+            DiagnosticLogging.record { appendLog("Startup: using remembered window ${remembered.first}x${remembered.second}; no layout wait") }
+            applyDisplaySize(DisplaySize(remembered.first, remembered.second))
+            mainHandler.post { attachStartupUi() }
+            return
+        }
+        // Measure the real host window once, without constructing video/menu views first.
+        val probe = FrameLayout(this)
+        probe.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+            override fun onLayoutChange(v: View, l: Int, t: Int, r: Int, b: Int,
+                oldL: Int, oldT: Int, oldR: Int, oldB: Int) {
+                if (r <= l || b <= t) return
+                probe.removeOnLayoutChangeListener(this)
+                val size = DisplaySize(r - l, b - t)
+                mainHandler.post {
+                    if (isDestroyed || isFinishing || shuttingDown.get()) return@post
+                    applyDisplaySize(size)
+                    attachStartupUi()
+                }
+            }
+        })
+        setContentView(probe)
+    }
+
+    private fun attachStartupUi() {
+        if (!preparingConnectionBeforeUi || isDestroyed || isFinishing || shuttingDown.get()) return
+        maybeStartCarPlay()
+        setContentView(buildContentView())
+        applyFullscreenMode()
+        syncWaitingRevealWithSink()
+        preparingConnectionBeforeUi = false
+        CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_UI_ATTACHED)
+        DiagnosticLogging.record { appendLog("Startup: host UI attached; controllerStarted=${controller != null}") }
+        if (newUiConnectionHub && !intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
+            returnToNewUiConnectionHub()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun startupDisplayConfiguration(): String? {
+        if (isMultiWindowActive()) return null
+        val display = windowManager.defaultDisplay
+        val metrics = android.util.DisplayMetrics().also { display.getRealMetrics(it) }
+        return "${display.displayId}:${display.rotation}:${metrics.widthPixels}x${metrics.heightPixels}:" +
+            "${metrics.densityDpi}:$hideTopBar:$hideBottomBar:$harmanFullscreenEnabled"
+    }
+
+    private fun rememberStartupDisplay(size: DisplaySize) {
+        if (!com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) return
+        val configuration = startupDisplayConfiguration() ?: return
+        val previous = AirPlayPersistence.loadStartupDisplay(this, configuration)
+        // Reversing cameras and temporary overlays can shrink the host window during a session.
+        if (previous != null && (size.width < previous.first || size.height < previous.second ||
+                size.width == previous.first && size.height == previous.second)) return
+        AirPlayPersistence.saveStartupDisplay(this, configuration, size.width, size.height)
     }
 
     private fun readNewUiLaunchMode(intent: Intent) {
@@ -787,7 +860,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun returnToNewUiConnectionHub() {
-        if (!newUiConnectionHub || isDestroyed) return
+        if (!newUiConnectionHub || preparingConnectionBeforeUi || isDestroyed) return
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastHubReturnUptime < 400L) return
         lastHubReturnUptime = now
@@ -800,6 +873,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun loadPersistedSettings() {
+        smoothVideo = AirPlayPersistence.loadSmoothVideo(this)
+        directVideoOutput = AirPlayPersistence.loadDirectVideoOutput(this)
         carPlayDock = CarPlayDock.load(this)
         carPlayNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         ambientLightThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
@@ -945,8 +1020,8 @@ class CarPlayHostActivity : ComponentActivity() {
         val diagnostic = "VPN consent unavailable operation=$operation " +
             "failureClass=${error.javaClass.simpleName} " +
             "component=${consent?.component?.flattenToString() ?: "none"}"
-        Log.w(TAG, diagnostic, error)
-        appendLog(diagnostic)
+        DiagnosticLogging.logcat { Log.w(TAG, diagnostic, error) }
+        DiagnosticLogging.record { appendLog(diagnostic) }
         setStatus(R.string.vpn_authorization_unavailable)
         if (!vpnAdbConsentTried) preConsentVpnOverAdb()
     }
@@ -960,7 +1035,7 @@ class CarPlayHostActivity : ComponentActivity() {
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 val granted = runCatching { CarPlayVpnService.prepare(this) == null }.getOrDefault(false)
-                appendLog("VPN consent over adb access=$access granted=$granted")
+                DiagnosticLogging.record { appendLog("VPN consent over adb access=$access granted=$granted") }
                 if (granted && !awaitingVpnConsent && !vpnReady) {
                     vpnReady = true
                     maybeStartCarPlay()
@@ -1039,6 +1114,16 @@ class CarPlayHostActivity : ComponentActivity() {
         if (restoreBootForeground) maybeRestoreBootForeground("host onStart")
         // Read here so a change made in Settings applies when the projection comes back.
         if (AirPlayPersistence.loadFpsCounter(this)) fpsCounter?.start() else fpsCounter?.stop()
+    }
+
+    internal fun vehicleNightChanged(night: Boolean?) {
+        if (isDestroyed) return
+        nightModeDiagnosticSource = ThemeModeDiagnostics.Source.VEHICLE_LIGHT
+        try {
+            nightModeController.vehicleChanged(night)
+        } finally {
+            nightModeDiagnosticSource = ThemeModeDiagnostics.Source.CARPLAY_MODE
+        }
     }
 
     internal fun reloadCarPlayNightModeFromSettings() {
@@ -1190,7 +1275,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val previous = adbNaviMode
         if (mode == previous) return
         adbNaviMode = mode
-        appendLog("Cluster map: ADB navi mode=${mode?.label ?: "unknown"}")
+        DiagnosticLogging.record { appendLog("Cluster map: ADB navi mode=${mode?.label ?: "unknown"}") }
         if (AirPlayPersistence.loadClusterSmallWindowMode(this) != CLUSTER_SMALL_WINDOW_AUTO) return
         if (mode == com.shilapi.xcertplay.hud.BydClusterNaviMode.SMALL ||
             mode == com.shilapi.xcertplay.hud.BydClusterNaviMode.FULL) {
@@ -1204,7 +1289,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun onClusterActivityState(state: ClusterActivityState.Snapshot) {
         val previous = detectedCluster
-        if (state != previous) appendLog("Cluster map: detected theme=${state.theme} mapVisible=${state.mapVisible} smallWindow=${state.smallWindow}")
+        if (state != previous) DiagnosticLogging.record { appendLog("Cluster map: detected theme=${state.theme} mapVisible=${state.mapVisible} smallWindow=${state.smallWindow}") }
         detectedCluster = state
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) { dismissClusterPresentation(); return }
         ensureClusterPresentation()
@@ -1212,9 +1297,9 @@ class CarPlayHostActivity : ComponentActivity() {
             adbNaviMode == null &&
             (previous.smallWindow != state.smallWindow || previous.mapVisible != state.mapVisible)) {
             if (!state.mapVisible) {
-                appendLog("Cluster map: map covered; keeping the stream at smallWindow=$requestedSmallWindowForStream")
+                DiagnosticLogging.record { appendLog("Cluster map: map covered; keeping the stream at smallWindow=$requestedSmallWindowForStream") }
             } else {
-                appendLog("Cluster map: instrument switched to ${if (state.smallWindow) "small" else "full"} window; stream requested=$requestedSmallWindowForStream")
+                DiagnosticLogging.record { appendLog("Cluster map: instrument switched to ${if (state.smallWindow) "small" else "full"} window; stream requested=$requestedSmallWindowForStream") }
                 if (CarPlayBackgroundSession.active && ClusterActivityState.shouldReconnectSmallWindowStream(
                         previous, state, requestedSmallWindowForStream)) {
                     reconnectAfterLoss("Cluster small-window navi ${if (state.smallWindow) "on" else "off"}")
@@ -1246,7 +1331,7 @@ class CarPlayHostActivity : ComponentActivity() {
             ClusterActivityOutput.setStreamActive(SCREEN_TYPE_ALT in activeScreenStreamTypes)
             applyClusterTurnOverlay()
             runCatching { ClusterActivityOutput.ensure(this) }.onFailure {
-                appendLog("Cluster activity: launch failed ${it.javaClass.simpleName}: ${it.message}")
+                DiagnosticLogging.record { appendLog("Cluster activity: launch failed ${it.javaClass.simpleName}: ${it.message}") }
             }
             return
         }
@@ -1263,7 +1348,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (clusterPresentation != null) return
         val display = ClusterMapPresentation.findDisplay(this, theme) ?: run {
-            appendLog("Cluster map: no cluster projection display among ${ClusterMapPresentation.describeDisplays(this)}")
+            DiagnosticLogging.record { appendLog("Cluster map: no cluster projection display among ${ClusterMapPresentation.describeDisplays(this)}") }
             return
         }
         val presentation = ClusterMapPresentation(this, display, theme) { surface -> runOnUiThread { onClusterSurface(surface) } }
@@ -1281,12 +1366,12 @@ class CarPlayHostActivity : ComponentActivity() {
             updateClusterMapShown()
             presentation.setStreamActive(SCREEN_TYPE_ALT in activeScreenStreamTypes)
             applyClusterTurnOverlay()
-            Log.i(ClusterMapPresentation.TAG, "cluster presentation shown display=${display.displayId} name=${display.name}")
-            appendLog("Cluster map: presentation shown display=${display.displayId} name=${display.name}")
+            DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "cluster presentation shown display=${display.displayId} name=${display.name}") }
+            DiagnosticLogging.record { appendLog("Cluster map: presentation shown display=${display.displayId} name=${display.name}") }
             applyUltraClusterDashboardIfNeeded()
         } catch (error: RuntimeException) {
-            Log.w(ClusterMapPresentation.TAG, "cluster presentation failed", error)
-            appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}")
+            DiagnosticLogging.logcat { Log.w(ClusterMapPresentation.TAG, "cluster presentation failed", error) }
+            DiagnosticLogging.record { appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}") }
         }
     }
 
@@ -1306,15 +1391,15 @@ class CarPlayHostActivity : ComponentActivity() {
         applyClusterTurnOverlay()
         if (Hs5ClusterActivityOutput.isOpen()) return true
         val display = ClusterMapPresentation.findDisplay(this, effectiveClusterTheme()) ?: run {
-            appendLog("Cluster window: no cluster display among ${ClusterMapPresentation.describeDisplays(this)}")
+            DiagnosticLogging.record { appendLog("Cluster window: no cluster display among ${ClusterMapPresentation.describeDisplays(this)}") }
             return true
         }
         if (Hs5ClusterActivityOutput.open(this, display, hs5ClusterHost)) {
-            appendLog("Cluster window: opening on display=${display.displayId} name=${display.name}")
+            DiagnosticLogging.record { appendLog("Cluster window: opening on display=${display.displayId} name=${display.name}") }
             return true
         }
         hs5ClusterWindowFailed = true
-        appendLog("Cluster window: could not open; using the cluster presentation")
+        DiagnosticLogging.record { appendLog("Cluster window: could not open; using the cluster presentation") }
         return false
     }
 
@@ -1329,7 +1414,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun onHs5ClusterWindowClosed(reason: String) {
         if (isDestroyed) return
-        appendLog("Cluster window: closed ($reason); fly screen off")
+        DiagnosticLogging.record { appendLog("Cluster window: closed ($reason); fly screen off") }
         clusterFlyScreenVisible = false
         clusterSurface?.let { sink?.clearSurface(SCREEN_TYPE_ALT, it) }
         clusterSurface = null
@@ -1361,12 +1446,12 @@ class CarPlayHostActivity : ComponentActivity() {
                 clusterPresentation = presentation
                 clusterLayers[fullMap] = presentation
                 presentation.show()
-                appendLog("Cluster map: retained layer display=${display.displayId} fullMap=$fullMap")
+                DiagnosticLogging.record { appendLog("Cluster map: retained layer display=${display.displayId} fullMap=$fullMap") }
                 target = presentation
             } catch (error: RuntimeException) {
                 clusterLayers.remove(fullMap)
                 clusterPresentation = null
-                appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}")
+                DiagnosticLogging.record { appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}") }
                 return
             }
         }
@@ -1465,7 +1550,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (isDestroyed || !AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) return
             val display = ClusterMapPresentation.findDisplay(this@CarPlayHostActivity, effectiveClusterTheme())
             if (display?.displayId != displayId) return
-            appendLog("Cluster map: display ${display.name} appeared")
+            DiagnosticLogging.record { appendLog("Cluster map: display ${display.name} appeared") }
             ensureClusterPresentation()
             if (controller != null && !clusterStreamOnDisplay) {
                 reconnectAfterLoss("Cluster display appeared; requesting its stream")
@@ -1488,7 +1573,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
                 markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this)).also {
                 MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
-                appendLog("Cluster activity: requesting stream 111 at ${it.widthPixels}x${it.heightPixels}; safeArea=${it.safeArea} drawOutside=${it.safeAreaDrawOutside}; ADB task routing")
+                DiagnosticLogging.record { appendLog("Cluster activity: requesting stream 111 at ${it.widthPixels}x${it.heightPixels}; safeArea=${it.safeArea} drawOutside=${it.safeAreaDrawOutside}; ADB task routing") }
             }
         }
         val theme = effectiveClusterTheme()
@@ -1501,7 +1586,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     val plan = DiLink51ClusterLayout.plan(size.x, size.y, theme) ?: return null
                     return DiLink51ClusterLayout.streamConfig().also {
                         MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
-                        appendLog("Cluster map: fixed 1920x720 stream; layout=$theme viewport=$plan")
+                        DiagnosticLogging.record { appendLog("Cluster map: fixed 1920x720 stream; layout=$theme viewport=$plan") }
                     }
                 }
                 if (DiLink4ClusterDisplay.matches(display.name, size.x, size.y)) {
@@ -1532,20 +1617,20 @@ class CarPlayHostActivity : ComponentActivity() {
                 // the same selected hardware decoder as the main-screen enlargement guard.
                 val effective = if (requestedScale > 100) {
                     val support = largerCanvasSupport(requested)
-                    appendLog("Cluster map: ${support.details}")
+                    DiagnosticLogging.record { appendLog("Cluster map: ${support.details}") }
                     if (support.supported) requested else {
                         val native = streamAt(100)
                         val fallback = if (largerCanvasSupport(native).supported) 100
                             else CarPlayClusterDisplay.STREAM_SCALE_PERCENT
                         AirPlayPersistence.saveClusterMapScalePercent(this, fallback)
-                        appendLog("Cluster map: scale $requestedScale% refused (${support.reason}); using $fallback%")
+                        DiagnosticLogging.record { appendLog("Cluster map: scale $requestedScale% refused (${support.reason}); using $fallback%") }
                         streamAt(fallback)
                     }
                 } else requested
                 return effective.also {
                     MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
-                    Log.i(TAG, "Cluster stream config ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}")
-                    appendLog("Cluster map: requesting ${it.widthPixels}x${it.heightPixels} on ${size.x}x${size.y} safeArea=${it.safeArea} url=${it.initialUrl}")
+                    DiagnosticLogging.logcat { Log.i(TAG, "Cluster stream config ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}") }
+                    DiagnosticLogging.record { appendLog("Cluster map: requesting ${it.widthPixels}x${it.heightPixels} on ${size.x}x${size.y} safeArea=${it.safeArea} url=${it.initialUrl}") }
                 }
             }
         }
@@ -1559,8 +1644,8 @@ class CarPlayHostActivity : ComponentActivity() {
             content = AirPlayPersistence.effectiveClusterContent(this),
             baseSafeArea = CarPlayClusterDisplay.VIRTUAL_SAFE_AREA_PERCENT,
         ).also {
-            Log.i(TAG, "Cluster virtual stream ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}")
-            appendLog("Cluster map: requesting virtual ${it.widthPixels}x${it.heightPixels} (16:9) stream for launcher/center card")
+            DiagnosticLogging.logcat { Log.i(TAG, "Cluster virtual stream ${it.widthPixels}x${it.heightPixels} url=${it.initialUrl}") }
+            DiagnosticLogging.record { appendLog("Cluster map: requesting virtual ${it.widthPixels}x${it.heightPixels} (16:9) stream for launcher/center card") }
         }
     }
 
@@ -1572,19 +1657,19 @@ class CarPlayHostActivity : ComponentActivity() {
         val url = CarPlayClusterDisplay.Content.INSTRUMENTS.url
         val active = controller
         if (active == null) {
-            Log.i(TAG, "Cluster dashboard pending url=$url (no controller yet)")
+            DiagnosticLogging.logcat { Log.i(TAG, "Cluster dashboard pending url=$url (no controller yet)") }
             return
         }
         val now = SystemClock.uptimeMillis()
         if (retryAttempt == 0 &&
             now - lastUltraClusterDashboardSuccessAt < ULTRA_CLUSTER_DASHBOARD_DEBOUNCE_MILLIS
         ) {
-            Log.i(TAG, "Cluster dashboard debounced url=$url (recent success)")
+            DiagnosticLogging.logcat { Log.i(TAG, "Cluster dashboard debounced url=$url (recent success)") }
             return
         }
         active.showDashboardContent(url) { sent ->
-            Log.i(TAG, "Cluster dashboard showUI url=$url sent=$sent attempt=$retryAttempt vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this@CarPlayHostActivity)}")
-            appendLog("Cluster dashboard: request Ultra instruments url=$url sent=$sent")
+            DiagnosticLogging.logcat { Log.i(TAG, "Cluster dashboard showUI url=$url sent=$sent attempt=$retryAttempt vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this@CarPlayHostActivity)}") }
+            DiagnosticLogging.record { appendLog("Cluster dashboard: request Ultra instruments url=$url sent=$sent") }
             if (sent) {
                 lastUltraClusterDashboardSuccessAt = SystemClock.uptimeMillis()
                 ultraClusterDashboardRetryScheduled = false
@@ -1625,10 +1710,10 @@ class CarPlayHostActivity : ComponentActivity() {
                 CarPlayRemoteKeys.fromExternalController(event, AirPlayPersistence.loadExternalController(this))) &&
             CarPlayRemoteKeys.dispatch(event, controller)) {
             if (event.repeatCount == 0) {
-                Log.d(
+                DiagnosticLogging.logcat { Log.d(
                     TAG,
                     "remote key ${KeyEvent.keyCodeToString(event.keyCode)} action=${event.action}",
-                )
+                ) }
             }
             return true
         }
@@ -1646,8 +1731,8 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             if (siriKey.opens(event.eventTime)) {
                 val message = "Siri: assigned key ${event.keyCode} sent=${controller?.requestSiri() == true}"
-                Log.i(WheelKeyService.TAG, message)
-                appendLog(message)
+                DiagnosticLogging.logcat { Log.i(WheelKeyService.TAG, message) }
+                DiagnosticLogging.record { appendLog(message) }
             }
             WheelZoomKeys.Action.CONSUME
         } else WheelZoomKeys.Action.PASS
@@ -1668,7 +1753,7 @@ class CarPlayHostActivity : ComponentActivity() {
             // receive an unpaired key.
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 val sent = controller?.sendMediaButton(mediaPress) == true
-                appendLog("Media: wheel key ${event.keyCode} -> CarPlay $mediaPress sent=$sent")
+                DiagnosticLogging.record { appendLog("Media: wheel key ${event.keyCode} -> CarPlay $mediaPress sent=$sent") }
             }
             return true
         }
@@ -1684,7 +1769,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun requestLegacySiri(keyCode: Int) {
         val sent = controller?.requestSiri() == true
-        appendLog("Siri: voice key $keyCode sent=$sent")
+        DiagnosticLogging.record { appendLog("Siri: voice key $keyCode sent=$sent") }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -1706,7 +1791,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (restoreBootForegroundAttempts >= 4) return
         restoreBootForegroundAttempts++
-        appendLog("Restoring CarPlay to foreground after boot ($reason attempt=$restoreBootForegroundAttempts)")
+        DiagnosticLogging.record { appendLog("Restoring CarPlay to foreground after boot ($reason attempt=$restoreBootForegroundAttempts)") }
         startActivity(
             Intent(this, CarPlayHostActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -1721,9 +1806,9 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onPause() {
         // On Android 9 the cluster window takes focus and pauses this screen while CarPlay stays in view.
         if (Hs5ClusterActivityOutput.ownsFocus()) {
-            appendLog("Host paused for the cluster window; CarPlay screen stays active")
+            DiagnosticLogging.record { appendLog("Host paused for the cluster window; CarPlay screen stays active") }
         } else if (newUiConnectionHub && !CarPlayBackgroundSession.active) {
-            appendLog("Host background connection hub; keeping session warm")
+            DiagnosticLogging.record { appendLog("Host background connection hub; keeping session warm") }
         } else {
             pauseHostUi()
         }
@@ -1763,7 +1848,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // Without the stream the card would stay black; it follows once the stream starts.
         if (SCREEN_TYPE_ALT !in activeScreenStreamTypes) return
         if (!CenterMapOverlay.permitted(this)) {
-            appendLog("Centre map: no permission to draw over other apps")
+            DiagnosticLogging.record { appendLog("Centre map: no permission to draw over other apps") }
             return
         }
         // Without Usage Access or when auto-hide is disabled, the card shows over any app, as before.
@@ -1782,12 +1867,12 @@ class CarPlayHostActivity : ComponentActivity() {
         val shown = CenterMapOverlay.show(applicationContext, MapMirrors.streamAspect, ::onCenterMapSurface) {
             startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-        appendLog("Centre map: card ${if (shown) "shown" else "failed"} streamActive=${SCREEN_TYPE_ALT in activeScreenStreamTypes}")
+        DiagnosticLogging.record { appendLog("Centre map: card ${if (shown) "shown" else "failed"} streamActive=${SCREEN_TYPE_ALT in activeScreenStreamTypes}") }
     }
 
     private fun onHomeScreenVisible(visible: Boolean) {
         homeScreenVisible = visible
-        appendLog("Centre map: home screen ${if (visible) "in front" else "not in front"}")
+        DiagnosticLogging.record { appendLog("Centre map: home screen ${if (visible) "in front" else "not in front"}") }
         if (!AirPlayPersistence.loadCenterMapAutoHide(this)) {
             homeMonitor?.stop()
             if (!isActivityStarted && !CenterMapOverlay.diPlayInFront()) showCenterMap()
@@ -1797,7 +1882,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun onCenterMapSurface(surface: Surface?) {
         MapMirrors.set(MapMirrors.CARD, surface)
-        appendLog(if (surface != null) "Centre map: mirroring the dashboard stream" else "Centre map: mirror stopped")
+        DiagnosticLogging.record { appendLog(if (surface != null) "Centre map: mirroring the dashboard stream" else "Centre map: mirror stopped") }
     }
 
     // The dashboard map pause must not stop the stream while a copy of the map is on screen.
@@ -2110,7 +2195,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 panel.alpha = 1f
                 val carPlay = sidePanelCarPlayShare(screen, drag[1] + raw - drag[0])
                 if (event.actionMasked == MotionEvent.ACTION_UP && carPlay > SIDE_PANEL_CLOSE_SHARE) {
-                    appendLog("Side panel closed by dragging its edge")
+                    DiagnosticLogging.record { appendLog("Side panel closed by dragging its edge") }
                     endSidePanelBlur()
                     showSidePanel(false)
                     if (sidePanelShown) videoView?.let { updateVideoLayout(it.width, it.height) }
@@ -2119,7 +2204,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 val sixths = CarPlayViewAreas.nearestSidePanelSixths(carPlay.toDouble())
                 if (event.actionMasked == MotionEvent.ACTION_UP && sixths != SidePanelSettings.sixths(this)) {
                     SidePanelSettings.setSixths(this, sixths)
-                    appendLog("Side panel resized: CarPlay $sixths/6 of the screen")
+                    DiagnosticLogging.record { appendLog("Side panel resized: CarPlay $sixths/6 of the screen") }
                     endSidePanelBlur()
                     showSidePanel(true)
                 } else {
@@ -2399,7 +2484,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 val carPlay = if (screen != null) sidePanelCarPlayShare(screen, position) else null
                 if (event.actionMasked == MotionEvent.ACTION_UP && carPlay != null && carPlay <= SIDE_PANEL_CLOSE_SHARE) {
                     SidePanelSettings.setSixths(this, CarPlayViewAreas.nearestSidePanelSixths(carPlay.toDouble()))
-                    appendLog("Side panel opened from its tab: CarPlay ${SidePanelSettings.sixths(this)}/6 of the screen")
+                    DiagnosticLogging.record { appendLog("Side panel opened from its tab: CarPlay ${SidePanelSettings.sixths(this)}/6 of the screen") }
                     showSidePanel(true)
                 }
                 endSidePanelBlur()
@@ -2511,7 +2596,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val portrait = if (split) screenPortrait() else view.height > view.width
         val target = if (show) areas.sidePanel(portrait, SidePanelSettings.sixths(this)) else areas.indexFor(view.width, view.height, split, portrait)
         val sent = target != null && controller?.showViewArea(target) == true
-        appendLog("Side panel ${if (show) "shown" else "hidden"}: view area $target sent=$sent")
+        DiagnosticLogging.record { appendLog("Side panel ${if (show) "shown" else "hidden"}: view area $target sent=$sent") }
         if (!sent || target == null) return
         areas.use(target)
         sidePanelShown = show
@@ -2725,10 +2810,10 @@ class CarPlayHostActivity : ComponentActivity() {
             wirelessEnabled = checked
             hotspotStatus = HotspotStatus(state = if (wirelessEnabled) getString(R.string.hotspot_state_stopped) else getString(R.string.hotspot_state_off))
             updateHotspotStatusBlock()
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "Wireless CarPlay ${if (wirelessEnabled) "enabled" else "disabled"}; " +
                     "applies when settings close",
-            )
+            ) }
             requestStartupPrerequisites()
         }
         content.addView(
@@ -2777,7 +2862,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 description = getString(R.string.start_carplay_automatically_after_device_boot),
             ) { checked ->
                 autoStartOnBoot = checked
-                appendLog("Boot auto-start ${if (checked) "enabled" else "disabled"}")
+                DiagnosticLogging.record { appendLog("Boot auto-start ${if (checked) "enabled" else "disabled"}") }
             },
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -2815,10 +2900,10 @@ class CarPlayHostActivity : ComponentActivity() {
                     description = getString(R.string.use_usage_content_type_routing_instead_of_stream_type),
                 ) { checked ->
                     advancedAudioChannelMapping = checked
-                    appendLog(
+                    DiagnosticLogging.record { appendLog(
                         "Advanced audio channel mapping ${if (checked) "enabled" else "disabled"}; " +
                             "applies when settings close",
-                    )
+                    ) }
                     updateResolutionMenu()
                 },
                 LinearLayout.LayoutParams(
@@ -2962,10 +3047,10 @@ class CarPlayHostActivity : ComponentActivity() {
         ) { checked ->
             if (hevcEnabled == checked) return@createHevcRow
             hevcEnabled = checked
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "HEVC (H.265) ${if (hevcEnabled) "enabled" else "disabled"}; " +
                     "applies when settings close",
-            )
+            ) }
             updateResolutionMenu()
         }
         content.addView(
@@ -2983,10 +3068,10 @@ class CarPlayHostActivity : ComponentActivity() {
         ) { checked ->
             if (hevcSoftwareDecoderEnabled == checked) return@createSoftwareHevcRow
             hevcSoftwareDecoderEnabled = checked
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "HEVC software decoder ${if (hevcSoftwareDecoderEnabled) "enabled" else "disabled"}; " +
                     "applies when settings close",
-            )
+            ) }
             updateResolutionMenu()
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -3240,7 +3325,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val customIconBytes = try {
             AirPlayPersistence.loadCustomAirPlayIconFile(this)?.readBytes()
         } catch (error: Exception) {
-            Log.w(TAG, "Could not read the current AirPlay icon for settings rollback", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Could not read the current AirPlay icon for settings rollback", error) }
             null
         }
         return SettingsBaseline(
@@ -3277,7 +3362,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.saveCustomAirPlayIcon(this, bytes)
             } ?: AirPlayPersistence.clearCustomAirPlayIcon(this)
         } catch (error: Exception) {
-            Log.w(TAG, "Could not restore the previous AirPlay icon", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Could not restore the previous AirPlay icon", error) }
         }
         settingsBaseline = null
         locationPermissionAvailable = hasFineLocationPermission()
@@ -3309,7 +3394,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (mfiTarget == target) return@createMfiTargetChoice
             mfiTarget = target
             updateMfiTargetFields()
-            appendLog("MFI target: ${mfiTargetLabel(target)}; applies when settings close")
+            DiagnosticLogging.record { appendLog("MFI target: ${mfiTargetLabel(target)}; applies when settings close") }
         }
         mfiTargetGroup = targetChoice.radioGroup
         section.addView(
@@ -3540,10 +3625,10 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun onLocationReportingChanged(checked: Boolean) {
         if (locationReportingEnabled == checked) return
         locationReportingEnabled = checked
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "Location reporting ${if (locationReportingEnabled) "enabled" else "disabled"}; " +
                 "applies when settings close",
-        )
+        ) }
         updateResolutionMenu()
         if (locationReportingEnabled && !locationPermissionAvailable) {
             requestLocationPermission()
@@ -3557,7 +3642,7 @@ class CarPlayHostActivity : ComponentActivity() {
             description = getString(R.string.show_on_screen_debug_logs),
         ) { checked ->
             debugLogsEnabled = checked
-            appendLog("Debug logs ${if (debugLogsEnabled) "enabled" else "disabled"}")
+            DiagnosticLogging.record { appendLog("Debug logs ${if (debugLogsEnabled) "enabled" else "disabled"}") }
             updateDebugOverlays()
         }
 
@@ -3668,7 +3753,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         documentPickerIsSystem = documentPickerIsSystem(),
                     ).onFailure {
                         externalActivityInProgress = false
-                        appendLog("No image picker: ${it.javaClass.simpleName}")
+                        DiagnosticLogging.record { appendLog("No image picker: ${it.javaClass.simpleName}") }
                         android.widget.Toast.makeText(this@CarPlayHostActivity,
                             getString(R.string.this_head_unit_has_no_image_picker),
                             android.widget.Toast.LENGTH_LONG).show()
@@ -4131,10 +4216,10 @@ class CarPlayHostActivity : ComponentActivity() {
             hotspotStatus = HotspotStatus(state = if (wirelessEnabled) getString(R.string.hotspot_state_stopped) else getString(R.string.hotspot_state_off))
             updateHotspotStatusBlock()
             updateManualHotspotFields()
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "Wi-Fi session mode: ${hotspotModeLabel(wirelessHotspotMode)}; " +
                     "applies when settings close",
-            )
+            ) }
         }
         section.addView(
             group,
@@ -4533,11 +4618,11 @@ class CarPlayHostActivity : ComponentActivity() {
             // hosts. Touch-capable head units remain touchscreen-primary.
             primaryInputDevice = if (knobPrimary) 3 else 1,
         )
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "CarPlay primary input=${if (knobPrimary) "knob" else "touch"} " +
                 "tv=${AndroidTvInputMode.isTelevision(this)} " +
                 "touchscreen=${resources.configuration.touchscreen}",
-        )
+        ) }
         val requestedResolutionPercent = displayScalePercent
         val requestedResolutionDisplay = CarPlayDisplayScale.applyPercent(baseDisplay, requestedResolutionPercent)
         var resolutionDisplay = requestedResolutionDisplay
@@ -4559,7 +4644,7 @@ class CarPlayHostActivity : ComponentActivity() {
             uiScalePercent = CarPlayUiScale.DEFAULT
             AirPlayPersistence.saveUiScalePercent(this, uiScalePercent)
             scaledDisplay = resolutionDisplay
-            appendLog("Larger CarPlay canvas unavailable reason=${failedCanvas.reason}; using Default icon and text size")
+            DiagnosticLogging.record { appendLog("Larger CarPlay canvas unavailable reason=${failedCanvas.reason}; using Default icon and text size") }
             // Removing the smaller-controls enlargement may leave a separately enlarged resolution.
             if (displayScalePercent > 100) {
                 val resolutionSupport = largerCanvasSupport(scaledDisplay)
@@ -4577,7 +4662,7 @@ class CarPlayHostActivity : ComponentActivity() {
             AirPlayPersistence.saveDisplayScaleTenths(this, displayScaleTenths)
             resolutionDisplay = baseDisplay
             scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, uiScalePercent)
-            appendLog("Enlarged CarPlay resolution unavailable reason=${support.reason}; using 100%")
+            DiagnosticLogging.record { appendLog("Enlarged CarPlay resolution unavailable reason=${support.reason}; using 100%") }
         }
         if (smallerUiFallback || resolutionFallback) {
             runOnUiThread {
@@ -4587,7 +4672,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     android.widget.Toast.LENGTH_LONG).show()
             }
         }
-        appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
+        DiagnosticLogging.record { appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}") }
         val display = scaledDisplay.copy(
             safeArea = if (mainDisplayDisableSafeArea) null else AirPlaySafeArea.toInsets(
                 mapping = AirPlayPersistence.loadSafeAreaRect(this, size.width, size.height),
@@ -4656,10 +4741,11 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         pendingViewAreas = viewAreas
         val declared = if (viewAreas == null) canvas else canvas.copy(viewAreas = viewAreas.areas, initialViewArea = viewAreas.current)
-        if (square != null) appendLog("Turning screen: square canvas ${square}x$square, areas ${viewAreas?.areas}")
+        if (square != null) DiagnosticLogging.record { appendLog("Turning screen: square canvas ${square}x$square, areas ${viewAreas?.areas}") }
         if (SplitScreenSettings.enabled(this) && !inSplitScreen) {
-            appendLog("Split screen expected from status bar=$statusBar navigation bar=$navigationBar divider=$divider px")
+            DiagnosticLogging.record { appendLog("Split screen expected from status bar=$statusBar navigation bar=$navigationBar divider=$divider px") }
         }
+        DiagnosticLogging.record {
         val requestSummary = "Display request selected=${CarPlayUiScale.label(requestedPercent)} percent=$requestedPercent " +
             "surface=${size.width}x${size.height} resolution=${requestedResolutionPercent}% " +
             "base=${requestedResolutionDisplay.widthPixels}x${requestedResolutionDisplay.heightPixels} " +
@@ -4670,9 +4756,10 @@ class CarPlayHostActivity : ComponentActivity() {
             "physical=${physical.widthMm}x${physical.heightMm}mm safeArea=${display.safeArea} " +
             "drawOutside=${display.safeAreaDrawOutside}"
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.begin(this, requestSummary, support.details, effectiveSummary)
-        appendLog(requestSummary)
-        appendLog(support.details)
-        appendLog(effectiveSummary)
+        DiagnosticLogging.record { appendLog(requestSummary) }
+        DiagnosticLogging.record { appendLog(support.details) }
+        DiagnosticLogging.record { appendLog(effectiveSummary) }
+        }
         val carBluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(this)
         if (carBluetoothAudio) logCarBluetoothAudio()
         return AirPlayConfig(
@@ -4699,9 +4786,9 @@ class CarPlayHostActivity : ComponentActivity() {
 
     /** Car Bluetooth audio: shows whether the iPhone keeps A2DP/HFP with the car now and once CarPlay runs. */
     private fun logCarBluetoothAudio() {
-        appendLog("Car Bluetooth audio: on; CarPlay audio not offered")
+        DiagnosticLogging.record { appendLog("Car Bluetooth audio: on; CarPlay audio not offered") }
         val adapter = runCatching { getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter }.getOrNull()
-            ?: return appendLog("Car Bluetooth audio: no Bluetooth adapter")
+            ?: return DiagnosticLogging.record { appendLog("Car Bluetooth audio: no Bluetooth adapter") }
         fun probe(moment: String) {
             for ((name, profile) in listOf("A2DP" to android.bluetooth.BluetoothProfile.A2DP,
                     "HFP" to android.bluetooth.BluetoothProfile.HEADSET)) {
@@ -4710,12 +4797,12 @@ class CarPlayHostActivity : ComponentActivity() {
                         override fun onServiceConnected(id: Int, proxy: android.bluetooth.BluetoothProfile) {
                             val devices = runCatching { proxy.connectedDevices.map { it.name ?: "?" } }
                                 .getOrElse { listOf("unreadable:${it.javaClass.simpleName}") }
-                            appendLog("Car Bluetooth audio: $moment $name connected=$devices")
+                            DiagnosticLogging.record { appendLog("Car Bluetooth audio: $moment $name connected=$devices") }
                             adapter.closeProfileProxy(id, proxy)
                         }
                         override fun onServiceDisconnected(id: Int) = Unit
                     }, profile)
-                }.onFailure { appendLog("Car Bluetooth audio: $moment $name unavailable ${it.javaClass.simpleName}") }
+                }.onFailure { DiagnosticLogging.record { appendLog("Car Bluetooth audio: $moment $name unavailable ${it.javaClass.simpleName}") } }
             }
         }
         probe("start")
@@ -4738,7 +4825,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun decodeAirPlayIcon(encoded: ByteArray): AirPlayIcon? {
         val (size, bytes) = AirPlayIconSizing.fit(encoded) ?: return null
-        if (bytes !== encoded) appendLog("CarPlay car-button icon resized bytes=${encoded.size}->${bytes.size} pixels=$size")
+        if (bytes !== encoded) DiagnosticLogging.record { appendLog("CarPlay car-button icon resized bytes=${encoded.size}->${bytes.size} pixels=$size") }
         return AirPlayIcon(size, size, bytes)
     }
 
@@ -4803,7 +4890,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun openSafeAreaEditor() {
         val size = currentActivitySize()
         if (size == null) {
-            appendLog("Safe area editor is unavailable before display layout")
+            DiagnosticLogging.record { appendLog("Safe area editor is unavailable before display layout") }
             return
         }
         val editorView = safeAreaEditorView ?: return
@@ -4815,10 +4902,10 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsMenu?.visibility = View.GONE
         safeAreaEditor?.visibility = View.VISIBLE
         editorView.setRect(initial, size.width, size.height)
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "Safe area editor opened for ${size.width}x${size.height}; " +
                 "drag the four boundaries",
-        )
+        ) }
     }
 
     private fun closeSafeAreaEditor() {
@@ -4829,7 +4916,7 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsMenu?.visibility = View.VISIBLE
         updateSafeAreaSummary()
         updateResolutionMenu()
-        appendLog("Safe area editor closed")
+        DiagnosticLogging.record { appendLog("Safe area editor closed") }
     }
 
     private fun saveSafeAreaEditor() {
@@ -4837,24 +4924,24 @@ class CarPlayHostActivity : ComponentActivity() {
         val rect = safeAreaEditorView?.currentRectForSource() ?: return
         rememberSafeAreaBeforeEdit(size)
         AirPlayPersistence.saveSafeAreaRect(this, size.width, size.height, rect)
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "Safe area saved for ${size.width}x${size.height}: " +
                 "${rect.width}x${rect.height} at (${rect.left}, ${rect.top})",
-        )
+        ) }
         closeSafeAreaEditor()
     }
 
     private fun resetSafeAreaForCurrentSize() {
         val size = currentActivitySize()
         if (size == null) {
-            appendLog("Safe area reset is unavailable before display layout")
+            DiagnosticLogging.record { appendLog("Safe area reset is unavailable before display layout") }
             return
         }
         rememberSafeAreaBeforeEdit(size)
         AirPlayPersistence.clearSafeAreaRect(this, size.width, size.height)
         updateSafeAreaSummary()
         updateResolutionMenu()
-        appendLog("Safe area reset to full screen for ${size.width}x${size.height}")
+        DiagnosticLogging.record { appendLog("Safe area reset to full screen for ${size.width}x${size.height}") }
     }
 
     private fun rememberSafeAreaBeforeEdit(size: DisplaySize) {
@@ -4901,10 +4988,13 @@ class CarPlayHostActivity : ComponentActivity() {
             },
             mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
             onAudioDiagnostic = { message ->
-                if (message.startsWith("Microphone: ")) {
-                    AsyncDiagnosticLog.append(diagnosticLog, message)
-                } else {
-                    diagnosticLog?.append(formattedLogLine(message, System.currentTimeMillis()))
+                DiagnosticLogging.record {
+                    val target = if (controllerGeneration == restartGeneration) sessionLog else diagnosticLog
+                    if (message.startsWith("Microphone: ")) {
+                        AsyncDiagnosticLog.append(target, message)
+                    } else {
+                        target?.append(formattedLogLine(message, System.currentTimeMillis()))
+                    }
                 }
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
@@ -4931,10 +5021,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
             override fun onSessionActive(session: AirPlaySession) {
                 runOnUiThread {
-                    if (controllerGeneration != restartGeneration) {
+                    if (controllerGeneration != restartGeneration || shuttingDown.get() || startupRetryStopped) {
                         return@runOnUiThread
                     }
                     activeAirPlaySession = session
+                    CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.SESSION_ACTIVE)
                     CarPlayBackgroundSession.active = true
                     callPopupSessionReady = true
                     updateCallPopupGuard()
@@ -4953,7 +5044,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         clusterFlyScreenVisible = true
                     }
                     if (menuOpen) return@runOnUiThread
-                    appendLog("AirPlay session active")
+                    DiagnosticLogging.record { appendLog("AirPlay session active") }
                     maybeRestoreBootForeground("session active")
                     if (AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) {
                         ensureClusterPresentation()
@@ -4966,6 +5057,7 @@ class CarPlayHostActivity : ComponentActivity() {
             override fun onVideoFrameRendered(session: AirPlaySession) {
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration || activeAirPlaySession !== session || shuttingDown.get()) return@runOnUiThread
+                    CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.FIRST_VIDEO_FRAME)
                     maybeStartWaitingReveal()
                     maybeRestoreBootForeground("first video frame")
                     if (!startupRetryBudget.firstFrame(session, android.os.SystemClock.elapsedRealtime())) return@runOnUiThread
@@ -4973,7 +5065,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         if (controllerGeneration == restartGeneration && activeAirPlaySession === session &&
                             !shuttingDown.get() && CarPlayBackgroundSession.isOwner(this@CarPlayHostActivity) &&
                             startupRetryBudget.resetIfStable(session, android.os.SystemClock.elapsedRealtime())) {
-                            appendLog("wireless startup retry budget reset after stable video session")
+                            DiagnosticLogging.record { appendLog("wireless startup retry budget reset after stable video session") }
                         }
                     }, WirelessStartupPolicy.STABLE_SESSION_MILLIS)
                 }
@@ -4984,58 +5076,61 @@ class CarPlayHostActivity : ComponentActivity() {
                     val active = activeAirPlaySession
                     if (active != null && active !== session) {
                         // 探针或非活动握手结束时，保留当前播放会话。
-                        appendLog("Non-active AirPlay connection ended; keeping the live session")
+                        DiagnosticLogging.record { appendLog("Non-active AirPlay connection ended; keeping the live session") }
                         return@runOnUiThread
                     }
-                    if (controllerGeneration != restartGeneration || startupRetryStopped) return@runOnUiThread
-                    startupRetryBudget.disconnected()
-                    activeAirPlaySession = null
-                    CarPlayBackgroundSession.active = false
-                    callPopupSessionReady = false
-                    dismissClusterPresentation()
-                    updateCallPopupGuard()
-                    waitingRevealPlayedForSession = false
-                    waitingReveal?.resetForNewSession()
+                    if (controllerGeneration != restartGeneration || shuttingDown.get()) return@runOnUiThread
+                    if (active === session || CarPlayBackgroundSession.active) {
+                        endConnectedSession("AirPlay session ended")
+                        return@runOnUiThread
+                    }
+                    clearDisconnectedSessionOutput()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
                     }
-                    activeScreenStreamTypes.clear()
-                    ClusterActivityOutput.setStreamActive(false)
                     setConnectionStage(R.string.carplay_session_ended_reconnecting)
-                    appendLog("AirPlay session ended; reconnecting from scratch")
+                    returnToConnectionHubAfterDisconnect()
+                    DiagnosticLogging.record { appendLog("AirPlay session ended; reconnecting from scratch") }
                     reconnectAfterLoss("AirPlay session ended")
                 }
             }
 
             override fun onTransportError(message: String) {
                 runOnUiThread {
-                    if (controllerGeneration != restartGeneration || startupRetryStopped) return@runOnUiThread
-                    callPopupSessionReady = false
-                    updateCallPopupGuard()
-                    startupRetryBudget.disconnected()
-                    activeAirPlaySession = null
-                    CarPlayBackgroundSession.active = false
-                    dismissClusterPresentation()
-                    waitingRevealPlayedForSession = false
-                    waitingReveal?.resetForNewSession()
+                    if (controllerGeneration != restartGeneration || shuttingDown.get()) return@runOnUiThread
+                    if (activeAirPlaySession != null || CarPlayBackgroundSession.active) {
+                        endConnectedSession("CarPlay transport error: $message")
+                        return@runOnUiThread
+                    }
+                    clearDisconnectedSessionOutput()
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
                     }
-                    activeScreenStreamTypes.clear()
-                    ClusterActivityOutput.setStreamActive(false)
                     setConnectionStage(R.string.transport_error_reconnecting)
-                    appendLog("CarPlay transport error: $message; reconnecting from scratch")
+                    returnToConnectionHubAfterDisconnect()
+                    DiagnosticLogging.record { appendLog("CarPlay transport error: $message; reconnecting from scratch") }
                     reconnectAfterLoss("CarPlay transport error: $message")
                 }
             }
 
             override fun onDebugLog(message: String) {
+                // Progress is functional UI state, independent of diagnostic recording.
+                if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) {
+                    val step = CarPlayConnectionProgress.stepIndexFromDebugLog(message) ?: return
+                    runOnUiThread {
+                        if (controllerGeneration == restartGeneration && !menuOpen) advanceConnectionProgress(step)
+                    }
+                    return
+                }
                 if (DiagnosticRedactor.redact(message) == null) return
                 if (message.startsWith(CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX + " ")) {
                     // Retain old-controller teardown evidence without accepting its UI/session state.
-                    AsyncDiagnosticLog.append(diagnosticLog, message)
+                    DiagnosticLogging.record {
+                        val target = if (controllerGeneration == restartGeneration) sessionLog else diagnosticLog
+                        AsyncDiagnosticLog.append(target, message)
+                    }
                     return
                 }
                 runOnUiThread {
@@ -5046,18 +5141,69 @@ class CarPlayHostActivity : ComponentActivity() {
                     if (menuOpen) return@runOnUiThread
                     noteConnectionProgressFromLog(message)
                     if (message.startsWith(PROTOCOL_TRACE_PREFIX)) {
-                        appendFileLog(message)
+                        DiagnosticLogging.record { appendFileLog(message) }
                     } else {
-                        appendLog(message)
+                        DiagnosticLogging.record { appendLog(message) }
                     }
                 }
             }
         }
 
+    /** Clear visible output before waiting for decoder/audio teardown or a reconnect timer. */
+    private fun clearDisconnectedSessionOutput() {
+        startupRetryBudget.disconnected()
+        activeAirPlaySession = null
+        CarPlayBackgroundSession.active = false
+        callPopupSessionReady = false
+        activeScreenStreamTypes.clear()
+        clusterFlyScreenVisible = false
+        abandonConnectionTiming("session disconnected")
+        connectionProgressLit = 0
+        connectionProgressDots?.litCount = 0
+        ConnectionProgressUiState.reset()
+        waitingRevealPlayedForSession = false
+        waitingReveal?.resetForNewSession()
+        videoView?.visibility = View.INVISIBLE
+        gestureOverlay?.visibility = View.GONE
+        mainHandler.removeCallbacks(hideIdleCenterMap)
+        CenterMapOverlay.hide()
+        MapMirrors.setStreamActive(false)
+        ClusterActivityOutput.setStreamActive(false)
+        Hs5ClusterActivityOutput.setStreamActive(false)
+        dismissClusterPresentation()
+        updateCallPopupGuard()
+        DiagnosticLogging.record { appendLog("CarPlay disconnect: cleared main/cluster output before media cleanup; menuOpen=$menuOpen retryStopped=$startupRetryStopped") }
+    }
+
+    private fun endConnectedSession(reason: String) {
+        // An established session ending is terminal. Its later iAP2/status callbacks
+        // must not turn a phone-initiated disconnect into a fresh connection.
+        startupRetryStopped = true
+        recoveryPendingAfterMenu = false
+        failurePendingAfterMenu = null
+        clearDisconnectedSessionOutput()
+        ConnectionProgressUiState.markDisconnected()
+        setConnectionStage(R.string.new_ui_status_disconnected)
+        returnToConnectionHubAfterDisconnect()
+        DiagnosticLogging.record { appendLog("$reason; disconnected, stopping controller and fly screen; waiting for explicit connect") }
+        if (CarPlayBackgroundSession.isOwner(this)) {
+            CarPlayBackgroundSession.stop()
+        } else {
+            shutdown(false, reason) { finish() }
+        }
+    }
+
+    private fun returnToConnectionHubAfterDisconnect() {
+        // A projection Activity has newUiConnectionHub=false. Promote it back to the
+        // connection hub before using its navigation guard, including after adoption.
+        newUiConnectionHub = true
+        if ((hostAppearanceResumed || isActivityStarted) && !isFinishing) returnToNewUiConnectionHub()
+    }
+
     private fun createStatusReporter(
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = report@{ status ->
-        if (controllerGeneration != restartGeneration) return@report
+        if (controllerGeneration != restartGeneration || shuttingDown.get()) return@report
         if (status is CarPlayStatus.Failed || status is CarPlayStatus.ControlEnded) {
             callPopupSessionReady = false
             updateCallPopupGuard()
@@ -5100,8 +5246,8 @@ class CarPlayHostActivity : ComponentActivity() {
         // example one whose reconnect stopped at a prerequisite) is stopped instead of adopted. Callers
         // retry, and the next start matches this view.
         if (!backgroundSessionMatchesView(snapshot.sink.videoPacingEnabled, smoothVideo)) {
-            appendLog("Background session smooth video=${snapshot.sink.videoPacingEnabled} differs from this view; " +
-                "stopping it instead of adopting it")
+            DiagnosticLogging.record { appendLog("Background session smooth video=${snapshot.sink.videoPacingEnabled} differs from this view; " +
+                "stopping it instead of adopting it") }
             CarPlayBackgroundSession.stop { mainHandler.post { if (!isDestroyed) maybeStartCarPlay() } }
             return false
         }
@@ -5154,13 +5300,13 @@ class CarPlayHostActivity : ComponentActivity() {
         syncWaitingRevealWithSink()
         currentSurface?.let(::attachSurface)
         val serviceReused = snapshot.controller.hasActiveAirPlayAttachment()
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             if (serviceReused) {
                 "Reusing existing background CarPlay service"
             } else {
                 "Reusing existing background CarPlay session"
             },
-        )
+        ) }
         setConnectionStage(
             if (serviceReused) {
                 R.string.carplay_service_already_running
@@ -5169,12 +5315,12 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         )
         updateDebugOverlays()
-        Log.i(
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "Background CarPlay adopted serviceReused=$serviceReused " +
                 "debugSimulatedCluster=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)} " +
                 "effectiveClusterUrl=${AirPlayPersistence.effectiveClusterContent(this).url}",
-        )
+        ) }
         reloadClusterMapFromSettings()
         applyUltraClusterDashboardIfNeeded()
         return true
@@ -5194,13 +5340,13 @@ class CarPlayHostActivity : ComponentActivity() {
             size
         }
         val airPlayConfig = createAirPlayConfig(effectiveSize)
-        Log.i(
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "CarPlay cluster advertised=${airPlayConfig.cluster != null} " +
                 "initialUrl=${airPlayConfig.cluster?.initialUrl} " +
                 "simulatedPresentation=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)} " +
                 "vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)}",
-        )
+        ) }
         val locationProvider: Iap2LocationProvider? =
             when {
                 !config.locationReportingEnabled -> null
@@ -5219,7 +5365,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 )
                 else -> AndroidCarPlayLocationProvider(this)
             }
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "Starting CarPlay controller at ${size.width}x${size.height} -> " +
                 "${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
                 "(${displayScalePercent}%) " +
@@ -5232,8 +5378,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 "${if (config.identification.vehicleSpeedEnabled) "+wheel-speed" else ""} " +
                 "mfi=${mfiTargetLabel(config.mfiTarget)}" +
                 if (config.transport == CarPlayTransport.WIRED) " usbCharging=${config.availableCurrentMilliAmps}mA" else "",
-        )
-        Log.i(
+        ) }
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "starting controller display=${size.width}x${size.height} " +
                 "negotiated=${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
@@ -5243,7 +5389,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 "microphone=${airPlayConfig.microphone} " +
                 "location=${config.locationReportingEnabled} " +
                 "mfi=${config.mfiTarget}",
-        )
+        ) }
         val renderer = createMediaSink(
             videoWidth = airPlayConfig.main.widthPixels,
             videoHeight = airPlayConfig.main.heightPixels,
@@ -5297,9 +5443,10 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         try {
             ContextCompat.startForegroundService(this, Intent(this, DiPlaySessionService::class.java))
+            CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.CONTROLLER_STARTED)
             next.start()
         } catch (error: RuntimeException) {
-            appendLog("Connection could not start: ${error.javaClass.simpleName}")
+            DiagnosticLogging.record { appendLog("Connection could not start: ${error.javaClass.simpleName}") }
             shutdown(false, "foreground service could not start")
             setConnectionStage(R.string.could_not_start_carplay_return_to_diplay_and_check_app_per)
         }
@@ -5325,6 +5472,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun logThemeState(source: ThemeModeDiagnostics.Source, configuration: Configuration) {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
         themeDiagnostics.observe(
             source, configuration.uiMode, darkMode, activeAirPlaySession != null, SystemClock.elapsedRealtime(),
         )?.let(::appendLog)
@@ -5334,31 +5482,32 @@ class CarPlayHostActivity : ComponentActivity() {
         val session = activeAirPlaySession
         val night = darkMode
         if (session == null) {
-            appendLog("THEME_DIAGNOSTIC request source=${source.label} applied=${if (night) "dark" else "light"} sessionActive=false")
+            DiagnosticLogging.record { appendLog("THEME_DIAGNOSTIC request source=${source.label} applied=${if (night) "dark" else "light"} sessionActive=false") }
             return
         }
         airPlayCommandExecutor.execute {
             try {
                 val sent = session.setNightMode(night)
                 // A successful write does not prove the iPhone changed its appearance.
-                appendLog(
+                DiagnosticLogging.record { appendLog(
                     "THEME_DIAGNOSTIC send source=${source.label} applied=${if (night) "dark" else "light"} commandWritten=$sent",
-                )
-                Log.i(
+                ) }
+                DiagnosticLogging.logcat { Log.i(
                     TAG,
                     "AirPlay dark mode=${if (night) "dark" else "light"} eventChannelReady=$sent",
-                )
+                ) }
             } catch (error: Throwable) {
                 val failureClass = error.javaClass.simpleName.take(64)
                     .filter { it.isLetterOrDigit() || it == '_' || it == '$' }
                     .ifEmpty { "unknown" }
-                appendLog("THEME_DIAGNOSTIC send source=${source.label} failureClass=$failureClass")
-                Log.w(TAG, "Could not send AirPlay dark mode update", error)
+                DiagnosticLogging.record { appendLog("THEME_DIAGNOSTIC send source=${source.label} failureClass=$failureClass") }
+                DiagnosticLogging.logcat { Log.w(TAG, "Could not send AirPlay dark mode update", error) }
             }
         }
     }
 
     private fun audioCaptureDirectory(): File? {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return null
         if (!File(filesDir, AUDIO_CAPTURE_MARKER).isFile) return null
         return File(filesDir, AUDIO_CAPTURE_DIRECTORY)
     }
@@ -5386,6 +5535,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
 
     private fun applyDisplaySize(size: DisplaySize) {
+        if (shuttingDown.get()) return
+        rememberStartupDisplay(size)
         val display = sessionDisplay
         if (display != null && applyViewArea(size, display)) return
         val layoutChanged = displayLayoutChanged(size)
@@ -5400,18 +5551,18 @@ class CarPlayHostActivity : ComponentActivity() {
         recordDetectedMaximum(size)
         updateResolutionMenu()
         if (previous == null) {
-            appendLog("Display detected: ${size.width}x${size.height}")
+            DiagnosticLogging.record { appendLog("Display detected: ${size.width}x${size.height}") }
             maybeStartCarPlay()
         } else if (menuOpen || handshakeResetInProgress) {
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "Display updated while handshake is reset: " +
                     "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
-            )
+            ) }
         } else if (controller == null && display == null) {
-            appendLog(
+            DiagnosticLogging.record { appendLog(
                 "Display updated before CarPlay startup: " +
                     "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
-            )
+            ) }
             maybeStartCarPlay()
         } else if (display != null && !layoutChanged &&
             size.width <= display.windowWidth && size.height <= display.windowHeight) {
@@ -5419,8 +5570,8 @@ class CarPlayHostActivity : ComponentActivity() {
             // session started in a camera window, growth beyond it needs a full-size canvas.
             val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
                 "keeping CarPlay session canvas=${display.width}x${display.height}"
-            appendLog(message)
-            Log.i(TAG, message)
+            DiagnosticLogging.record { appendLog(message) }
+            DiagnosticLogging.logcat { Log.i(TAG, message) }
             videoView?.let { updateVideoLayout(it.width, it.height) }
         } else {
             restartCarPlay(
@@ -5448,7 +5599,7 @@ class CarPlayHostActivity : ComponentActivity() {
             // The turn arrived before the window's new size: note it and wait for the size, which picks
             // the area, instead of letting the old rotation look like a changed layout.
             sessionDisplay = display.copy(rotation = displayRotation())
-            Log.i(TAG, "Screen turned before the window resized (${size.width}x${size.height}); waiting for its size")
+            DiagnosticLogging.logcat { Log.i(TAG, "Screen turned before the window resized (${size.width}x${size.height}); waiting for its size") }
             return true
         }
         val turned = previous != null && !split && (previous.height > previous.width) != portrait
@@ -5474,8 +5625,8 @@ class CarPlayHostActivity : ComponentActivity() {
         videoView?.let { updateVideoLayout(it.width, it.height) }
         val message = "Window ${previous?.width}x${previous?.height} -> ${size.width}x${size.height} " +
             "split=$split portrait=$portrait turned=$turned: view area $target sent=$sent"
-        appendLog(message)
-        Log.i(TAG, message)
+        DiagnosticLogging.record { appendLog(message) }
+        DiagnosticLogging.logcat { Log.i(TAG, message) }
         return true
     }
 
@@ -5573,7 +5724,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // setting needs a new one.
         if (controller == null && (AirPlayPersistence.loadSmoothVideo(this) != smoothVideo ||
                 AirPlayPersistence.loadDirectVideoOutput(this) != directVideoOutput)) {
-            appendLog("Video output setting changed; rebuilding the video view")
+            DiagnosticLogging.record { appendLog("Video output setting changed; rebuilding the video view") }
             // No session runs here, but a restart keeps this host as the session owner; the new instance
             // must be able to start its own.
             if (CarPlayBackgroundSession.isOwner(this)) CarPlayBackgroundSession.clear()
@@ -5625,7 +5776,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (newUiConnectionHub) {
                 ConnectionProgressUiState.markFailed(latestStage)
             }
-            appendLog("wireless startup recovery stopped generation=$restartGeneration reason=$startupFailure retries=${startupRetryBudget.retries}")
+            DiagnosticLogging.record { appendLog("wireless startup recovery stopped generation=$restartGeneration reason=$startupFailure retries=${startupRetryBudget.retries}") }
             return
         }
         reconnectScheduled = true
@@ -5640,7 +5791,7 @@ class CarPlayHostActivity : ComponentActivity() {
             (RECONNECT_DELAY_MILLIS * (1L shl reconnectAttempts.coerceAtMost(4))).coerceAtMost(30_000L)
         }
         reconnectAttempts += 1
-        appendLog("$reason; retrying in ${delayMillis}ms generation=$generation startupFailure=$startupFailure startupRetries=${startupRetryBudget.retries}")
+        DiagnosticLogging.record { appendLog("$reason; retrying in ${delayMillis}ms generation=$generation startupFailure=$startupFailure startupRetries=${startupRetryBudget.retries}") }
         mainHandler.postDelayed(
             {
                 reconnectScheduled = false
@@ -5680,7 +5831,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val size = activeDisplaySize ?: return
         startupRetryBudget.disconnected()
         startupRetryButton?.visibility = View.GONE
-        appendLog(reason)
+        DiagnosticLogging.record { appendLog(reason) }
         activeAirPlaySession = null
         CarPlayBackgroundSession.active = false
         dismissClusterPresentation()
@@ -5690,7 +5841,7 @@ class CarPlayHostActivity : ComponentActivity() {
         ClusterActivityOutput.setStreamActive(false)
         resetConnectionProgress()
         setConnectionStage(reason)
-        Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}")
+        DiagnosticLogging.logcat { Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}") }
         val generation = ++restartGeneration
         handshakeResetInProgress = true
         callPopupSessionReady = false
@@ -5708,12 +5859,12 @@ class CarPlayHostActivity : ComponentActivity() {
             val started = System.nanoTime()
             oldController?.close()
             val completed = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
-            AsyncDiagnosticLog.append(
+            DiagnosticLogging.record { AsyncDiagnosticLog.append(
                 diagnosticLog,
                 "${CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX} generation=$generation " +
                     "restart teardownWaitCompleted=$completed " +
                     "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}",
-            )
+            ) }
             oldSink?.let(::closeRetiringSink)
             runOnUiThread {
                 if (!shuttingDown.get() && generation == restartGeneration) {
@@ -5830,13 +5981,13 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint?.text = settingsGestureHintText()
         updateDebugOverlays()
         logLines.clear()
-        appendLog(
+        DiagnosticLogging.record { appendLog(
             "$prefix; resolution " +
                 "${displayScalePercent}% with " +
                 (if (hevcEnabled) "HEVC (H.265)" else "H.264") +
                 ", MFI ${mfiTargetLabel(mfiTarget)}" +
                 ", Wi-Fi session ${hotspotModeLabel(wirelessHotspotMode)}",
-        )
+        ) }
         val failure = failurePendingAfterMenu
         failurePendingAfterMenu = null
         val recoveryPending = recoveryPendingAfterMenu || failure != null
@@ -5885,7 +6036,7 @@ class CarPlayHostActivity : ComponentActivity() {
         oldSink?.let(retiringSinks::add)
         sink = null
         sessionDisplay = null
-        Log.i(TAG, "shutdown reason=$reason terminateProcess=$terminateProcess")
+        DiagnosticLogging.logcat { Log.i(TAG, "shutdown reason=$reason terminateProcess=$terminateProcess") }
         teardownExecutor.execute {
             oldController?.close()
             val clean = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
@@ -5894,7 +6045,7 @@ class CarPlayHostActivity : ComponentActivity() {
             if (terminateProcess) {
                 applicationContext.stopService(Intent(applicationContext, CarPlayVpnService::class.java))
             }
-            Log.i(TAG, "shutdown complete clean=$clean")
+            DiagnosticLogging.logcat { Log.i(TAG, "shutdown complete clean=$clean") }
             applicationContext.stopService(Intent(applicationContext, DiPlaySessionService::class.java))
             teardownExecutor.shutdown()
             mainHandler.post { completion() }
@@ -5909,8 +6060,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 removeVideoSurfaceProbe()
                 if (isDestroyed || videoView !== texture) return true
                 val mode = carPlayVideoSurfaceMode(texture.isHardwareAccelerated, smoothVideo, directVideoOutput)
-                appendLog("Video output mode=$mode windowHardwareAccelerated=${texture.isHardwareAccelerated} " +
-                    "smoothVideo=$smoothVideo directVideoOutput=$directVideoOutput")
+                DiagnosticLogging.record { appendLog("Video output mode=$mode windowHardwareAccelerated=${texture.isHardwareAccelerated} " +
+                    "smoothVideo=$smoothVideo directVideoOutput=$directVideoOutput") }
                 if (mode == CarPlayVideoSurfaceMode.TEXTURE) return true
                 useFallbackVideoSurface(texture)
                 return false // Measure the replacement before drawing the software window.
@@ -5952,7 +6103,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         root.addView(viewport, index, texture.layoutParams)
-        appendLog(if (smoothVideo) {
+        DiagnosticLogging.record { appendLog(if (smoothVideo) {
             "Using SurfaceView video output: smooth video, frames shown at the iPhone's frame time + a delay " +
                 "starting at ${smoothVideoDelayMillis(fps)} ms; picture adjustments unavailable"
         } else if (directVideoOutput) {
@@ -5960,7 +6111,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 "picture adjustments unavailable"
         } else {
             "Using SurfaceView video output: window has no hardware acceleration; picture adjustments unavailable"
-        })
+        }) }
     }
 
     /** A dimension of the platform's own resources in pixels, or 0 when this build has none by [name]. */
@@ -6003,7 +6154,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     clusterGestureStartX = pointerCentroid(event, horizontal = true)
                     clusterGestureStartY = pointerCentroid(event, horizontal = false)
                     controller?.sendTouch(emptyList())
-                    appendLog("Cluster map swipe tracking started; fingers=$CLUSTER_GESTURE_FINGERS")
+                    DiagnosticLogging.record { appendLog("Cluster map swipe tracking started; fingers=$CLUSTER_GESTURE_FINGERS") }
                 }
                 if (gestureFingerCount > 0 && event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
                     val deferToClusterGesture = clusterMapHorizontalGestureEnabled() &&
@@ -6015,7 +6166,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         gestureStartX = pointerCentroid(event, horizontal = true)
                         gestureStartY = pointerCentroid(event, horizontal = false)
                         controller?.sendTouch(emptyList())
-                        appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
+                        DiagnosticLogging.record { appendLog("Settings swipe tracking started; fingers=$gestureFingerCount") }
                         return true
                     }
                 }
@@ -6115,11 +6266,11 @@ class CarPlayHostActivity : ComponentActivity() {
             MotionEvent.ACTION_POINTER_DOWN,
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_POINTER_UP,
-            MotionEvent.ACTION_CANCEL -> Log.i(
+            MotionEvent.ACTION_CANCEL -> DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "touch action=${MotionEvent.actionToString(event.actionMasked)} " +
                     "pointers=${event.pointerCount} queued=$queued",
-            )
+            ) }
         }
         return true
     }
@@ -6147,7 +6298,7 @@ class CarPlayHostActivity : ComponentActivity() {
         currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
         updateClusterMapShown()
         syncClusterPresentationStreamState()
-        appendLog("Cluster map closed by $reason")
+        DiagnosticLogging.record { appendLog("Cluster map closed by $reason") }
         return true
     }
 
@@ -6155,7 +6306,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return
         if (!clusterMapHorizontalGestureEnabled()) return
         if (clusterFlyScreenVisible == show) {
-            appendLog("Cluster map gesture visible=$show (unchanged)")
+            DiagnosticLogging.record { appendLog("Cluster map gesture visible=$show (unchanged)") }
             return
         }
         clusterFlyScreenVisible = show
@@ -6170,8 +6321,8 @@ class CarPlayHostActivity : ComponentActivity() {
         currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
         updateClusterMapShown()
         syncClusterPresentationStreamState()
-        Log.i(ClusterMapPresentation.TAG, "cluster map gesture visible=$show")
-        appendLog("Cluster map gesture visible=$show")
+        DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "cluster map gesture visible=$show") }
+        DiagnosticLogging.record { appendLog("Cluster map gesture visible=$show") }
     }
 
     private fun refreshClusterStreamRoutingAfterToggle() {
@@ -6210,8 +6361,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 activeScreenStreamTypes.remove(type)
             }
             if (type == SCREEN_TYPE_ALT) {
-                Log.i(ClusterMapPresentation.TAG, "cluster stream active=$active")
-                appendLog("Cluster map: stream active=$active")
+                DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "cluster stream active=$active") }
+                DiagnosticLogging.record { appendLog("Cluster map: stream active=$active") }
                 clusterPresentation?.setStreamActive(active)
                 ClusterActivityOutput.setStreamActive(active)
                 Hs5ClusterActivityOutput.setStreamActive(active)
@@ -6252,7 +6403,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val englishMessage = englishResources.getString(stringId)
         runOnUiThread {
             setConnectionStage(message, englishMessage)
-            appendLog(message)
+            DiagnosticLogging.record { appendLog(message) }
         }
     }
 
@@ -6287,7 +6438,7 @@ class CarPlayHostActivity : ComponentActivity() {
         connectionProgressDots?.litCount = step
         updateConnectionStepStage(step)
         val label = CarPlayConnectionProgress.stepLabel(step)
-        connectionTiming.onStep(step, label)
+        connectionTiming.onStep(step, label).forEach(::appendLog)
         if (step >= CarPlayConnectionProgress.STEP_COUNT) {
             completeConnectionTiming()
         }
@@ -6335,8 +6486,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (connectionTiming.completed()) return
         stopConnectionTimingTicker()
         val formatted = connectionTiming.formatElapsed()
-        connectionTiming.finishSuccess()
-        Log.i(TAG, "CarPlay connected in $formatted")
+        connectionTiming.finishSuccess().forEach(::appendLog)
+        DiagnosticLogging.logcat { Log.i(TAG, "CarPlay connected in $formatted") }
         updateConnectionElapsedLabel(success = true)
     }
 
@@ -6385,6 +6536,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun appendLog(message: String) {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
+        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("host $message") }
         if (!AirPlayPersistence.loadSessionLogRecordingEnabled(this)) return
         ensureSessionLogFile()
         val safe = DiagnosticRedactor.redact(message) ?: return
@@ -6392,6 +6545,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun appendFileLog(message: String) {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
+        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("host $message") }
         if (!AirPlayPersistence.loadSessionLogRecordingEnabled(this)) return
         ensureSessionLogFile()
         sessionLog?.append(formattedLogLine(message, System.currentTimeMillis()))
@@ -6613,6 +6768,7 @@ internal object CarPlayBackgroundSession {
     private val stopWaiters = mutableListOf<() -> Unit>()
 
     fun stop(completion: () -> Unit = {}) {
+        com.shilapi.xcertplay.orchestration.BluetoothBootPreconnect.cancel()
         val action: (((() -> Unit)) -> Unit)?
         synchronized(this) {
             if (stopping) { stopWaiters.add(completion); return }

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -34,10 +36,10 @@ object WifiDirectRadioReady {
                 else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     if (WifiClientEnable.requestEnable(wifi, log)) {
                         log("Wi-Fi enable requested before Wi-Fi Direct")
-                        Log.i(TAG, "Wi-Fi enable requested before Wi-Fi Direct")
+                        DiagnosticLogging.logcat { Log.i(TAG, "Wi-Fi enable requested before Wi-Fi Direct") }
                         Bootstrap.ENABLING
                     } else {
-                        Log.w(TAG, "Wi-Fi enable request refused; system action required")
+                        DiagnosticLogging.logcat { Log.w(TAG, "Wi-Fi enable request refused; system action required") }
                         Bootstrap.NEEDS_USER
                     }
                 } else {
@@ -51,10 +53,10 @@ object WifiDirectRadioReady {
                 }
             }
         } catch (_: SecurityException) {
-            Log.w(TAG, "Wi-Fi enable requires system authorization")
+            DiagnosticLogging.logcat { Log.w(TAG, "Wi-Fi enable requires system authorization") }
             Bootstrap.NEEDS_USER
         } catch (error: RuntimeException) {
-            Log.w(TAG, "Wi-Fi radio unavailable: ${error.javaClass.simpleName}")
+            DiagnosticLogging.logcat { Log.w(TAG, "Wi-Fi radio unavailable: ${error.javaClass.simpleName}") }
             Bootstrap.UNAVAILABLE
         }
     }

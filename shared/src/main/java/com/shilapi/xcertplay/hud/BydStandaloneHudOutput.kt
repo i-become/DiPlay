@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -18,7 +20,7 @@ internal class BydStandaloneHudOutput private constructor(context: Context) {
         send = { packet ->
             app.sendBroadcast(Intent("byd.hud.NAVIGATION").setComponent(TARGET)
                 .putExtra("normal", packet).addFlags(Intent.FLAG_RECEIVER_FOREGROUND))
-            Log.d(TAG, "dispatch uid=${Process.myUid()} bytes=${packet.split(',').size}")
+            DiagnosticLogging.logcat { Log.d(TAG, "dispatch uid=${Process.myUid()} bytes=${packet.split(',').size}") }
         },
         rememberPendingClear = { pending ->
             check(prefs.edit().putBoolean("pending_clear", pending).commit()) { "Cannot persist HUD cleanup" }
@@ -27,9 +29,9 @@ internal class BydStandaloneHudOutput private constructor(context: Context) {
     )
 
     init {
-        Log.i(TAG, "Standalone navigation ready uid=${Process.myUid()} helper=none")
+        DiagnosticLogging.logcat { Log.i(TAG, "Standalone navigation ready uid=${Process.myUid()} helper=none") }
         // Retain the journal if dispatch fails; the next scheduled tick retries.
-        runCatching { session.clear() }.onFailure { Log.w(TAG, "Startup clear will retry", it) }
+        runCatching { session.clear() }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "Startup clear will retry", it) } }
     }
 
     fun update(icon: Int, exit: Int, distanceMeters: Int, road: String) =

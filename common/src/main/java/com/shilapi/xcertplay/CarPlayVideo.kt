@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
@@ -102,7 +104,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
      * receiver does, say so on the car screen and go back to CarPlay instead of showing black. Main thread.
      */
     fun onPlayerFailed(code: Int) {
-        Log.w(TAG, "item cannot play here code=$code")
+        DiagnosticLogging.logcat { Log.w(TAG, "item cannot play here code=$code") }
         streamId?.let { reply(it, VideoInCar.errorNotification(itemUuid, code)) }
         appContext?.let { Toast.makeText(it, R.string.video_cannot_play, Toast.LENGTH_LONG).show() }
         stop()
@@ -122,15 +124,15 @@ internal object CarPlayVideo : CarPlayVideoListener {
                 // An app's own scheme is loaded through the iPhone (IphoneResolvingDataSource).
                 val item = VideoInCar.parseItem(message, iphoneLoadsAppSchemes = true)
                 if (item == null) {
-                    Log.w(TAG, "queue item this player cannot play")
+                    DiagnosticLogging.logcat { Log.w(TAG, "queue item this player cannot play") }
                     return
                 }
-                Log.i(TAG, "queue item app=${(message["item"] as? Map<*, *>)?.get("clientBundleID")}")
+                DiagnosticLogging.logcat { Log.i(TAG, "queue item app=${(message["item"] as? Map<*, *>)?.get("clientBundleID")}") }
                 url = item.url
                 itemUuid = item.uuid
                 val queued = message["item"] as? Map<*, *>
                 streaming = queued?.get("mediaType") == "streaming"
-                Log.i(TAG, "queue item host=${android.net.Uri.parse(item.url).host} mediaType=${queued?.get("mediaType")}")
+                DiagnosticLogging.logcat { Log.i(TAG, "queue item host=${android.net.Uri.parse(item.url).host} mediaType=${queued?.get("mediaType")}") }
                 startMillis = item.startMillis
                 activity?.load()
             }
@@ -157,7 +159,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
             "unhandledURL" -> onUrlLoaded(message)
             "stop", "removePlayQueueItem" -> stop()
             "setProperty" -> Unit
-            else -> Log.i(TAG, "video message $type keys=${message.keys}")
+            else -> DiagnosticLogging.logcat { Log.i(TAG, "video message $type keys=${message.keys}") }
         }
     }
 
@@ -187,11 +189,11 @@ internal object CarPlayVideo : CarPlayVideoListener {
             ),
             "item" to linkedMapOf("uuid" to itemUuid),
         ))
-        Log.i(TAG, "asked the iPhone to load a ${android.net.Uri.parse(url).scheme} URL request=$id")
+        DiagnosticLogging.logcat { Log.i(TAG, "asked the iPhone to load a ${android.net.Uri.parse(url).scheme} URL request=$id") }
         val response = try {
             answer.get(URL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (_: Exception) {
-            Log.w(TAG, "no iPhone answer for request=$id")
+            DiagnosticLogging.logcat { Log.w(TAG, "no iPhone answer for request=$id") }
             null
         } finally {
             pendingUrls.remove(id)
@@ -208,7 +210,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
     private fun onUrlLoaded(message: Map<String, Any?>) {
         val response = message["response"] as? Map<*, *>
         val id = (response?.get("FCUP_Response_RequestID") as? Number)?.toLong()
-        Log.i(TAG, "iPhone unhandledURL answer request=$id keys=${message.keys} responseKeys=${response?.keys}")
+        DiagnosticLogging.logcat { Log.i(TAG, "iPhone unhandledURL answer request=$id keys=${message.keys} responseKeys=${response?.keys}") }
         if (id != null) pendingUrls[id]?.complete(response)
     }
 
@@ -221,17 +223,17 @@ internal object CarPlayVideo : CarPlayVideoListener {
         sender.execute {
             // A reply that cannot be sent must never take CarPlay down with it.
             val sent = runCatching { target.sendVideoMessage(streamId, message) }
-                .onFailure { Log.w(TAG, "reply ${message["type"]} failed: ${it.javaClass.simpleName}") }
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "reply ${message["type"]} failed: ${it.javaClass.simpleName}") } }
                 .getOrDefault(false)
-            if (!sent) Log.w(TAG, "reply ${message["type"]} not sent")
+            if (!sent) DiagnosticLogging.logcat { Log.w(TAG, "reply ${message["type"]} not sent") }
         }
     }
 
     private fun show() {
         val context = appContext ?: return
         when {
-            url == null -> Log.w(TAG, "video player requested without a playable item")
-            !VideoInCar.allowed -> Log.w(TAG, "video player requested while not parked")
+            url == null -> DiagnosticLogging.logcat { Log.w(TAG, "video player requested without a playable item") }
+            !VideoInCar.allowed -> DiagnosticLogging.logcat { Log.w(TAG, "video player requested while not parked") }
             activity != null -> Unit
             else -> context.startActivity(
                 Intent(context, CarPlayVideoActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -241,7 +243,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
 
     private fun closePlayer(reason: String) {
         val player = activity ?: return
-        Log.i(TAG, "closing the video player: $reason")
+        DiagnosticLogging.logcat { Log.i(TAG, "closing the video player: $reason") }
         player.finish()
     }
 

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.airplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 import java.io.Closeable
 import java.io.DataInputStream
@@ -195,7 +197,7 @@ internal class BufferedAudioStream(
             }
         } catch (_: InterruptedException) {
         } catch (error: Exception) {
-            if (!closed.get()) Log.w(TAG, "buffered audio feed failed", error)
+            if (!closed.get()) DiagnosticLogging.logcat { Log.w(TAG, "buffered audio feed failed", error) }
             close()
         }
     }

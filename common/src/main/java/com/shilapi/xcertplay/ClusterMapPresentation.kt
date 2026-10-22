@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Presentation
 import android.content.Context
 import android.graphics.Color
@@ -101,23 +103,23 @@ internal class ClusterMapPresentation(
             root.addView(textureView, videoParams)
             videoView = textureView
             if (plan.fullMap) root.addView(InstrumentContrastView(context, plan, backdrop), FrameLayout.LayoutParams(-1, -1))
-            Log.i(TAG, "layout=$theme viewport=$plan source=${plan.sourceLeft},${plan.sourceTop} dark=$dark")
+            DiagnosticLogging.logcat { Log.i(TAG, "layout=$theme viewport=$plan source=${plan.sourceLeft},${plan.sourceTop} dark=$dark") }
         } else {
             // Preserve the original PR renderer for DiLink 5 and unverified firmware.
             val surfaceView = SurfaceView(context)
             surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(holder: SurfaceHolder) {
-                    Log.i(TAG, "cluster surface created")
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface created") }
                     outputSurface = holder.surface
                     onSurface(holder.surface)
                 }
 
                 override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                    Log.i(TAG, "cluster surface ${width}x$height")
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface ${width}x$height") }
                 }
 
                 override fun surfaceDestroyed(holder: SurfaceHolder) {
-                    Log.i(TAG, "cluster surface destroyed")
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface destroyed") }
                     onSurface(null)
                     // SurfaceHolder owns this surface; do not release it ourselves.
                     outputSurface = null

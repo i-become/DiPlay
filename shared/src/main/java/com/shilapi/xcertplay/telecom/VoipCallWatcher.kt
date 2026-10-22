@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.telecom
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -56,7 +58,7 @@ internal class VoipCallWatcher(context: Context, private val onChange: (Boolean)
         recordings?.let { list -> recordingSources = list.map { it.clientAudioSource } }
         playbacks?.let { list -> playbackUsages = list.mapNotNull { it.audioAttributes?.usage } }
         val voip = voipActive(recordingSources, playbackUsages) && !PhoneAudioRoute.ownCarPlayCallActive()
-        Log.i(TAG, "recording sources=$recordingSources playback usages=$playbackUsages voip=$voip")
+        DiagnosticLogging.logcat { Log.i(TAG, "recording sources=$recordingSources playback usages=$playbackUsages voip=$voip") }
         onChange(voip)
     }
 

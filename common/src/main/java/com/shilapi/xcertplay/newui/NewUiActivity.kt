@@ -116,7 +116,6 @@ class NewUiActivity : ComponentActivity() {
     private var diagnosticStoragePath by mutableStateOf("")
     private var diagnosticSaving by mutableStateOf(false)
     private var sessionLogRecordingEnabled by mutableStateOf(false)
-    private var debugSimulatedClusterEnabled by mutableStateOf(false)
     private var carPlayWasActive = false
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
@@ -188,6 +187,13 @@ class NewUiActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
             DiPlayLauncher.openCarPlayProjection(this)
+            finish()
+            return
+        }
+        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) &&
+            !intent.hasExtra(DiPlayActivity.EXTRA_SETTINGS_CATEGORY) &&
+            !intent.getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false) &&
+            DiPlayLauncher.startAutomaticConnection(this)) {
             finish()
             return
         }
@@ -379,10 +385,6 @@ class NewUiActivity : ComponentActivity() {
                                     NewUiDisplayActions.saveClusterFlyScreenDefaultOnConnect(activity, enabled)
                                     refreshAll()
                                 },
-                                onClusterFlyScreenWindowChanged = { enabled ->
-                                    NewUiDisplayActions.saveClusterFlyScreenWindow(activity, enabled)
-                                    refreshAll()
-                                },
                                 onClusterGestureChanged = { enabled ->
                                     NewUiDisplayActions.saveClusterGesture(activity, enabled)
                                     refreshAll()
@@ -569,7 +571,6 @@ class NewUiActivity : ComponentActivity() {
                             )
                             NewUiDiagnosticsSubpage.MAIN -> NewUiDiagnosticsScreen(
                                 sessionLogRecordingEnabled = sessionLogRecordingEnabled,
-                                debugSimulatedClusterEnabled = debugSimulatedClusterEnabled,
                                 storagePath = diagnosticStoragePath,
                                 reports = diagnosticReports,
                                 saving = diagnosticSaving,
@@ -580,16 +581,6 @@ class NewUiActivity : ComponentActivity() {
                                     CarPlayHostSettingsBridge.notifySessionLogRecordingChanged()
                                 },
                                 onClearSessionLogs = { clearRecordedSessionLogs() },
-                                onDebugSimulatedClusterChanged = { enabled ->
-                                    AirPlayPersistence.saveDebugSimulatedClusterPresentation(activity, enabled)
-                                    debugSimulatedClusterEnabled = enabled
-                                    CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
-                                    Toast.makeText(
-                                        activity,
-                                        R.string.new_ui_diag_simulated_cluster_toast,
-                                        Toast.LENGTH_LONG,
-                                    ).show()
-                                },
                                 onSaveReport = { saveDiagnosticReport() },
                                 onSaveReportToUsb = { saveDiagnosticReportToUsb(it) },
                                 onViewReport = { openDiagnosticReport(it) },
@@ -605,6 +596,9 @@ class NewUiActivity : ComponentActivity() {
                 }
             }
         }
+        com.shilapi.xcertplay.CarPlayStartupDiagnostics.mark(
+            com.shilapi.xcertplay.CarPlayStartupDiagnostics.Phase.HOME_UI_ATTACHED,
+        )
         if (pendingWirelessRecovery) {
             pendingWirelessRecovery = false
             WirelessRecovery.showResetConfirm(this) {
@@ -678,8 +672,10 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun refreshAll() {
+        updateController.refreshInstallResult()
         connectionActions.refreshSetupError()
-        if (!CarPlayBackgroundSession.hasSession() && !ConnectionProgressUiState.failed()) {
+        if (!CarPlayBackgroundSession.hasSession() && !ConnectionProgressUiState.failed() &&
+            !ConnectionProgressUiState.disconnected()) {
             ConnectionProgressUiState.reset()
         }
         val carPlayNowActive = CarPlayBackgroundSession.active
@@ -700,7 +696,6 @@ class NewUiActivity : ComponentActivity() {
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)
         diagnosticUsbRoots = DiagnosticRemovableVolumes.list(this)
         sessionLogRecordingEnabled = AirPlayPersistence.loadSessionLogRecordingEnabled(this)
-        debugSimulatedClusterEnabled = AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)
         phoneSelectionState = NewUiPhoneSelectionReader.read(this)
         if (connectionSubpage == NewUiConnectionSubpage.CONNECTION_METHOD) {
             manualHotspotOffHint = NewUiConnectionMethodActions.manualHotspotOff(this)
@@ -708,19 +703,26 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun saveDiagnosticReport(customDirectory: String? = null) {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
         if (diagnosticSaving) return
         diagnosticSaving = true
         val version = settingsState.versionName
         val app = applicationContext
+        val recordingGeneration = com.shilapi.xcertplay.diagnostics.DiagnosticLogging.generation
         Thread({
             val fileName = "DiPlay-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.txt"
             val report = NewUiDiagnosticReport.build(app, version)
             val saved = runCatching {
-                if (customDirectory.isNullOrBlank()) {
-                    DiagnosticExportStore.saveWithoutPicker(app, fileName, report)
-                } else {
-                    DiagnosticExportStore.saveToDirectory(app, customDirectory, fileName, report)
+                var written = false
+                com.shilapi.xcertplay.diagnostics.DiagnosticLogging.write(recordingGeneration) {
+                    if (customDirectory.isNullOrBlank()) {
+                        DiagnosticExportStore.saveWithoutPicker(app, fileName, report)
+                    } else {
+                        DiagnosticExportStore.saveToDirectory(app, customDirectory, fileName, report)
+                    }
+                    written = true
                 }
+                check(written)
             }
             runOnUiThread {
                 diagnosticSaving = false

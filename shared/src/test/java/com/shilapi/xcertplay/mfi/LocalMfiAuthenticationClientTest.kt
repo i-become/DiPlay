@@ -107,4 +107,46 @@ class LocalMfiAuthenticationClientTest {
         assertFalse(first.readCertificate().all { it == 0.toByte() })
         assertEquals(64, second.signChallenge(ByteArray(32) { it.toByte() }).size)
     }
+
+    @Test fun reusesValidatedKeyButKeepsEachConnectionsSignatureCallback() {
+        val directory = identity()
+        var firstCount = 0
+        var secondCount = 0
+        val first = LocalMfiAuthenticationClient.load(directory) { firstCount++ }
+        val second = LocalMfiAuthenticationClient.load(directory) { secondCount++ }
+        val key = LocalMfiAuthenticationClient::class.java.getDeclaredField("privateKey").apply { isAccessible = true }
+        assertSame("Reload must reuse the parsed, validated key", key.get(first), key.get(second))
+        assertNotSame(first, second)
+        first.signChallenge(ByteArray(32))
+        assertEquals(1, firstCount)
+        assertEquals(0, secondCount)
+        second.signChallenge(ByteArray(32) { 1 })
+        assertEquals(1, firstCount)
+        assertEquals(1, secondCount)
+    }
+
+    @Test fun changedKeyWithUnchangedFileMetadataCannotReuseTheValidatedIdentity() {
+        val directory = identity()
+        LocalMfiAuthenticationClient.load(directory)
+        val file = File(directory, "identity.pk8")
+        val modified = file.lastModified()
+        val originalSize = file.length()
+        // Same size and timestamp, but a different private scalar for the same curve.
+        val generator = KeyPairGenerator.getInstance("EC")
+        generator.initialize(ECGenParameterSpec("secp256r1"))
+        file.writeBytes(generator.generateKeyPair().private.encoded)
+        assertEquals(originalSize, file.length())
+        assertTrue(file.setLastModified(modified))
+        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+    }
+
+    @Test fun missingOrChangedCertificateCannotUseThePreviouslyValidatedKey() {
+        val directory = identity()
+        LocalMfiAuthenticationClient.load(directory)
+        val certificate = File(directory, "certificate.p7b")
+        certificate.writeBytes(ByteArray(certificate.length().toInt()))
+        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+        assertTrue(certificate.delete())
+        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+    }
 }

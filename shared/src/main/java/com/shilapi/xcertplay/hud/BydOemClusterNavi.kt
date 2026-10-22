@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
@@ -30,7 +32,7 @@ object BydOemClusterNavi {
                 (mode == BydOemClusterHold.OFF || applicable(app)) &&
                     state(app).acquire(mode, lease, current)
             }.get()
-        }.onFailure { Log.w(TAG, "Stock-map hold refused", it) }.getOrDefault(false)
+        }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "Stock-map hold refused", it) } }.getOrDefault(false)
     }
 
     /** Always enqueue, even when acquire has not saved its journal yet. */
@@ -39,7 +41,7 @@ object BydOemClusterNavi {
         worker.execute {
             val pendingLease = lease ?: runCatching { journal(app)?.lease }.getOrNull()
             val restored = runCatching { state(app).release(pendingLease) }
-                .onFailure { Log.w(TAG, "Stock-map restore will retry", it) }.getOrDefault(false)
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "Stock-map restore will retry", it) } }.getOrDefault(false)
             if (!restored) worker.schedule({ release(app, pendingLease) }, 30, TimeUnit.SECONDS)
         }
     }

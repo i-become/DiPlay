@@ -4,6 +4,7 @@ import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
 import java.io.File
 import java.security.KeyFactory
+import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.Signature
@@ -45,15 +46,42 @@ class LocalMfiAuthenticationClient private constructor(
         const val DIRECTORY = "offline-mfi"
         private const val MAX_FILE_BYTES = 16 * 1024
 
+        private data class ValidatedIdentity(
+            val directory: String,
+            val keyDigest: ByteArray,
+            val privateKey: PrivateKey,
+            val certificate: ByteArray,
+        )
+
+        // Only validated material is shared. Each connection keeps its own signature callback.
+        private var cachedIdentity: ValidatedIdentity? = null
+
         fun load(directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
             require(directory.isDirectory) { "Offline MFi directory is missing or invalid" }
             val encodedKey = readBounded(File(directory, "identity.pk8"))
-            val privateKey = try {
-                KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(encodedKey))
+            val material = try {
+                val certificate = readBounded(File(directory, "certificate.p7b"))
+                val path = directory.canonicalPath
+                val keyDigest = MessageDigest.getInstance("SHA-256").digest(encodedKey)
+                synchronized(this) {
+                    cachedIdentity?.takeIf {
+                        it.directory == path && it.keyDigest.contentEquals(keyDigest) &&
+                            it.certificate.contentEquals(certificate)
+                    } ?: validateIdentity(path, keyDigest, encodedKey, certificate).also { cachedIdentity = it }
+                }
             } finally {
                 encodedKey.fill(0)
             }
-            val certificate = readBounded(File(directory, "certificate.p7b"))
+            return LocalMfiAuthenticationClient(material.privateKey, material.certificate, onSignature)
+        }
+
+        private fun validateIdentity(
+            directory: String,
+            keyDigest: ByteArray,
+            encodedKey: ByteArray,
+            certificate: ByteArray,
+        ): ValidatedIdentity {
+            val privateKey = KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(encodedKey))
             val certificates = CertificateFactory.getInstance("X.509")
                 .generateCertificates(certificate.inputStream())
             require(certificates.size == 1) { "Expected one accessory certificate" }
@@ -72,7 +100,7 @@ class LocalMfiAuthenticationClient private constructor(
             verifier.initVerify(publicKey)
             verifier.update(challenge)
             require(verifier.verify(signature)) { "Local private key does not match certificate" }
-            return LocalMfiAuthenticationClient(privateKey, certificate, onSignature)
+            return ValidatedIdentity(directory, keyDigest, privateKey, certificate)
         }
 
         private fun readBounded(file: File): ByteArray = file.inputStream().use { stream ->

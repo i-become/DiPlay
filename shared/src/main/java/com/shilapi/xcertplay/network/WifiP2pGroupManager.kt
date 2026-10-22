@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.Manifest
 import android.app.AppOpsManager
 import android.content.Context
@@ -82,6 +84,45 @@ class WifiP2pGroupManager(
     private var startAttempt: StartAttempt? = null
     @Volatile private var observedCreatedName: String? = null
     @Volatile private var requestedName: String? = null
+    private var clientObservationStartedNs: Long? = null
+    private var clientObservationReceivedNs: Long? = null
+    private var associatedClient = false
+
+    override fun hasAssociatedClient(): Boolean {
+        val now = System.nanoTime()
+        val current = synchronized(stateLock) {
+            if (closed || !created) return false
+            val active = channel ?: return false
+            if (clientObservationStartedNs?.let { now - it < TimeUnit.MILLISECONDS.toNanos(500) } == true) {
+                null
+            } else {
+                clientObservationStartedNs = now
+                active
+            }
+        }
+        if (current != null) {
+            try {
+                // Do not wait for Android on the authenticated Bluetooth control thread.
+                p2pManager.requestGroupInfo(current) { group ->
+                    synchronized(stateLock) {
+                        if (!closed && channel === current && clientObservationStartedNs == now) {
+                            associatedClient = group != null && group.isGroupOwner &&
+                                observedCreatedName != null && group.networkName == observedCreatedName &&
+                                group.clientList.isNotEmpty()
+                            clientObservationReceivedNs = System.nanoTime()
+                        }
+                    }
+                }
+            } catch (_: RuntimeException) {
+                // Unavailable counts keep the timed discovery recovery path unchanged.
+            }
+        }
+        return synchronized(stateLock) {
+            !closed && associatedClient && clientObservationReceivedNs?.let {
+                System.nanoTime() - it < TimeUnit.SECONDS.toNanos(1)
+            } == true
+        }
+    }
 
     override fun connectionDiagnosticSnapshot(): String {
         val current = synchronized(stateLock) { if (closed) null else channel }
@@ -359,6 +400,7 @@ class WifiP2pGroupManager(
         attempt: StartAttempt,
     ): WifiP2pManager.ChannelListener = object : WifiP2pManager.ChannelListener {
         override fun onChannelDisconnected() {
+            diagnostic("Wi-Fi P2P framework channel disconnected")
             failAttempt(attempt, IOException("Wi-Fi P2P channel disconnected"))
         }
     }
@@ -368,6 +410,7 @@ class WifiP2pGroupManager(
         request: CreateRequest,
     ): WifiP2pManager.ActionListener = object : WifiP2pManager.ActionListener {
         override fun onSuccess() {
+            diagnostic("Wi-Fi P2P create callback result=success elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - request.startedNs)}")
             val activeChannel = attempt.channel
             val removeDetachedGroup = synchronized(stateLock) {
                 if (request.completed) return
@@ -385,6 +428,7 @@ class WifiP2pGroupManager(
         }
 
         override fun onFailure(reason: Int) {
+            diagnostic("Wi-Fi P2P create callback result=failure code=$reason elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - request.startedNs)}")
             synchronized(stateLock) {
                 if (request.completed || attempt.request !== request) return
                 request.completed = true
@@ -926,7 +970,7 @@ class WifiP2pGroupManager(
                 })
             }
         } catch (failure: RuntimeException) {
-            Log.w(TAG, "Wi-Fi P2P removeGroup could not be issued", failure)
+            DiagnosticLogging.logcat { Log.w(TAG, "Wi-Fi P2P removeGroup could not be issued", failure) }
             latch.countDown()
         }
         if (!waitForCallback) return
@@ -977,6 +1021,7 @@ class WifiP2pGroupManager(
     }
 
     private class CreateRequest {
+        val startedNs = System.nanoTime()
         var completed = false
         var failure: P2pCreateRejected? = null
     }

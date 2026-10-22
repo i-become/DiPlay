@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 
 /** Five-second video counters that separate network/iPhone gaps from decoder throughput. */
@@ -7,7 +9,7 @@ internal class VideoStats(
     private val label: String = "",
     private val nanoTime: () -> Long = System::nanoTime,
 ) {
-    private var windowStartNs = nanoTime()
+    private var windowStartNs = if (DiagnosticLogging.enabled) nanoTime() else 0L
     private var lastArrivalNs = 0L
     private var received = 0
     private var rendered = 0
@@ -23,6 +25,7 @@ internal class VideoStats(
     private var pacingDelayNanos = 0L
 
     @Synchronized fun onReceived(size: Int) {
+        if (!DiagnosticLogging.enabled) return
         val now = nanoTime()
         val gap = now - lastArrivalNs
         if (lastArrivalNs != 0L && gap < IDLE_GAP_NS) maxArrivalGapNs = maxOf(maxArrivalGapNs, gap)
@@ -38,20 +41,21 @@ internal class VideoStats(
         bytes += size
     }
 
-    @Synchronized fun onRendered() { rendered++ }
+    @Synchronized fun onRendered() { if (DiagnosticLogging.enabled) rendered++ }
 
-    @Synchronized fun onRecovery() { recoveries++ }
+    @Synchronized fun onRecovery() { if (DiagnosticLogging.enabled) recoveries++ }
 
     /** Time from queueing a frame into the decoder to dequeueing its output. */
     @Synchronized fun onDecodeLatency(ns: Long) {
+        if (!DiagnosticLogging.enabled) return
         if (decodeSamples < decodeMicros.size) decodeMicros[decodeSamples++] = (ns / 1000).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }
 
     /** A paced frame left the decoder after its display time and was shown at once. */
-    @Synchronized fun onLate() { late++ }
+    @Synchronized fun onLate() { if (DiagnosticLogging.enabled) late++ }
 
     /** Smooth video's current display delay ([PacingDelay]). */
-    @Synchronized fun onPacingDelay(ns: Long) { pacingDelayNanos = ns }
+    @Synchronized fun onPacingDelay(ns: Long) { if (DiagnosticLogging.enabled) pacingDelayNanos = ns }
 
     private fun decodeSummary(): String {
         if (decodeSamples == 0) return ""
@@ -62,6 +66,7 @@ internal class VideoStats(
     }
 
     @Synchronized fun logIfDue(): String? {
+        if (!DiagnosticLogging.enabled) return null
         val now = nanoTime()
         val elapsedNs = now - windowStartNs
         if (elapsedNs < WINDOW_NS) return null
@@ -75,7 +80,7 @@ internal class VideoStats(
             touchAvgMs, maxTouchLatencyNs / 1_000_000, touchSamples, TouchLatencyProbe.maxSendNs / 1_000_000,
         ) + decodeSummary()
         TouchLatencyProbe.maxSendNs = 0
-        Log.i(TAG, line)
+        DiagnosticLogging.logcat { Log.i(TAG, line) }
         windowStartNs = now
         received = 0; rendered = 0; recoveries = 0; bytes = 0; maxArrivalGapNs = 0
         touchSamples = 0; touchLatencySumNs = 0; maxTouchLatencyNs = 0

@@ -17,6 +17,8 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class CarPlayConnectionDiagnosticLogTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private lateinit var activity: CarPlayHostActivity
     private lateinit var listener: AirPlaySessionListener
     private val log get() = File(activity.filesDir, "logs/diplay.log").readText()

@@ -23,6 +23,7 @@ internal fun resolveAppNight(
     systemNight: Boolean,
     minuteOfDay: Int,
     hostNight: Boolean?,
+    vehicleNight: Boolean? = null,
 ): Boolean = when (appearance) {
     AppAppearance.DARK -> true
     AppAppearance.LIGHT -> false
@@ -30,7 +31,7 @@ internal fun resolveAppNight(
         CarPlayNightMode.DAY -> false
         CarPlayNightMode.NIGHT -> true
         CarPlayNightMode.SCHEDULE -> schedule.isNight(minuteOfDay)
-        CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> systemNight
+        CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> vehicleNight ?: systemNight
     }
 }
 
@@ -47,6 +48,7 @@ internal fun Context.resolveAppNightNow(hostNight: Boolean? = AppAppearanceRunti
             Configuration.UI_MODE_NIGHT_YES,
         minuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE),
         hostNight = hostNight,
+        vehicleNight = HongqiPositionLights.night(),
     )
 }
 
@@ -61,6 +63,11 @@ internal object AppAppearanceRuntime {
     private val observers = linkedMapOf<Any, (Boolean?) -> Unit>()
 
     fun hostNight(): Boolean? = synchronized(lock) { hostNight }
+
+    fun invalidateVehicleLight() {
+        val (value, callbacks) = synchronized(lock) { hostNight to observers.values.toList() }
+        callbacks.forEach { it(value) }
+    }
 
     fun publishHost(owner: Any, night: Boolean) {
         val callbacks = synchronized(lock) {

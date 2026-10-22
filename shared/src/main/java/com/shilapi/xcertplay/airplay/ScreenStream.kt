@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.airplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 import java.io.Closeable
 import java.io.InputStream
@@ -97,27 +99,27 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         when (header[OPCODE_OFFSET].toInt() and 0xff) {
             OP_VIDEO_FRAME -> {
                 val payload = if (body.size >= ScreenCodec.TAG_SIZE) {
-                    val start = System.nanoTime()
+                            val start = if (DiagnosticLogging.enabled) System.nanoTime() else 0L
                     ScreenCodec.decryptFrame(key, frameCounter.get(), header, body)
                         .also {
-                            stats.decrypted(System.nanoTime() - start, body.size)
+                            DiagnosticLogging.record { stats.decrypted(System.nanoTime() - start, body.size) }
                             frameCounter.incrementAndGet()
                         }
                 } else {
                     body
                 }
                 if (firstFrameLogged.compareAndSet(false, true)) {
-                    Log.i(
+                    DiagnosticLogging.logcat { Log.i(
                         TAG,
                         "video first decrypted frame sealed=${body.size} plain=${payload.size} " +
                         "head=${payload.hexPrefix(16)} chacha=${AirPlayCrypto.chachaImplementation}",
-                    )
+                    ) }
                 }
                 listener.onFrame(ScreenCodec.lengthPrefixedToAnnexB(payload), ScreenCodec.senderNanos(header), arrivalNanos)
             }
             OP_VIDEO_CONFIG -> {
                 val (codec, codecData) = ScreenCodec.detectConfig(body)
-                Log.i(TAG, "video codec config codec=$codec body=${body.size} data=${codecData.size}")
+                DiagnosticLogging.logcat { Log.i(TAG, "video codec config codec=$codec body=${body.size} data=${codecData.size}") }
                 listener.onCodec(codec)
                 listener.onConfig(codecData)
             }

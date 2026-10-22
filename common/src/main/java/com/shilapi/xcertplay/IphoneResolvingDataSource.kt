@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
@@ -39,7 +41,7 @@ internal class IphoneResolvingDataSource(
         }
         if (scheme in DIRECT_SCHEMES) return openSource(upstream, dataSpec)
         val resolved = resolveOnIphone(url) ?: throw IOException("iPhone did not load the $scheme URL")
-        Log.i(TAG, "iPhone loaded $scheme URL status=${resolved.status} bytes=${resolved.data?.size} redirect=${resolved.location != null}")
+        DiagnosticLogging.logcat { Log.i(TAG, "iPhone loaded $scheme URL status=${resolved.status} bytes=${resolved.data?.size} redirect=${resolved.location != null}") }
         resolved.location?.let { location ->
             if (redirects >= MAX_REDIRECTS) throw IOException("Too many iPhone URL redirects")
             // Reapply the policy: a resource loader's Location must not select an Android file,

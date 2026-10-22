@@ -13,7 +13,11 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 class DiPlayBootInitProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         val app = context?.applicationContext ?: return true
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(AirPlayPersistence.loadSessionLogRecordingEnabled(app))
+        CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.PROCESS_READY)
         if (!Hs5HeadUnit.isHeadUnit(app)) return true
+        CarPlayStartupDiagnostics.initialize(app)
+        HongqiPositionLights.initialize(app)
         if (!AirPlayPersistence.loadAutoStartOnBoot(app)) return true
         DiPlayBootStartup.runPrewarm(app, launchEnabled = true)
         return true

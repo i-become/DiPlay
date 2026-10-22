@@ -736,6 +736,10 @@
     <string name="update_verifying">جارٍ التحقق…</string>
     <string name="update_install">تثبيت %1$s</string>
     <string name="update_failed">فشل التحديث</string>
+    <string name="update_install_preparing">جارٍ تجهيز التحديث لمثبّت النظام…</string>
+    <string name="update_install_requested">تم إرسال التحديث إلى النظام. في انتظار نتيجة التثبيت…</string>
+    <string name="update_install_permission">اسمح لتطبيق DiPlay بتثبيت التطبيقات في إعدادات النظام، ثم اضغط على تثبيت مجددًا. إذا لم تظهر شاشة الإذن، فصدّر تقرير التشخيص.</string>
+    <string name="update_install_missing">ملف APK الذي تم تنزيله غير متاح. تحقّق من التحديثات ونزّله مجددًا.</string>
     <string name="update_available_home">يتوفر تحديث</string>
     <string name="update_saved_to">تم الحفظ في %1$s</string>
     <string name="backup_title">نسخة احتياطية من الإعدادات</string>
@@ -880,4 +884,18 @@
     <string name="new_ui_location_title">Send location to iPhone</string>
     <string name="new_ui_location_subtitle">Show vehicle location in CarPlay</string>
     <string name="new_ui_section_coming_soon">%1$s is coming soon in the new UI.</string>
+    <string name="new_ui_theme_follow_system">تلقائي</string>
+    <string name="new_ui_shell_display_theme_sub">تلقائي: تشغيل أضواء الموضع يفعّل الوضع الليلي وإطفاؤها يفعّل النهاري. عند تعذر القراءة يُستخدم مستشعر الضوء ثم مظهر النظام.</string>
+    <string name="new_ui_status_disconnected">تم قطع الاتصال</string>
+    <string name="update_install_confirm">أكّد التحديث في مثبّت النظام.</string>
+    <string name="update_install_success">تم تثبيت التحديث.</string>
+    <string name="update_install_cancelled">تم إلغاء التثبيت. اضغط على تثبيت للمحاولة مجددًا.</string>
+    <string name="update_install_blocked">منع النظام التثبيت. تحقق من إذن تثبيت التطبيقات وقيود وحدة السيارة.</string>
+    <string name="update_install_conflict">يتعارض التحديث مع تطبيق مثبّت. صدّر تقرير التشخيص لمعرفة سبب النظام.</string>
+    <string name="update_install_incompatible">لا يمكن تثبيت هذه الحزمة على وحدة السيارة. نزّل إصدارًا متوافقًا.</string>
+    <string name="update_install_storage">لا توجد مساحة تخزين كافية لتثبيت التحديث.</string>
+    <string name="update_install_failure">فشل التثبيت. تم تسجيل سبب النظام؛ صدّر تقرير التشخيص.</string>
+    <string name="new_ui_about_sec5_title">5. شكر وتقدير</string>
+    <string name="new_ui_about_sec5_body">شكرًا لحساب Douyin @YiMeng谁的梦还没醒 (1768868288) على توفير واجهة أضواء الموضع في السيارة.</string>
+    <string name="new_ui_diag_log_record_sub">فعّل الخيار لتسجيل السجلات وجمع بيانات التشخيص وإنشاء التقارير. عند إيقافه يتوقف التسجيل وجمع بيانات التشخيص في الخلفية.</string>
 </resources>

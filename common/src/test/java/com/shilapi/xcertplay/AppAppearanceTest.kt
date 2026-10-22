@@ -12,6 +12,30 @@ class AppAppearanceTest {
 
     @After fun resetRuntime() = AppAppearanceRuntime.resetForTest()
 
+    @Test fun automaticAppearanceUsesLightsOutsideHostAndKeepsManualAndScheduledChoices() {
+        for (mode in listOf(CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT)) {
+            assertTrue(resolveAppNight(AppAppearance.AUTO, mode, schedule, false, 12 * 60, null, true))
+            assertFalse(resolveAppNight(AppAppearance.AUTO, mode, schedule, true, 23 * 60, null, false))
+            assertFalse(resolveAppNight(AppAppearance.AUTO, mode, schedule, false, 12 * 60, null, null))
+            assertTrue(resolveAppNight(AppAppearance.DARK, mode, schedule, false, 12 * 60, null, false))
+            assertFalse(resolveAppNight(AppAppearance.LIGHT, mode, schedule, true, 23 * 60, null, true))
+        }
+        assertFalse(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.DAY, schedule, true, 23 * 60, null, true))
+        assertTrue(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.NIGHT, schedule, false, 12 * 60, null, false))
+        assertFalse(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.SCHEDULE, schedule, true, 12 * 60, null, true))
+    }
+
+    @Test fun vehicleInvalidationRefreshesObserversWithoutClaimingHostOwnership() {
+        val observed = mutableListOf<Boolean?>()
+        val stop = AppAppearanceRuntime.observeHost(observed::add)
+        AppAppearanceRuntime.invalidateVehicleLight()
+        assertNull(AppAppearanceRuntime.hostNight())
+        assertEquals(listOf<Boolean?>(null, null), observed)
+        stop()
+        AppAppearanceRuntime.invalidateVehicleLight()
+        assertEquals(2, observed.size)
+    }
+
     @Test fun stableKeysRoundTripAndUnknownValuesDefaultToDark() {
         assertEquals(AppAppearance.DARK, AppAppearance.fromKey(null))
         assertEquals(AppAppearance.DARK, AppAppearance.fromKey("future-value"))

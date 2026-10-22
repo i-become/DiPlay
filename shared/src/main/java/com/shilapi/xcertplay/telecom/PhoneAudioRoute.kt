@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.telecom
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -82,10 +84,10 @@ internal class PhoneAudioRouteController(
                     held = false
                     if (backend.start()) {
                         held = true
-                        Log.i(TAG, "car phone audio state on")
+                        DiagnosticLogging.logcat { Log.i(TAG, "car phone audio state on") }
                     } else {
                         failedAt = now()
-                        Log.w(TAG, "Telecom refused the call that selects the car's phone audio state")
+                        DiagnosticLogging.logcat { Log.w(TAG, "Telecom refused the call that selects the car's phone audio state") }
                     }
                 }
             } else if (held && cancelRelease == null) {
@@ -94,7 +96,7 @@ internal class PhoneAudioRouteController(
                     if (!needed()) {
                         backend.stop()
                         held = false
-                        Log.i(TAG, "car phone audio state off")
+                        DiagnosticLogging.logcat { Log.i(TAG, "car phone audio state off") }
                     }
                 }
             }
@@ -140,12 +142,12 @@ object PhoneAudioRoute {
                 backend = TelecomPhoneAudioBackend(app),
                 scheduler = object : RouteScheduler {
                     override fun execute(block: () -> Unit) {
-                        executor.execute { runCatching(block).onFailure { Log.w(TAG, "phone audio step failed", it) } }
+                        executor.execute { runCatching(block).onFailure { DiagnosticLogging.logcat { Log.w(TAG, "phone audio step failed", it) } } }
                     }
 
                     override fun schedule(delayMillis: Long, block: () -> Unit): () -> Unit {
                         val task = executor.schedule(
-                            { runCatching(block).onFailure { Log.w(TAG, "phone audio step failed", it) } },
+                            { runCatching(block).onFailure { DiagnosticLogging.logcat { Log.w(TAG, "phone audio step failed", it) } } },
                             delayMillis,
                             TimeUnit.MILLISECONDS,
                         )
@@ -196,7 +198,7 @@ object PhoneAudioRoute {
         val wantWatcher = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && BydOutputSettings.phoneAudioRouteApps(context)
         if (wantWatcher && watcher == null) {
             watcher = VoipCallWatcher(context) { active -> voipApp(active) }.also { it.start() }
-            Log.i(TAG, "watching for voice-over-IP calls in other apps")
+            DiagnosticLogging.logcat { Log.i(TAG, "watching for voice-over-IP calls in other apps") }
         } else if (!wantWatcher && watcher != null) {
             watcher?.stop()
             watcher = null

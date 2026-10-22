@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -51,7 +53,7 @@ internal object BydClusterBridge {
             factory = BydFactoryNavigationOutput(appContext.applicationContext)
             available = true
         }
-        Log.i(TAG, "cluster adapter available=$available adapter=${adapter?.packageName} factoryTest=${factory != null}")
+        DiagnosticLogging.logcat { Log.i(TAG, "cluster adapter available=$available adapter=${adapter?.packageName} factoryTest=${factory != null}") }
         if (available && !senderStarted) {
             senderStarted = true
             Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -117,7 +119,7 @@ internal object BydClusterBridge {
             applyClusterModeLocked()
             if (!guidanceLogged) {
                 guidanceLogged = true
-                Log.i(TAG, "cluster guidance sent $frame")
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster guidance sent $frame") }
             }
         }
     }
@@ -143,7 +145,7 @@ internal object BydClusterBridge {
         guidanceLogged = false
         guidanceActive = false
         applyClusterModeLocked()
-        Log.i(TAG, "cluster guidance ended")
+        DiagnosticLogging.logcat { Log.i(TAG, "cluster guidance ended") }
     }
 
     /** The host's CarPlay map window appeared on or left the cluster display. */
@@ -207,7 +209,7 @@ internal object BydClusterBridge {
             appContext.sendBroadcast(intent)
             true
         } catch (error: RuntimeException) {
-            Log.w(TAG, "cluster broadcast failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "cluster broadcast failed", error) }
             false
         }
     }

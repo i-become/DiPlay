@@ -14,7 +14,7 @@ internal object CarPlayNightModePolicy {
             CarPlayNightMode.DAY -> false
             CarPlayNightMode.NIGHT -> true
             CarPlayNightMode.SCHEDULE -> AirPlayPersistence.loadCarPlayNightSchedule(context).isNight(minute)
-            CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> systemNight
+            CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> HongqiPositionLights.night() ?: systemNight
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
@@ -44,7 +46,7 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
             .onSuccess { PhoneWakeDiagnostics.record(context, "startActivity-returned") }
             .onFailure { error ->
                 PhoneWakeDiagnostics.record(context, "failed", error)
-                Log.w("DiPlayPhoneWake", "Bluetooth wake launch failed: ${error.javaClass.simpleName}")
+                DiagnosticLogging.logcat { Log.w("DiPlayPhoneWake", "Bluetooth wake launch failed: ${error.javaClass.simpleName}") }
             }
     }
 
@@ -58,11 +60,12 @@ internal object PhoneWakeDiagnostics {
     private const val PREFS = "diplay_phone_wake_diagnostics"
 
     fun record(context: Context, result: String, error: Throwable? = null) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
+        DiagnosticLogging.write { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putLong("at", System.currentTimeMillis())
             .putString("result", result)
             .putString("failureClass", error?.javaClass?.simpleName ?: "none")
-            .apply()
+            .apply() }
     }
 
     fun report(context: Context): String {

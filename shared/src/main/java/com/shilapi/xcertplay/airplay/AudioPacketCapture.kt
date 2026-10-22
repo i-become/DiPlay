@@ -1,7 +1,8 @@
 package com.shilapi.xcertplay.airplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
-import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.DataOutputStream
 import java.io.File
@@ -34,6 +35,8 @@ class AudioPacketCapture(
     private val maxBytes: Long = 16L * 1024L * 1024L,
 ) : Closeable {
     private val closed = AtomicBoolean(false)
+    private val recordingToken = DiagnosticLogging.generation
+    private var disableSubscription: AutoCloseable? = null
     private var packets = 0
     private var bytesWritten: Long = (MAGIC.size + HEADER_BYTES).toLong()
     private val output: DataOutputStream?
@@ -41,36 +44,27 @@ class AudioPacketCapture(
     val file: File
 
     init {
-        val captureDirectory = if (directory.isDirectory || directory.mkdirs()) {
-            directory
-        } else {
-            null
-        }
-        file = if (captureDirectory == null) {
-            File(directory, "audio-capture-unavailable-type-$streamType.xcap")
-        } else {
-            File(
-                captureDirectory,
-                "audio-${System.currentTimeMillis()}-type-$streamType.xcap",
-            )
-        }
-        output = if (captureDirectory == null) {
-            null
-        } else {
+        var captureFile = File(directory, "audio-capture-unavailable-type-$streamType.xcap")
+        var opened: DataOutputStream? = null
+        DiagnosticLogging.write(recordingToken) {
+            if (!directory.isDirectory && !directory.mkdirs()) return@write
+            captureFile = File(directory, "audio-${System.currentTimeMillis()}-type-$streamType.xcap")
             try {
-                DataOutputStream(BufferedOutputStream(FileOutputStream(file, false))).also {
+                opened = DataOutputStream(FileOutputStream(captureFile, false)).also {
                     it.write(MAGIC)
                     it.writeInt(VERSION)
                     it.writeInt(streamType)
                     it.writeLong(System.currentTimeMillis())
                     it.flush()
-                    Log.i(TAG, "audio capture started type=$streamType file=${file.absolutePath}")
+                    DiagnosticLogging.logcat { Log.i(TAG, "audio capture started type=$streamType file=${captureFile.absolutePath}") }
                 }
             } catch (error: Exception) {
-                Log.w(TAG, "audio capture could not open type=$streamType", error)
-                null
+                DiagnosticLogging.logcat { Log.w(TAG, "audio capture could not open type=$streamType", error) }
             }
         }
+        file = captureFile
+        output = opened
+        if (output != null) disableSubscription = DiagnosticLogging.onDisabled(::close)
     }
 
     fun record(
@@ -79,7 +73,7 @@ class AudioPacketCapture(
         sample: Int?,
         error: Throwable?,
     ) {
-        if (output == null || closed.get()) return
+        if (!DiagnosticLogging.enabled || output == null || closed.get()) return
         synchronized(this) {
             if (closed.get() || packets >= maxPackets) return
             val errorBytes = error?.message?.toByteArray(Charsets.UTF_8) ?: ByteArray(0)
@@ -88,7 +82,7 @@ class AudioPacketCapture(
                 close()
                 return
             }
-            try {
+            DiagnosticLogging.write(recordingToken) { try {
                 output.writeInt(wire.size)
                 output.writeInt(rtp?.size ?: -1)
                 output.writeInt(sample ?: -1)
@@ -102,26 +96,28 @@ class AudioPacketCapture(
                 if (packets % FLUSH_INTERVAL_PACKETS == 0) output.flush()
                 if (packets >= maxPackets) close()
             } catch (failure: Exception) {
-                Log.w(TAG, "audio capture write failed type=$streamType", failure)
+                DiagnosticLogging.logcat { Log.w(TAG, "audio capture write failed type=$streamType", failure) }
                 close()
-            }
+            } }
         }
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        disableSubscription?.close()
+        disableSubscription = null
         try {
             output?.flush()
             output?.close()
         } catch (error: Exception) {
-            Log.w(TAG, "audio capture close failed type=$streamType", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "audio capture close failed type=$streamType", error) }
         } finally {
             if (output != null) {
-                Log.i(
+                DiagnosticLogging.logcat { Log.i(
                     TAG,
                     "audio capture stopped type=$streamType packets=$packets " +
                         "bytes=$bytesWritten file=${file.absolutePath}",
-                )
+                ) }
             }
         }
     }

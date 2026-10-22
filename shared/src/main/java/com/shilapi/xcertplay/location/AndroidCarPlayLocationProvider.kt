@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.location
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
@@ -67,12 +69,12 @@ class AndroidCarPlayLocationProvider(
                     )
                     subscribedProviders++
                 } catch (error: Exception) {
-                    Log.w(TAG, "Could not subscribe to Android location provider $provider", error)
+                    DiagnosticLogging.logcat { Log.w(TAG, "Could not subscribe to Android location provider $provider", error) }
                 }
             }
             started = subscribedProviders > 0
             if (!started) {
-                Log.w(TAG, "No Android location provider could be started")
+                DiagnosticLogging.logcat { Log.w(TAG, "No Android location provider could be started") }
             }
             started
         }
@@ -84,14 +86,14 @@ class AndroidCarPlayLocationProvider(
             val location = try {
                 locationManager.getLastKnownLocation(provider)
             } catch (error: Exception) {
-                Log.w(TAG, "Could not read last known location from $provider", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Could not read last known location from $provider", error) }
                 null
             } ?: continue
             latestFixes[provider] = location
-            Log.i(
+            DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "Seeded $provider location ageMs=${(System.currentTimeMillis() - location.time).coerceAtLeast(0)}",
-            )
+            ) }
         }
     }
 
@@ -124,7 +126,7 @@ class AndroidCarPlayLocationProvider(
                 ),
             )
         } catch (error: Throwable) {
-            Log.w(TAG, "Could not encode Android location as NMEA", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Could not encode Android location as NMEA", error) }
             null
         }
     }

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.update
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.net.ConnectivityManager
 import android.util.Log
@@ -36,7 +38,7 @@ internal class BackgroundUpdateWorker(context: Context, parameters: WorkerParame
         val connectivity = applicationContext.getSystemService(ConnectivityManager::class.java)
             ?: return Result.success()
         val network = runCatching { InternetNetworkSelector.select(connectivity) }
-            .onFailure { Log.i(TAG, "network lookup failed", it) }
+            .onFailure { DiagnosticLogging.logcat { Log.i(TAG, "network lookup failed", it) } }
             .getOrNull() ?: return retryOrGiveUp("no validated network")
         val installedVersion = applicationContext.packageManager
             .getPackageInfo(applicationContext.packageName, 0).versionName
@@ -54,7 +56,7 @@ internal class BackgroundUpdateWorker(context: Context, parameters: WorkerParame
             UpdateAvailability.recordResult(applicationContext, now, if (release == null) "up to date" else "found ${release.tagName}")
             Result.success()
         } catch (failure: Exception) {
-            Log.i(TAG, "background update check failed", failure)
+            DiagnosticLogging.logcat { Log.i(TAG, "background update check failed", failure) }
             retryOrGiveUp("fetch failed: ${failure.javaClass.simpleName}")
         }
     }

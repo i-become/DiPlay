@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -56,7 +58,7 @@ internal object BydHudBridge {
             FIRST_CALL_TRANSACTION + 1 -> {
                 data.enforceInterface(CALLBACK_TOKEN)
                 val ready = data.readInt() != 0
-                Log.i(TAG, "SOME/IP HAL ready=$ready")
+                DiagnosticLogging.logcat { Log.i(TAG, "SOME/IP HAL ready=$ready") }
                 reply?.writeNoException()
                 true
             }
@@ -90,7 +92,7 @@ internal object BydHudBridge {
         if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE ||
             frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
         ) {
-            Log.d(TAG, "route frame=0x${frame.messageId.toString(16)} change=$change guidance=${route.current()}")
+            DiagnosticLogging.logcat { Log.d(TAG, "route frame=0x${frame.messageId.toString(16)} change=$change guidance=${route.current()}") }
         }
         when (change) {
             BydHudRouteChange.GUIDANCE -> sendCurrentLocked()
@@ -134,7 +136,7 @@ internal object BydHudBridge {
         val accepted = sendLocked(payload)
         if (accepted && !guidanceSentLogged) {
             guidanceSentLogged = true
-            Log.i(TAG, "HUD profile (300ms repeat, fixed field2=2): gateway accepted guidance; rendering unconfirmed")
+            DiagnosticLogging.logcat { Log.i(TAG, "HUD profile (300ms repeat, fixed field2=2): gateway accepted guidance; rendering unconfirmed") }
         }
         if (accepted) showing = true
     }
@@ -160,7 +162,7 @@ internal object BydHudBridge {
                 val code = name.removePrefix("0x").removeSuffix(".png").toIntOrNull(16) ?: return@mapNotNull null
                 code to assets.open("$ICON_ASSET_DIR/$name").use { it.readBytes() }
             }.toMap()
-        }.onFailure { Log.w(TAG, "HUD icons unavailable", it) }.getOrDefault(emptyMap())
+        }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "HUD icons unavailable", it) } }.getOrDefault(emptyMap())
     }
 
     private fun someIpServiceAvailable(appContext: Context): Boolean = try {
@@ -183,17 +185,17 @@ internal object BydHudBridge {
                 type = appContext.packageName
             }
             binding = appContext.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            Log.i(TAG, "bindService=$binding")
+            DiagnosticLogging.logcat { Log.i(TAG, "bindService=$binding") }
         } catch (error: Throwable) {
             binding = false
-            Log.w(TAG, "cannot bind SOME/IP service", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "cannot bind SOME/IP service", error) }
         }
     }
 
     private fun onGatewayCallback(action: () -> Unit) {
         callbacks.execute {
             synchronized(lock) {
-                runCatching(action).onFailure { Log.w(TAG, "gateway callback failed", it) }
+                runCatching(action).onFailure { DiagnosticLogging.logcat { Log.w(TAG, "gateway callback failed", it) } }
             }
         }
     }
@@ -206,7 +208,7 @@ internal object BydHudBridge {
             val startResult = if (registered == 0) transactLocked(TX_START_SERVICE) { it.writeLong(SERVICE_ID) } else -1
             // Firmware explicitly treats 13 as an already-started service.
             started = BydHudProtocol.serviceStarted(startResult)
-            Log.i(TAG, "SOME/IP connected, callback=$registered startResult=$startResult started=$started")
+            DiagnosticLogging.logcat { Log.i(TAG, "SOME/IP connected, callback=$registered startResult=$startResult started=$started") }
             showing = false
             sendCurrentLocked()
         }
@@ -232,7 +234,7 @@ internal object BydHudBridge {
             reply.readException()
             if (returnsValue) reply.readInt() else 0
         } catch (error: Throwable) {
-            Log.w(TAG, "SOME/IP transaction $code failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "SOME/IP transaction $code failed", error) }
             -1
         } finally {
             reply.recycle()
@@ -250,7 +252,7 @@ internal object BydHudBridge {
             it.writeByteArray(payload)
         }
         if (lastSendResult != result) {
-            Log.i(TAG, "HUD fireEvent result=$result bytes=${payload.size}")
+            DiagnosticLogging.logcat { Log.i(TAG, "HUD fireEvent result=$result bytes=${payload.size}") }
             lastSendResult = result
         }
         if (result != 0) {

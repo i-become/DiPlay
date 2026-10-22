@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 import java.io.IOException
 import java.security.GeneralSecurityException
@@ -60,14 +62,14 @@ class LockdownPairingClient(
                     isCancelled = isCancelled,
                 ).also {
                     pairRecord = it
-                    Log.i(
+                    DiagnosticLogging.logcat { Log.i(
                         TAG,
                         "lockdown pair prepared hostId=uuid systemBuid=uuid " +
                             "deviceKey=${it.devicePublicKeyPem.size} deviceCert=${it.deviceCertificatePem.size} " +
                             "hostCert=${it.hostCertificatePem.size} rootCert=${it.rootCertificatePem.size}",
-                    )
+                    ) }
                 }
-                Log.i(TAG, "lockdown pair attempt=$attempt")
+                DiagnosticLogging.logcat { Log.i(TAG, "lockdown pair attempt=$attempt") }
                 val response = channel.request(pairRequest(label, record), stepTimeoutMillis(deadline))
                 checkCancelled(isCancelled)
                 when (val error = response.errorCodeOrNull()) {
@@ -79,7 +81,7 @@ class LockdownPairingClient(
                 }
             }
             if (pending) {
-                Log.i(TAG, "lockdown trust pending; reconnecting before retry")
+                DiagnosticLogging.logcat { Log.i(TAG, "lockdown trust pending; reconnecting before retry") }
                 waitForRetry(deadline, isCancelled)
             }
         }
@@ -143,7 +145,7 @@ class LockdownPairingClient(
         )
         checkCancelled(isCancelled)
         response.errorCodeOrNull()?.let { throw LockdownPairingException.RemoteError(it) }
-        Log.i(TAG, "lockdown UntrustedHostBUID set")
+        DiagnosticLogging.logcat { Log.i(TAG, "lockdown UntrustedHostBUID set") }
     }
 
     private fun getValue(

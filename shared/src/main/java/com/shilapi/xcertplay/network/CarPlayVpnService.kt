@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
@@ -86,7 +88,7 @@ class CarPlayVpnService : VpnService() {
         media: AirPlayMediaHandler,
     ): AttachResult {
         if (active.get()) {
-            Log.i(TAG, "replacing stale NCM/VPN attachment")
+            DiagnosticLogging.logcat { Log.i(TAG, "replacing stale NCM/VPN attachment") }
             releaseLocked()
         }
         active.set(true)
@@ -146,7 +148,7 @@ class CarPlayVpnService : VpnService() {
         listenerIdentity: AirPlayListenerIdentity? = null,
     ): AttachResult {
         if (active.get()) {
-            Log.i(TAG, "replacing stale local-only Wi-Fi attachment")
+            DiagnosticLogging.logcat { Log.i(TAG, "replacing stale local-only Wi-Fi attachment") }
             releaseLocked()
         }
         active.set(true)
@@ -221,12 +223,12 @@ class CarPlayVpnService : VpnService() {
     ) {
         val servers = if (replacement.additionalAddresses.isEmpty()) {
             listOf(AirPlayPortSelector.bind(replacement.address, replacement.config.port) { busy, bound ->
-                Log.w(TAG, "AirPlay port $busy is in use; listening on $bound instead")
+                DiagnosticLogging.logcat { Log.w(TAG, "AirPlay port $busy is in use; listening on $bound instead") }
             })
         } else {
             AirPlayPortSelector.bindAll(listOf(replacement.address) + replacement.additionalAddresses,
                 replacement.config.port) { busy, bound ->
-                Log.w(TAG, "AirPlay port $busy is in use; listening on $bound instead")
+                DiagnosticLogging.logcat { Log.w(TAG, "AirPlay port $busy is in use; listening on $bound instead") }
             }
         }
         val server = servers.first()
@@ -255,7 +257,7 @@ class CarPlayVpnService : VpnService() {
             while (active.get()) {
                 val socket: Socket = server.accept()
                 val acceptedAtNanos = System.nanoTime()
-                Log.i(TAG, "airplay connection accepted from ${socket.remoteSocketAddress}")
+                DiagnosticLogging.logcat { Log.i(TAG, "airplay connection accepted from ${socket.remoteSocketAddress}") }
                 socket.tcpNoDelay = true
                 socket.keepAlive = true
                 socket.setSoLinger(true, 0)
@@ -334,7 +336,7 @@ class CarPlayVpnService : VpnService() {
                 try {
                     session.close()
                 } catch (error: Exception) {
-                    Log.w(TAG, "AirPlay session replacement failed", error)
+                    DiagnosticLogging.logcat { Log.w(TAG, "AirPlay session replacement failed", error) }
                 }
             }
             sessions.clear()
@@ -347,7 +349,7 @@ class CarPlayVpnService : VpnService() {
         error: Throwable,
     ) {
         val message = error.message ?: error.javaClass.simpleName
-        Log.e(TAG, "CarPlay transport stopped: $message", error)
+        DiagnosticLogging.logcat { Log.e(TAG, "CarPlay transport stopped: $message", error) }
         Thread(
             {
                 val releasedGeneration = synchronized(this) {

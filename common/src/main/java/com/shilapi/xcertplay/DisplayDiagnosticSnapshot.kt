@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
 /** Small, redacted snapshot retained separately from the rotating session logs. */
 internal object DisplayDiagnosticSnapshot {
@@ -14,13 +15,18 @@ internal object DisplayDiagnosticSnapshot {
 
     @Synchronized
     fun selection(context: Context, previous: Int, selected: Int, reconnect: Boolean) {
+        if (!DiagnosticLogging.enabled) return
+        DiagnosticLogging.write {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("selection",
             "${stamp()} Size setting previous=$previous% selected=$selected% reconnect=$reconnect").apply()
+        }
     }
 
     @Synchronized
-    fun begin(context: Context, request: String, capability: String, effective: String): String {
+    fun begin(context: Context, request: String, capability: String, effective: String): String? {
+        if (!DiagnosticLogging.enabled) return null
         val attempt = UUID.randomUUID().toString()
+        DiagnosticLogging.write {
         val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
         fields.filter { it != "selection" }.forEach(editor::remove)
         editor.putString("attempt", attempt)
@@ -28,15 +34,17 @@ internal object DisplayDiagnosticSnapshot {
             DiagnosticRedactor.redact(line)?.let { editor.putString(key, "${stamp()} $it") }
         }
         editor.apply()
+        }
         return attempt
     }
 
     @Synchronized
-    fun currentAttempt(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("attempt", null)
+    fun currentAttempt(context: Context): String? = if (DiagnosticLogging.enabled)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("attempt", null) else null
 
     @Synchronized
     fun record(context: Context, attempt: String?, message: String) {
+        if (!DiagnosticLogging.enabled) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (attempt == null || prefs.getString("attempt", null) != attempt) return
         val field = when {
@@ -46,7 +54,7 @@ internal object DisplayDiagnosticSnapshot {
             else -> return
         }
         val safe = DiagnosticRedactor.redact(message) ?: return
-        prefs.edit().putString(field, "${stamp()} $safe").apply()
+        DiagnosticLogging.write { prefs.edit().putString(field, "${stamp()} $safe").apply() }
     }
 
     @Synchronized

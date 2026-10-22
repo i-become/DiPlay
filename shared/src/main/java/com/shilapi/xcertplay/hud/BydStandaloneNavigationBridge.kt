@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
@@ -49,7 +51,7 @@ internal object BydStandaloneNavigationBridge {
                 else -> output?.clear()
             }
         } catch (error: Exception) {
-            Log.w("DiPlay-Standalone", "HUD update/cleanup will retry", error)
+            DiagnosticLogging.logcat { Log.w("DiPlay-Standalone", "HUD update/cleanup will retry", error) }
         }
     }
 }

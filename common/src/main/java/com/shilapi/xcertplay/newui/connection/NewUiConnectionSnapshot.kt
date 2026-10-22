@@ -14,6 +14,7 @@ import java.net.NetworkInterface
 enum class NewUiConnectionPhase {
     NEEDS_SETUP,
     READY,
+    DISCONNECTED,
     CONNECTING,
     CONNECTED,
     FAILED,
@@ -60,7 +61,8 @@ data class NewUiConnectionSnapshot(
 
 internal object NewUiConnectionSnapshotReader {
     fun read(context: Context, setupError: String?): NewUiConnectionSnapshot {
-        val sessionRunning = CarPlayBackgroundSession.hasSession()
+        val disconnected = ConnectionProgressUiState.disconnected()
+        val sessionRunning = CarPlayBackgroundSession.hasSession() && !disconnected
         val carPlayActive = CarPlayBackgroundSession.active
         val phoneAddress = DiPlayPreferences.phoneAddress(context)
         val phoneName = DiPlayPreferences.phoneName(context)
@@ -68,6 +70,7 @@ internal object NewUiConnectionSnapshotReader {
         val phase = when {
             setupError != null -> NewUiConnectionPhase.NEEDS_SETUP
             carPlayActive -> NewUiConnectionPhase.CONNECTED
+            disconnected -> NewUiConnectionPhase.DISCONNECTED
             connectionFailed -> NewUiConnectionPhase.FAILED
             sessionRunning -> NewUiConnectionPhase.CONNECTING
             DiPlayPreferences.phoneAddress(context) != null -> NewUiConnectionPhase.READY
@@ -76,6 +79,7 @@ internal object NewUiConnectionSnapshotReader {
         val statusTitle = when {
             setupError != null -> context.getString(R.string.setup_needs_attention)
             carPlayActive -> context.getString(R.string.new_ui_status_connected)
+            disconnected -> context.getString(R.string.new_ui_status_disconnected)
             connectionFailed -> context.getString(R.string.new_ui_status_failed)
             sessionRunning -> context.getString(R.string.connecting_to_your_iphone)
             else -> context.getString(R.string.ready_when_you_are)
@@ -103,6 +107,8 @@ internal object NewUiConnectionSnapshotReader {
             setupError != null -> context.getString(R.string.setup_needs_attention) to null
             carPlayActive -> context.getString(R.string.new_ui_connection_progress_complete_title) to
                 context.getString(R.string.new_ui_connection_progress_complete_sub)
+            disconnected -> context.getString(R.string.new_ui_status_disconnected) to
+                context.getString(R.string.new_ui_connection_progress_idle_hint)
             connectionFailed && progressLit > 0 -> {
                 context.getString(CarPlayConnectionProgress.stepTitleRes(progressLit)) to
                     (ConnectionProgressUiState.failureDetail()

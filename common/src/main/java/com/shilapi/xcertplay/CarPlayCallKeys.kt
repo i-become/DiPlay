@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -41,7 +43,7 @@ internal object CarPlayCallKeys {
                     )
                     if (action == CarPlayCallKeyPolicy.Action.END) {
                         val sent = controller?.endCall() == true
-                        Log.i(TAG, "hang-up key $keyCode: end CarPlay call sent=$sent")
+                        DiagnosticLogging.logcat { Log.i(TAG, "hang-up key $keyCode: end CarPlay call sent=$sent") }
                     }
                 }
             }
@@ -54,7 +56,7 @@ internal object CarPlayCallKeys {
                 } else {
                     app.registerReceiver(receiver, filter, android.Manifest.permission.DUMP, null)
                 }
-            }.onFailure { Log.w(TAG, "hang-up broadcast unavailable", it) }
+            }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "hang-up broadcast unavailable", it) } }
             installed = true
         }
     }
@@ -68,11 +70,11 @@ internal object CarPlayCallKeys {
             CarPlayCallKeyPolicy.Action.CONSUME -> Unit
             CarPlayCallKeyPolicy.Action.ANSWER -> {
                 val sent = controller?.answerCall() == true
-                Log.i(TAG, "call key $keyCode: answer CarPlay call sent=$sent")
+                DiagnosticLogging.logcat { Log.i(TAG, "call key $keyCode: answer CarPlay call sent=$sent") }
             }
             CarPlayCallKeyPolicy.Action.END -> {
                 val sent = controller?.endCall() == true
-                Log.i(TAG, "key $keyCode: end CarPlay call sent=$sent")
+                DiagnosticLogging.logcat { Log.i(TAG, "key $keyCode: end CarPlay call sent=$sent") }
             }
         }
         if (!down && keyCode == CarPlayCallKeyPolicy.KEYCODE_BYD_DIAL_ANSWER) returnToCarPlay(context.applicationContext)
@@ -87,7 +89,7 @@ internal object CarPlayCallKeys {
                     Intent(app, CarPlayHostActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
                 )
-            }.onFailure { Log.w(TAG, "could not bring CarPlay back after the call key", it) }
+            }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "could not bring CarPlay back after the call key", it) } }
         }, RETURN_DELAY_MILLIS)
     }
 

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Activity
 import android.content.Context
 import android.content.ServiceConnection
@@ -177,9 +179,9 @@ internal object Hs5SteeringKeys {
                 )
                 keysRegistered = true
                 registeredKeyCodes = desiredKeys
-                Log.i(TAG, "temporary keys registered count=${desiredKeys.size}")
+                DiagnosticLogging.logcat { Log.i(TAG, "temporary keys registered count=${desiredKeys.size}") }
             }.onFailure { error ->
-                Log.w(TAG, "steering hard-key register failed: ${error.javaClass.simpleName}")
+                DiagnosticLogging.logcat { Log.w(TAG, "steering hard-key register failed: ${error.javaClass.simpleName}") }
                 bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
             }
         } else if (!claimKeys && keysRegistered) {
@@ -190,9 +192,9 @@ internal object Hs5SteeringKeys {
             runCatching {
                 val result = QisiSteeringServiceClient.requestCarPlayViewFocus(binder, viewFocusListener)
                 viewFocusHeld = result == 1 || result == 2
-                Log.i(TAG, "CarPlay view focus request=$result")
+                DiagnosticLogging.logcat { Log.i(TAG, "CarPlay view focus request=$result") }
             }.onFailure { error ->
-                Log.w(TAG, "CarPlay view focus unavailable: ${error.javaClass.simpleName}")
+                DiagnosticLogging.logcat { Log.w(TAG, "CarPlay view focus unavailable: ${error.javaClass.simpleName}") }
             }
         } else if (!holdFocus && viewFocusHeld) {
             releaseViewFocusLocked(binder)
@@ -212,13 +214,13 @@ internal object Hs5SteeringKeys {
                 synchronized(this@Hs5SteeringKeys) {
                     binding = false
                     if (service?.interfaceDescriptor != QisiSteeringServiceClient.TOKEN) {
-                        Log.w(TAG, "QiSi key service unexpected binder")
+                        DiagnosticLogging.logcat { Log.w(TAG, "QiSi key service unexpected binder") }
                         bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
                         runCatching { context.unbindService(this) }
                         return
                     }
                     serviceBinder = service
-                    Log.i(TAG, "QiSi steering service bound")
+                    DiagnosticLogging.logcat { Log.i(TAG, "QiSi steering service bound") }
                     scheduleRefresh(force = true)
                 }
             }
@@ -243,7 +245,7 @@ internal object Hs5SteeringKeys {
         if (!binding) {
             connection = null
             bindAttemptAt = SystemClock.uptimeMillis() + BIND_RETRY_MS
-            Log.w(TAG, "QiSi steering service bind denied")
+            DiagnosticLogging.logcat { Log.w(TAG, "QiSi steering service bind denied") }
         }
     }
 
@@ -264,7 +266,7 @@ internal object Hs5SteeringKeys {
         }
         connection?.let { conn ->
             runCatching { context.unbindService(conn) }
-                .onFailure { Log.w(TAG, "QiSi steering unbind failed: ${it.javaClass.simpleName}") }
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "QiSi steering unbind failed: ${it.javaClass.simpleName}") } }
         }
         connection = null
         serviceBinder = null
@@ -288,9 +290,9 @@ internal object Hs5SteeringKeys {
                 keys,
                 hardKeyListener,
             )
-            Log.i(TAG, "steering hard keys restored to OEM")
+            DiagnosticLogging.logcat { Log.i(TAG, "steering hard keys restored to OEM") }
         }.onFailure { error ->
-            Log.w(TAG, "steering hard-key release failed: ${error.javaClass.simpleName}")
+            DiagnosticLogging.logcat { Log.w(TAG, "steering hard-key release failed: ${error.javaClass.simpleName}") }
         }
         keysRegistered = false
         registeredKeyCodes = intArrayOf()
@@ -300,9 +302,9 @@ internal object Hs5SteeringKeys {
     private fun releaseViewFocusLocked(binder: IBinder) {
         runCatching {
             QisiSteeringServiceClient.releaseCarPlayViewFocus(binder)
-            Log.i(TAG, "CarPlay UI focus returned to vehicle")
+            DiagnosticLogging.logcat { Log.i(TAG, "CarPlay UI focus returned to vehicle") }
         }.onFailure { error ->
-            Log.w(TAG, "CarPlay view focus release failed: ${error.javaClass.simpleName}")
+            DiagnosticLogging.logcat { Log.w(TAG, "CarPlay view focus release failed: ${error.javaClass.simpleName}") }
         }
         viewFocusHeld = false
         viewFocusCooldownUntil = 0L
@@ -316,7 +318,7 @@ internal object Hs5SteeringKeys {
             return
         }
         if (keyCode == 110) {
-            Log.i(TAG, "factory mode key action=$action consumed=true")
+            DiagnosticLogging.logcat { Log.i(TAG, "factory mode key action=$action consumed=true") }
             return
         }
         if (keyCode == KeyEvent.KEYCODE_CALL) {
@@ -349,7 +351,7 @@ internal object Hs5SteeringKeys {
             }
             else -> false
         }
-        Log.i(TAG, "factory key=$keyCode action=$action sent=$sent")
+        DiagnosticLogging.logcat { Log.i(TAG, "factory key=$keyCode action=$action sent=$sent") }
     }
 
     /** QiSi phone key: action 0 is a short press, 1 a long press starting and 2 its release. */
@@ -388,7 +390,7 @@ internal object Hs5SteeringKeys {
             1 -> phoneKeyHeld = true
             2 -> phoneKeyHeld = false
         }
-        Log.i(TAG, "factory key=${KeyEvent.KEYCODE_CALL} action=$action call=${call?.phase} $outcome")
+        DiagnosticLogging.logcat { Log.i(TAG, "factory key=${KeyEvent.KEYCODE_CALL} action=$action call=${call?.phase} $outcome") }
     }
 
     internal object Hs5PhoneKeyPolicy {
@@ -461,7 +463,7 @@ internal object Hs5SteeringKeys {
             if (state == -1 && type == QisiSteeringServiceClient.VIEW_FOCUS_CARPLAY) {
                 scheduleRefresh(force = true)
             }
-            Log.i(TAG, "CarPlay view focus change=$state")
+            DiagnosticLogging.logcat { Log.i(TAG, "CarPlay view focus change=$state") }
             reply?.writeNoException()
             return true
         }

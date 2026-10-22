@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Activity
 import android.app.ActivityOptions
 import android.content.Context
@@ -59,7 +61,7 @@ class Hs5ClusterActivity : Activity() {
             }
 
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                Log.i(ClusterMapPresentation.TAG, "hs5 cluster window surface ${width}x$height")
+                DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "hs5 cluster window surface ${width}x$height") }
             }
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -303,7 +305,7 @@ internal object Hs5ClusterActivityOutput {
     }
 
     private fun record(message: String) {
-        Log.i(TAG, message)
+        DiagnosticLogging.logcat { Log.i(TAG, message) }
         val line = "${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())} $message"
         synchronized(events) {
             events.addLast(line)

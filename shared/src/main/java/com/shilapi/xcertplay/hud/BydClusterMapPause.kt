@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.util.Log
 import java.util.concurrent.Executors
@@ -64,7 +66,7 @@ internal object BydClusterMapPause {
         val mode = readMode(app)
         if (mode != lastNaviMode) {
             lastNaviMode = mode
-            Log.i(TAG, "cluster mode ${mode?.label ?: "unknown"}")
+            DiagnosticLogging.logcat { Log.i(TAG, "cluster mode ${mode?.label ?: "unknown"}") }
             onNaviMode?.invoke(mode)
         }
         // Following the layout must not keep a previous pause latched after it is disabled.

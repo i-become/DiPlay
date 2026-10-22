@@ -831,6 +831,10 @@
     <string name="update_verifying">正在校验…</string>
     <string name="update_install">安装 %1$s</string>
     <string name="update_failed">更新失败</string>
+    <string name="update_install_preparing">正在为系统安装器准备更新…</string>
+    <string name="update_install_requested">已向系统提交更新，正在等待安装结果…</string>
+    <string name="update_install_permission">请在系统设置中允许 DiPlay 安装应用，再次点击安装。如果没有出现授权页面，请导出诊断报告。</string>
+    <string name="update_install_missing">下载的安装包已不可用，请检查更新并重新下载。</string>
     <string name="update_available_home">有可用更新</string>
     <string name="update_saved_to">已保存到 %1$s</string>
     <string name="backup_title">备份设置</string>
@@ -953,7 +957,7 @@
     <string name="new_ui_shell_display_fly_window_sub">独立 cluster 窗口</string>
     <string name="new_ui_shell_display_gesture_sub">地图左右切换</string>
     <string name="new_ui_shell_display_theme_title">CarPlay 主题</string>
-    <string name="new_ui_shell_display_theme_sub">日/夜外观</string>
+    <string name="new_ui_shell_display_theme_sub">自动模式：示宽灯开启为夜间，关闭为日间；读取失败时回退到感光、系统状态。</string>
     <string name="new_ui_shell_settings_boot_sub">开机自动运行 CarPlay</string>
     <string name="new_ui_shell_settings_wheel_media_sub">转发至 CarPlay</string>
     <string name="new_ui_shell_settings_wheel_siri_sub">长按唤醒</string>
@@ -1009,7 +1013,7 @@
     <string name="new_ui_display_theme_applied">CarPlay 主题已更新。若画面未变化，请进入 CarPlay 后重试或重新连接。</string>
     <string name="new_ui_display_carplay_theme">CarPlay 主题模式</string>
     <string name="new_ui_display_carplay_theme_sub">日间、夜间或跟随系统。</string>
-    <string name="new_ui_theme_follow_system">跟随系统</string>
+    <string name="new_ui_theme_follow_system">跟随车灯</string>
     <string name="new_ui_theme_day">日间</string>
     <string name="new_ui_theme_night">夜间</string>
     <string name="new_ui_settings_boot_start">开机启动</string>
@@ -1029,6 +1033,8 @@
     <string name="new_ui_about_sec3_body">本软件为第三方开发的兼容性软件，车主应在充分了解相关风险的前提下，自愿决定是否安装和使用。\n\n安装、运行或使用本软件可能受到车机型号、系统版本、硬件配置及其他第三方软件等因素影响。用户应自行评估并承担因安装或使用本软件可能产生的风险，包括但不限于软件运行异常、功能不兼容、数据异常及车机系统相关问题。\n\n本软件开发者不对因用户自主安装、使用、修改或不当操作所产生的非预期影响承担责任，但法律法规另有规定或依法不得免责的情形除外。涉及车辆行驶安全的操作，请务必在车辆安全停靠后进行，驾驶过程中请勿操作车机软件。</string>
     <string name="new_ui_about_sec4_title">四、更新与交流</string>
     <string name="new_ui_about_sec4_body">欢迎红旗 HS5 车主加入交流群，获取软件最新版本、兼容性适配进展、更新说明及使用交流信息。</string>
+    <string name="new_ui_about_sec5_title">五、鸣谢</string>
+    <string name="new_ui_about_sec5_body">感谢抖音@YiMeng谁的梦还没醒（1768868288）大佬提供车辆示宽灯接口。</string>
     <string name="new_ui_about_sec4_scan_hint">抖音扫码加群 · 获取版本与适配更新</string>
     <string name="new_ui_about_payment_caption">自愿打赏，支持开发 · 微信 / 支付宝扫码</string>
     <string name="new_ui_about_qr_placeholder">抖音二维码占位</string>
@@ -1036,7 +1042,7 @@
     <string name="new_ui_update_latest">已是最新版本</string>
     <string name="new_ui_update_available">可更新至 %1$s</string>
     <string name="new_ui_diag_log_record_title">记录会话日志</string>
-    <string name="new_ui_diag_log_record_sub">开启后 DiPlay 会持续写入日志文件，导出诊断报告时会附带。关闭后不会写入磁盘。</string>
+    <string name="new_ui_diag_log_record_sub">开启后才会记录日志、采集诊断数据并生成报告。关闭后停止日志记录和后台诊断采样。</string>
     <string name="new_ui_diag_log_clear">清空已记录日志</string>
     <string name="new_ui_diag_log_cleared">已清空记录的日志。</string>
     <string name="new_ui_diag_simulated_cluster_title">使用模拟副屏作仪表（实验性）</string>
@@ -1073,4 +1079,13 @@
     <string name="new_ui_display_key_probe_overlay">CarPlay 上显示按键码（实验性）</string>
     <string name="new_ui_display_key_probe_overlay_sub">在 CarPlay 画面左下角列出最近按键：QiSi 硬键、无障碍过滤到的键、以及进入 CarPlay 窗口的键。请在系统无障碍中开启「DiPlay 方向盘按键」以尽量收全。</string>
     <string name="new_ui_display_key_probe_overlay_hint">探测：QiSi 已分批注册 0–1000（0=单击，1=长按，2=松开）。左键/滚轮若始终无行，通常只在红旗系统内处理，第三方 App 收不到。请同时打开「DiPlay 方向盘按键」无障碍并导出诊断报告。</string>
+    <string name="new_ui_status_disconnected">已断开连接</string>
+    <string name="update_install_confirm">请在系统安装页面确认安装更新。</string>
+    <string name="update_install_success">更新已安装。</string>
+    <string name="update_install_cancelled">安装已取消，可以再次点击安装。</string>
+    <string name="update_install_blocked">系统阻止了安装，请检查安装应用的授权或车机限制。</string>
+    <string name="update_install_conflict">安装包与已安装的应用冲突，请导出诊断报告查看系统原因。</string>
+    <string name="update_install_incompatible">此安装包无法在当前车机安装，请重新下载兼容的版本。</string>
+    <string name="update_install_storage">可用存储空间不足，请清理空间后再次安装。</string>
+    <string name="update_install_failure">安装失败，已记录系统返回的原因，请导出诊断报告。</string>
 </resources>

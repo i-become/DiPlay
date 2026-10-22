@@ -16,4 +16,5 @@ data class NewUiUpdateUiState(
     val progress: Int? = null,
     val releaseTag: String? = null,
     val savedPath: String? = null,
+    val installPreparing: Boolean = false,
 )

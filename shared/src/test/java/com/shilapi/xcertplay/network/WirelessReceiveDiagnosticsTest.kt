@@ -6,6 +6,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WirelessReceiveDiagnosticsTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     @Test fun fullWidthCounterDeltasFitOnSeparateExportableLines() {
         var value = 0L
         var clock = 0L

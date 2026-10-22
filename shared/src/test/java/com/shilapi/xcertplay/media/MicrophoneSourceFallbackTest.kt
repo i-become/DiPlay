@@ -34,6 +34,8 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28, 33], manifest = Config.NONE, shadows = [MicrophoneSourceFallbackTest.RecorderBuilder::class])
 class MicrophoneSourceFallbackTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private val context get() = RuntimeEnvironment.getApplication()
     private val id = AudioStreamId(100, "speechrecognition")
     private val diagnostics = CopyOnWriteArrayList<String>()

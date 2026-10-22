@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.util.Log
 import java.util.concurrent.Executors
@@ -45,8 +47,8 @@ internal object BydDiLink3ClusterOutput {
             val prepared = runCatching {
                 state(app).prepareDisplay(displayPresent, { desiredMode },
                     { BydOutputSettings.enabled(app) }, { Thread.sleep(3_000L) })
-            }.onFailure { Log.w(TAG, "Cluster preparation will recover", it) }.getOrDefault(false)
-            Log.i(TAG, "DiLink 3 cluster display prepared=$prepared")
+            }.onFailure { DiagnosticLogging.logcat { Log.w(TAG, "Cluster preparation will recover", it) } }.getOrDefault(false)
+            DiagnosticLogging.logcat { Log.i(TAG, "DiLink 3 cluster display prepared=$prepared") }
         }
     }
 
@@ -77,8 +79,8 @@ internal object BydDiLink3ClusterOutput {
         // old recovery journal pending rather than closing DiLink 4 casting.
         if (adbClusterRouteSelected(app)) return
         runCatching { state(app).apply(desiredMode) }
-            .onFailure { Log.w(TAG, "Cluster mode will retry", it) }
-            .onSuccess { accepted -> if (!accepted) Log.w(TAG, "Cluster mode pending recovery/retry") }
+            .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "Cluster mode will retry", it) } }
+            .onSuccess { accepted -> if (!accepted) DiagnosticLogging.logcat { Log.w(TAG, "Cluster mode pending recovery/retry") } }
     }
 
     private fun state(app: Context): DiLink3ClusterModeSession {

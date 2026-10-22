@@ -1,11 +1,57 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Activity
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 internal object DiPlayLauncher {
+    /** Start the configured Hongqi connection before constructing either full UI. */
+    fun startAutomaticConnection(context: Context, fromBoot: Boolean = false): Boolean {
+        val diagnosticStarted = android.os.SystemClock.elapsedRealtime()
+        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch enter fromBoot=$fromBoot") }
+        val wireless = DiPlayPreferences.autoConnectWireless(context)
+        if (!Hs5BootLaunchPolicy.opensCarPlayDirectly(
+                hongqi = Hs5HeadUnit.isHeadUnit(context),
+                autoConnect = DiPlayPreferences.autoConnect(context),
+                phoneAddress = DiPlayPreferences.phoneAddress(context),
+                wireless = wireless,
+                hotspotMode = AirPlayPersistence.loadWirelessHotspotMode(context),
+                notificationsAllowed = Build.VERSION.SDK_INT < 33 ||
+                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+                sessionRunning = CarPlayBackgroundSession.hasSession(),
+                setupReady = true,
+            )) {
+            DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=policy_skipped elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
+            return false
+        }
+        if (runCatching {
+                DiPlayBootstrap.ensure(context, AirPlayPersistence.loadMfiTarget(context))
+            }.onFailure {
+                DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=bootstrap_failed failureClass=${it.javaClass.simpleName}") }
+            }.isFailure) return false
+        AirPlayPersistence.saveWirelessEnabled(context, wireless)
+        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch request=CarPlayHostActivity wireless=$wireless " +
+            "elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
+        context.startActivity(
+            Intent(context, CarPlayHostActivity::class.java)
+                .putExtra(EXTRA_NEW_UI_CONNECTION_HUB, true)
+                .putExtra(EXTRA_BOOT_AUTO_START, fromBoot)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+        )
+        (context as? Activity)?.overridePendingTransition(0, 0)
+        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=startActivity_returned elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
+        return true
+    }
+
     fun isLauncherIntent(intent: Intent): Boolean =
         intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
             !intent.hasExtra(EXTRA_PAGE)

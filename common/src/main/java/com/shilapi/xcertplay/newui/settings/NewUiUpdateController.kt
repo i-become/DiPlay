@@ -1,19 +1,25 @@
 package com.shilapi.xcertplay.newui.settings
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.pm.PackageInstaller
 import android.net.Uri
+import android.os.Build
+import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.core.content.FileProvider
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.update.UpdateApkExport
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.update.UpdateCatalog
 import com.shilapi.xcertplay.update.UpdateChecksums
 import com.shilapi.xcertplay.update.UpdateClient
+import com.shilapi.xcertplay.update.UpdateDiagnostics
 import com.shilapi.xcertplay.update.UpdateRelease
 import com.shilapi.xcertplay.update.UpdateReleaseLookup
+import com.shilapi.xcertplay.update.UpdateInstaller
 import java.io.File
 import java.io.IOException
 
@@ -27,9 +33,11 @@ internal class NewUiUpdateController(
     private var generation = 0
     private var release: UpdateRelease? = null
     private var updateFile: File? = null
-    private var savedUri: Uri? = null
+    private var installResultRevision = 0L
 
     fun checkForUpdates() {
+        if (uiState.installPreparing) return
+        diagnostic("check-clicked")
         uiState = uiState.copy(stage = NewUiUpdateStage.CHECKING, message = null, progress = null)
         onStateChanged()
         val gen = ++generation
@@ -40,7 +48,7 @@ internal class NewUiUpdateController(
                 outcome.fold(
                     { found ->
                         UpdateAvailability.recordAttempt(activity, System.currentTimeMillis())
-                        val version = installedVersion()
+                        diagnostic("check-completed updateAvailable=${found != null}")
                         if (found == null) {
                             UpdateAvailability.clear(activity)
                             uiState = NewUiUpdateUiState(
@@ -59,7 +67,8 @@ internal class NewUiUpdateController(
                         onStateChanged()
                     },
                     { failure ->
-                        Log.w(TAG, "update check failed", failure)
+                        diagnostic("check-failed failureClass=${failure.javaClass.simpleName}")
+                        DiagnosticLogging.logcat { Log.w(TAG, "update check failed", failure) }
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.FAILED,
                             message = failure.message ?: activity.getString(R.string.update_failed),
@@ -76,10 +85,15 @@ internal class NewUiUpdateController(
     }
 
     fun downloadUpdate() {
+        if (uiState.installPreparing) return
         if (release == null) {
             release = UpdateAvailability.available(activity, installedVersion())
         }
-        if (release == null) return
+        if (release == null) {
+            diagnostic("download-unavailable reason=no-release")
+            return
+        }
+        diagnostic("download-started")
         uiState = uiState.copy(
             stage = NewUiUpdateStage.DOWNLOADING,
             message = null,
@@ -91,7 +105,7 @@ internal class NewUiUpdateController(
         Thread({
             val directory = File(activity.cacheDir, "update/${java.util.UUID.randomUUID()}")
             val outcome = runCatching {
-                var latest = latestRelease() ?: throw IOException(activity.getString(R.string.update_up_to_date))
+                val latest = latestRelease() ?: throw IOException(activity.getString(R.string.update_up_to_date))
                 val checksumsFile = File(directory, UpdateCatalog.CHECKSUMS_FILE)
                 UpdateClient.download(latest.checksumsUrl, checksumsFile) { _, _ -> }
                 val apkFile = File(directory, latest.apkName)
@@ -112,15 +126,19 @@ internal class NewUiUpdateController(
                         onStateChanged()
                     }
                 }
+                diagnostic("download-completed bytes=${apkFile.length()} verification-started")
                 val expected = UpdateChecksums.parse(checksumsFile.readText())
                 val actual = UpdateChecksums.sha256Hex(apkFile)
                 if (!UpdateChecksums.matches(expected, latest.apkName, actual)) {
+                    diagnostic("verification-failed reason=checksum-mismatch")
                     throw IOException("Checksum mismatch for ${latest.apkName}")
                 }
                 release = latest
+                diagnostic("verification-passed")
                 apkFile
             }.onFailure { directory.deleteRecursively() }
             val saved = outcome.getOrNull()?.let { UpdateApkExport.copy(activity.applicationContext, it) }
+            if (outcome.isSuccess) diagnostic("apk-export completed=${saved != null} publicUri=${saved?.uri != null}")
             activity.runOnUiThread {
                 if (gen != generation || activity.isFinishing || activity.isDestroyed) {
                     directory.deleteRecursively()
@@ -128,8 +146,8 @@ internal class NewUiUpdateController(
                 }
                 outcome.fold(
                     { file ->
+                        diagnostic("download-ready bytes=${file.length()}")
                         updateFile = file
-                        savedUri = saved?.uri
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.READY,
                             releaseTag = release?.tagName,
@@ -138,7 +156,8 @@ internal class NewUiUpdateController(
                         onStateChanged()
                     },
                     { failure ->
-                        Log.w(TAG, "update download failed", failure)
+                        diagnostic("download-failed failureClass=${failure.javaClass.simpleName}")
+                        DiagnosticLogging.logcat { Log.w(TAG, "update download failed", failure) }
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.FAILED,
                             message = failure.message ?: activity.getString(R.string.update_failed),
@@ -151,50 +170,89 @@ internal class NewUiUpdateController(
     }
 
     fun installUpdate() {
-        val file = updateFile ?: return
+        diagnostic("install-clicked stage=${uiState.stage} preparing=${uiState.installPreparing} " +
+            "apkPresent=${updateFile?.isFile == true}")
+        if (uiState.installPreparing) return
+        val file = updateFile
+        if (file == null || !file.isFile || file.length() <= 0L) {
+            diagnostic("install-failed reason=apk-missing")
+            uiState = uiState.copy(stage = NewUiUpdateStage.FAILED, message = activity.getString(R.string.update_install_missing))
+            onStateChanged()
+            return
+        }
+        val allowed = Build.VERSION.SDK_INT < 26 || activity.packageManager.canRequestPackageInstalls()
+        diagnostic("install-permission canRequest=$allowed")
+        if (!allowed) {
+            uiState = uiState.copy(message = activity.getString(R.string.update_install_permission))
+            onStateChanged()
+            runCatching {
+                activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
+            }.onFailure { diagnostic("install-permission-open-failed failureClass=${it.javaClass.simpleName}") }
+            return
+        }
+        uiState = uiState.copy(installPreparing = true, message = activity.getString(R.string.update_install_preparing))
+        installResultRevision = UpdateInstaller.result(activity)?.revision ?: 0L
+        onStateChanged()
         val gen = generation
+        val started = SystemClock.elapsedRealtime()
         Thread({
-            val publicUri = savedUri?.takeIf { sameContent(it, file) }
+            val prepared = runCatching { UpdateInstaller.prepare(activity.applicationContext, file) }
+            diagnostic("install-prepared success=${prepared.isSuccess} elapsedMs=${SystemClock.elapsedRealtime() - started}")
             activity.runOnUiThread {
                 if (gen == generation && !activity.isFinishing && !activity.isDestroyed) {
-                    startInstaller(file, publicUri)
+                    prepared.fold(
+                        { id ->
+                            runCatching { UpdateInstaller.commit(activity, id) }
+                                .onFailure { diagnostic("install-commit-failed failureClass=${it.javaClass.simpleName}") }
+                            refreshInstallResult()
+                        },
+                        { failure ->
+                            diagnostic("install-prepare-failed failureClass=${failure.javaClass.simpleName} detail=${failure.message}")
+                            uiState = uiState.copy(stage = NewUiUpdateStage.FAILED, installPreparing = false,
+                                message = activity.getString(R.string.update_install_failure))
+                            onStateChanged()
+                        },
+                    )
+                } else {
+                    prepared.getOrNull()?.let { id ->
+                        UpdateInstaller.abandon(activity, id)
+                        UpdateInstaller.record(activity, id, UpdateInstaller.LAUNCH_FAILED, "UI closed before commit")
+                    }
+                    diagnostic("install-abandoned generationChanged=${gen != generation} " +
+                        "finishing=${activity.isFinishing} destroyed=${activity.isDestroyed}")
+                    uiState = uiState.copy(installPreparing = false)
                 }
             }
         }, "new-ui-update-install-prep").start()
     }
 
-    private fun startInstaller(file: File, publicUri: Uri?) {
-        val uri = publicUri ?: FileProvider.getUriForFile(activity, "${activity.packageName}.update-apks", file)
-        val view = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    fun refreshInstallResult() {
+        UpdateInstaller.reconcile(activity)
+        val result = UpdateInstaller.result(activity) ?: return
+        if (result.revision == installResultRevision) return
+        installResultRevision = result.revision
+        val message = when (result.status) {
+            UpdateInstaller.STAGED -> R.string.update_install_preparing
+            UpdateInstaller.COMMITTED, UpdateInstaller.INSTALLING -> R.string.update_install_requested
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> R.string.update_install_confirm
+            PackageInstaller.STATUS_SUCCESS -> R.string.update_install_success
+            PackageInstaller.STATUS_FAILURE_ABORTED -> R.string.update_install_cancelled
+            PackageInstaller.STATUS_FAILURE_BLOCKED -> R.string.update_install_blocked
+            PackageInstaller.STATUS_FAILURE_CONFLICT -> R.string.update_install_conflict
+            PackageInstaller.STATUS_FAILURE_INVALID, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> R.string.update_install_incompatible
+            PackageInstaller.STATUS_FAILURE_STORAGE -> R.string.update_install_storage
+            else -> R.string.update_install_failure
         }
-        val installers = activity.packageManager.queryIntentActivities(view, PackageManager.MATCH_DEFAULT_ONLY).size
-        val launch = if (installers > 1) Intent.createChooser(view, null) else view
-        val outcome = "${if (installers > 1) "chooser" else "direct"} uri=${if (publicUri != null) "public" else "provider"} installers=$installers"
-        try {
-            activity.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            Log.i(TAG, "install started: $outcome")
-            UpdateAvailability.recordInstall(activity.applicationContext, System.currentTimeMillis(), outcome)
-        } catch (failure: RuntimeException) {
-            Log.w(TAG, "install failed to start: $outcome", failure)
-            UpdateAvailability.recordInstall(
-                activity.applicationContext,
-                System.currentTimeMillis(),
-                "$outcome failed=${failure.javaClass.simpleName}",
-            )
-            uiState = uiState.copy(
-                stage = NewUiUpdateStage.FAILED,
-                message = activity.getString(R.string.update_failed),
-            )
-            onStateChanged()
-        }
+        uiState = uiState.copy(
+            stage = if (result.status == PackageInstaller.STATUS_SUCCESS) NewUiUpdateStage.IDLE
+                else if (updateFile?.isFile == true) NewUiUpdateStage.READY else uiState.stage,
+            installPreparing = result.busy,
+            message = activity.getString(message),
+        )
+        onStateChanged()
     }
 
-    private fun sameContent(uri: Uri, verified: File): Boolean = runCatching {
-        val copy = activity.contentResolver.openInputStream(uri)?.use { UpdateChecksums.sha256Hex(it) }
-        copy != null && copy == UpdateChecksums.sha256Hex(verified)
-    }.getOrDefault(false)
+    private fun diagnostic(event: String) = DiagnosticLogging.record { UpdateDiagnostics.record(activity.applicationContext, event) }
 
     private fun latestRelease(): UpdateRelease? =
         UpdateReleaseLookup.latest(installedVersion(), "DiPlay/${installedVersion()}")

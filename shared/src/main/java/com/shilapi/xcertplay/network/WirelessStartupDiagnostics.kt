@@ -7,16 +7,17 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
 /** Observes startup without changing connection deadlines, address selection or retry behavior. */
 internal class WirelessStartupDiagnostics(
     private val sample: () -> String,
     private val log: (String) -> Unit,
-    private val intervalMillis: Long = 10_000,
+    private val intervalMillis: Long = 1_000,
     private val nowNs: () -> Long = System::nanoTime,
 ) : Closeable {
     private val closed = AtomicBoolean(false)
-    private val startedNanos = nowNs()
+    private val startedNanos = if (DiagnosticLogging.enabled) nowNs() else 0L
     private var authenticated = false
     private var wifiConfigs = 0
     private var startRequests = 0
@@ -25,15 +26,20 @@ internal class WirelessStartupDiagnostics(
     private var firstStartRequestNs: Long? = null
     private var firstTcpAfterStartMs: Long? = null
     @Volatile private var lastSnapshot = ""
+    @Volatile private var lastSampleNs: Long? = null
     private val worker = Thread(::observe, "diplay-wireless-diagnostics").apply { isDaemon = true }
+    private var disableSubscription: AutoCloseable? = null
 
     init { require(intervalMillis > 0) }
 
     @Synchronized fun start() {
+        if (!DiagnosticLogging.enabled) return
+        disableSubscription = DiagnosticLogging.onDisabled(::close)
         if (!closed.get() && worker.state == Thread.State.NEW) worker.start()
     }
 
     @Synchronized fun controlProgress(message: String) {
+        if (!DiagnosticLogging.enabled) return
         when (message) {
             "iap2 authentication accepted" -> authenticated = true
             "iap2 tx=0x5703 accessory-wifi-configuration",
@@ -46,12 +52,13 @@ internal class WirelessStartupDiagnostics(
     }
 
     @Synchronized fun connectionAccepted() {
+        if (!DiagnosticLogging.enabled) return
         tcpAccepted++
         if (firstTcpAfterStartMs == null) {
             firstStartRequestNs?.let { firstTcpAfterStartMs = elapsedMillis(it) }
         }
     }
-    @Synchronized fun sessionActive() { sessionActive = true }
+    @Synchronized fun sessionActive() { if (DiagnosticLogging.enabled) sessionActive = true }
 
     @Synchronized fun summary(): String {
         val waitingFor = when {
@@ -70,17 +77,24 @@ internal class WirelessStartupDiagnostics(
 
     private fun elapsedMillis(since: Long): Long = (nowNs() - since).coerceAtLeast(0) / 1_000_000
 
+    internal fun samplingIntervalMillis(): Long =
+        if (elapsedMillis(startedNanos) < 180_000L) intervalMillis else maxOf(intervalMillis, 10_000L)
+
     private fun observe() {
         try {
-            while (!closed.get()) {
+            while (!closed.get() && DiagnosticLogging.enabled) {
+                val sampleStarted = nowNs()
                 val snapshot = try { sample() } catch (error: Exception) {
                     "sampling=unavailable failureClass=${error.javaClass.simpleName}"
                 }
                 if (closed.get()) return
                 lastSnapshot = snapshot
+                lastSampleNs = sampleStarted
                 emit(summary())
+                val delayMillis = samplingIntervalMillis()
+                emit("wireless observation sampleDurationMs=${elapsedMillis(sampleStarted)} intervalMs=$delayMillis")
                 emitSnapshot(snapshot)
-                Thread.sleep(intervalMillis)
+                Thread.sleep(delayMillis)
             }
         } catch (_: InterruptedException) {
             // Teardown interrupts sleep or an in-flight Android callback wait.
@@ -90,7 +104,11 @@ internal class WirelessStartupDiagnostics(
     @Synchronized override fun close() {
         if (!closed.compareAndSet(false, true)) return
         worker.interrupt()
+        disableSubscription?.close()
+        disableSubscription = null
+        if (!DiagnosticLogging.enabled) { lastSnapshot = ""; return }
         emit("${summary()} observation=ended")
+        emit("wireless observation cachedAgeMs=${lastSampleNs?.let(::elapsedMillis) ?: "none"}")
         emitSnapshot(lastSnapshot, cached = true)
     }
 

@@ -10,6 +10,8 @@ import java.net.URLConnection
 
 internal object UpdateClient {
     internal const val RELEASES_URL =
+        "https://api.gitcode.com/api/v5/repos/liujing_1998/DiPlay/releases?per_page=20&direction=desc"
+    internal const val FALLBACK_RELEASES_URL =
         "https://api.github.com/repos/i-become/DiPlay/releases?per_page=3"
     private const val CONNECT_TIMEOUT_MILLIS = 10_000
     private const val READ_TIMEOUT_MILLIS = 30_000

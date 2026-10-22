@@ -36,14 +36,18 @@ import org.robolectric.android.util.concurrent.PausedExecutorService
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
+import org.robolectric.shadows.ShadowBuild
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 @LooperMode(LooperMode.Mode.PAUSED)
 class CarPlayHostDisplaySizeTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private lateinit var activity: CarPlayHostActivity
     private lateinit var controllerConstruction: MockedConstruction<CarPlayController>
     private val sizeClass = Class.forName("com.shilapi.xcertplay.CarPlayHostActivity\$DisplaySize")
+    private var controllerStartedBeforeUi = false
 
     @Before fun setUp() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
@@ -51,15 +55,182 @@ class CarPlayHostDisplaySizeTest {
         AirPlayPersistence.saveHarmanFullscreen(activity, false)
         // Source-only tests have no provisioned local authentication identity.
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
+        // These focused lifecycle tests do not call onCreate/buildContentView. Match the
+        // persisted video options so a display change does not request an unrelated recreation.
+        setField("smoothVideo", AirPlayPersistence.loadSmoothVideo(activity))
+        setField("directVideoOutput", AirPlayPersistence.loadDirectVideoOutput(activity))
         // Exercise host startup without launching vendor-service workers or real transports.
         controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, _ ->
             org.mockito.Mockito.`when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+            org.mockito.Mockito.doAnswer {
+                controllerStartedBeforeUi = getField("videoView") == null
+                null
+            }.`when`(controller).start()
         }
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
         CarPlayBackgroundSession::class.java.getDeclaredField("owner").apply { isAccessible = true }
             .set(CarPlayBackgroundSession, activity)
         setField("activeDisplaySize", size(1920, 990))
+    }
+
+    @Test fun hongqiStartsBeforeBuildingUiAndKeepsThatSessionWhenUiMeasuresTheSameWindow() {
+        assertStartupBeforeUi(1920, 720)
+    }
+
+    @Test fun hongqiEarlyStartupUsesTheActualNarrowWindowInsteadOfTheWholeDisplay() {
+        assertStartupBeforeUi(700, 720)
+    }
+
+    @Test fun rememberedWindowStartsWithoutLayoutAndTheUiKeepsTheSameController() {
+        rememberWindowForStartup(1920, 720)
+        allowStartup()
+        setField("wirelessEnabled", false)
+
+        invoke("prepareConnectionBeforeUi")
+
+        // No layout or main-loop traversal has happened in this launch.
+        assertTrue(controllerStartedBeforeUi)
+        assertNull(getField("videoView"))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        val controller = controllerConstruction.constructed().single()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNotNull(getField("videoView"))
+        assertSame(controller, getField("controller"))
+        scheduleSize(1920, 720)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(getField("pendingDisplaySize"))
+        assertEquals(0, getField("restartGeneration"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.times(1)).start()
+        assertEquals(1, controllerConstruction.constructed().size)
+    }
+
+    @Test fun rememberedWindowDoesNotBypassStartupPermissions() {
+        rememberWindowForStartup(1920, 720)
+        setField("microphonePermissionResolved", false)
+
+        invoke("prepareConnectionBeforeUi")
+
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(controllerConstruction.constructed().isEmpty())
+        assertNotNull(getField("videoView"))
+    }
+
+    @Test fun changingSystemBarsRequiresANewWindowMeasurement() {
+        rememberWindowForStartup(1920, 720)
+        setField("hideTopBar", !(getField("hideTopBar") as Boolean))
+        allowStartup()
+        setField("wirelessEnabled", false)
+
+        invoke("prepareConnectionBeforeUi")
+
+        assertNull(getField("activeDisplaySize"))
+        assertTrue(controllerConstruction.constructed().isEmpty())
+        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        probe.layout(0, 0, 1920, 680)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(controllerStartedBeforeUi)
+        assertEquals(size(1920, 680), getField("activeDisplaySize"))
+        val configuration = invoke("startupDisplayConfiguration") as String
+        assertEquals(1920 to 680, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+    }
+
+    @Test fun aTemporaryCameraWindowDoesNotReplaceTheRememberedNormalWindow() {
+        rememberWindowForStartup(1920, 720)
+        applySize(700, 680)
+        val configuration = invoke("startupDisplayConfiguration") as String
+        assertEquals(1920 to 720, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+
+        applySize(1920, 990)
+        assertEquals(1920 to 990, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+    }
+
+    @Test fun anIncompleteRememberedWindowFallsBackToMeasurement() {
+        rememberWindowForStartup(1920, 720)
+        activity.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .remove("startup_display_height").commit()
+
+        invoke("prepareConnectionBeforeUi")
+
+        assertNull(getField("activeDisplaySize"))
+        assertNull(getField("videoView"))
+        assertNotNull(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
+    }
+
+    private fun rememberWindowForStartup(width: Int, height: Int) {
+        ShadowBuild.setManufacturer("HONG QI")
+        ShadowBuild.setModel("HS5")
+        invoke("loadPersistedSettings")
+        setField("activeDisplaySize", null)
+        applySize(width, height)
+        val configuration = invoke("startupDisplayConfiguration") as String
+        assertEquals(width to height, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+        setField("activeDisplaySize", null)
+        assertTrue(controllerConstruction.constructed().isEmpty())
+    }
+
+    @Test fun earlyWindowMeasurementDoesNotBypassStartupPermissions() {
+        invoke("loadPersistedSettings")
+        setField("activeDisplaySize", null)
+        setField("microphonePermissionResolved", false)
+        invoke("prepareConnectionBeforeUi")
+        activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0).layout(0, 0, 1920, 720)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(controllerConstruction.constructed().isEmpty())
+        assertNotNull(getField("videoView"))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+    }
+
+    @Test fun repeatedConnectionIntentDoesNotOpenHomeBeforeTheWindowIsMeasured() {
+        invoke("loadPersistedSettings")
+        setField("activeDisplaySize", null)
+        setField("lastHubReturnUptime", -1000L)
+        invoke("prepareConnectionBeforeUi")
+        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        val repeat = android.content.Intent(activity, CarPlayHostActivity::class.java)
+            .putExtra(DiPlayLauncher.EXTRA_NEW_UI_CONNECTION_HUB, true)
+        activity.javaClass.getDeclaredMethod("onNewIntent", android.content.Intent::class.java)
+            .apply { isAccessible = true }.invoke(activity, repeat)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertNull(getField("videoView"))
+
+        probe.layout(0, 0, 1920, 720)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertNotNull(getField("videoView"))
+        assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name,
+            shadowOf(activity).nextStartedActivity?.component?.className)
+        assertNull(shadowOf(activity).nextStartedActivity)
+    }
+
+    private fun assertStartupBeforeUi(width: Int, height: Int) {
+        invoke("loadPersistedSettings")
+        allowStartup()
+        setField("wirelessEnabled", false)
+        setField("activeDisplaySize", null)
+        invoke("prepareConnectionBeforeUi")
+        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        assertNull(getField("videoView"))
+        assertTrue(controllerConstruction.constructed().isEmpty())
+
+        probe.layout(0, 0, width, height)
+        // No 500ms resize debounce is needed for the first actual window measurement.
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(controllerStartedBeforeUi)
+        assertNotNull(getField("videoView"))
+        assertEquals(size(width, height), getField("activeDisplaySize"))
+        val controller = controllerConstruction.constructed().single()
+        assertSame(controller, getField("controller"))
+        assertSame(controller, CarPlayBackgroundSession.snapshot()?.controller)
+        scheduleSize(width, height)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, getField("restartGeneration"))
+        assertNull(getField("pendingDisplaySize"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.times(1)).start()
+        assertEquals(1, controllerConstruction.constructed().size)
     }
 
     @After fun tearDown() {
@@ -436,6 +607,9 @@ class CarPlayHostDisplaySizeTest {
     }
 
     @Test fun adoptingABackgroundSessionPreservesItsCanvasOnResize() {
+        // This fixture uses an unpaced sink; adoption requires the host to use the same mode.
+        AirPlayPersistence.saveSmoothVideo(activity, false)
+        setField("smoothVideo", false)
         val display = CarPlaySessionDisplay(1536, 792, Surface.ROTATION_0, true, true, 1920, 990)
         val sink = AndroidMediaSink()
         val controller = CarPlayController(activity,
@@ -472,6 +646,8 @@ class CarPlayHostDisplaySizeTest {
     }
 
     @Test fun adoptingBackgroundClusterRestoresNativeAdbFlagButRejectsTheVirtualFallback() {
+        AirPlayPersistence.saveSmoothVideo(activity, false)
+        setField("smoothVideo", false)
         AirPlayPersistence.saveAdbClusterEnabled(activity, true)
         val sink = AndroidMediaSink()
         val display = CarPlaySessionDisplay(1920, 990, Surface.ROTATION_0, true, true, 1920, 990)
@@ -509,7 +685,7 @@ class CarPlayHostDisplaySizeTest {
 
     private fun allowStartup() {
         setField("airPlayIdentity", AirPlayIdentity.generate())
-        setField("mfiTarget", MfiTarget.LOCAL)
+        setField("mfiTarget", MfiTarget.USB_CH341)
         setField("vpnReady", true)
         setField("microphonePermissionResolved", true)
     }

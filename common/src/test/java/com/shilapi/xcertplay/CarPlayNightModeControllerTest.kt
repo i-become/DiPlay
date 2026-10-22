@@ -47,6 +47,137 @@ class CarPlayNightModeControllerTest {
         }
     }
 
+    @Test fun vehicleLightsOverrideSystemAndAmbientImmediatelyWithoutLuxDebounce() {
+        for (mode in listOf(CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT)) {
+            val light = Light()
+            val clock = Clock()
+            val output = mutableListOf<Boolean>()
+            val controller = CarPlayNightModeController(light, clock, false, output::add,
+                vehicleLightEnabled = true, initialVehicleNight = true)
+            controller.configure(mode, false, delaySeconds = 60)
+            controller.resume(false)
+            assertTrue(controller.night)
+            assertEquals(0, light.starts)
+            controller.systemChanged(false)
+            assertTrue(controller.night)
+            controller.vehicleChanged(false)
+            assertFalse(controller.night)
+            controller.systemChanged(true)
+            controller.vehicleChanged(false)
+            assertFalse(controller.night)
+            assertEquals(listOf(true, false), output)
+            assertTrue(clock.tasks.isEmpty())
+        }
+    }
+
+    @Test fun manualAndScheduledModesIgnoreLightsAndRetainTheirTimers() {
+        val clock = Clock()
+        var minute = 12 * 60
+        val time = object : NightTimeSource {
+            override fun snapshot() = NightTimeSnapshot(minute, 1_000)
+        }
+        val controller = CarPlayNightModeController(Light(), clock, false, {}, time,
+            vehicleLightEnabled = true, initialVehicleNight = true)
+        controller.configure(CarPlayNightMode.DAY, true)
+        controller.resume(true)
+        controller.vehicleChanged(false)
+        controller.vehicleChanged(true)
+        assertFalse(controller.night)
+        controller.configure(CarPlayNightMode.NIGHT, false)
+        controller.vehicleChanged(false)
+        assertTrue(controller.night)
+        controller.configure(CarPlayNightMode.SCHEDULE, true)
+        controller.vehicleChanged(true)
+        assertFalse(controller.night)
+        assertEquals(1, clock.tasks.size)
+        minute = 20 * 60
+        clock.advance(1_000)
+        assertTrue(controller.night)
+        assertEquals(1, clock.tasks.size)
+        controller.configure(CarPlayNightMode.SYSTEM, false)
+        assertTrue(controller.night)
+    }
+
+    @Test fun lossOfVehicleStateFallsBackToSensorAndRecoveryCancelsPendingSensorSwitch() {
+        val light = Light()
+        val clock = Clock()
+        val output = mutableListOf<Boolean>()
+        val controller = CarPlayNightModeController(light, clock, false, output::add,
+            vehicleLightEnabled = true, initialVehicleNight = false)
+        controller.configure(CarPlayNightMode.SYSTEM, false, AmbientLightThreshold(50), 2)
+        controller.resume(false)
+        controller.vehicleChanged(null)
+        assertEquals(1, light.starts)
+        light.emit(1f)
+        clock.advance(2_000)
+        assertTrue(controller.night)
+        light.emit(100f)
+        val queued = light.receiver!!
+        controller.vehicleChanged(true)
+        queued(100f)
+        clock.advance(2_000)
+        assertTrue(controller.night)
+        assertEquals(1, light.stops)
+        assertEquals(listOf(true), output)
+        assertTrue(clock.tasks.isEmpty())
+    }
+
+    @Test fun missingAndFailedSensorUseSystemOnlyWhileVehicleSignalIsUnavailable() {
+        for (light in listOf(Light(available = false), Light(succeeds = false))) {
+            val controller = CarPlayNightModeController(light, Clock(), true, {},
+                vehicleLightEnabled = true)
+            controller.configure(CarPlayNightMode.SYSTEM, false)
+            controller.resume(false)
+            assertFalse(controller.night)
+            controller.systemChanged(true)
+            assertTrue(controller.night)
+            controller.vehicleChanged(false)
+            controller.systemChanged(true)
+            assertFalse(controller.night)
+            controller.vehicleChanged(null)
+            assertTrue(controller.night)
+        }
+    }
+
+    @Test fun vehicleUpdatesContinueWhileUiIsPausedAndUseLatestStateOnResume() {
+        val controller = CarPlayNightModeController(Light(), Clock(), false, {},
+            vehicleLightEnabled = true, initialVehicleNight = false)
+        controller.configure(CarPlayNightMode.SYSTEM, false)
+        controller.resume(false)
+        controller.pause()
+        controller.vehicleChanged(true)
+        assertTrue(controller.night)
+        controller.resume(false)
+        assertTrue(controller.night)
+        controller.vehicleChanged(false)
+        assertFalse(controller.night)
+    }
+
+    @Test fun otherDevicesKeepTheirExistingSystemPolicy() {
+        val controller = CarPlayNightModeController(Light(), Clock(), false, {})
+        controller.configure(CarPlayNightMode.SYSTEM, false)
+        controller.resume(false)
+        controller.vehicleChanged(true)
+        assertFalse(controller.night)
+        controller.systemChanged(true)
+        assertTrue(controller.night)
+    }
+
+    @Test fun silentOrInvalidAmbientSensorUsesSystemWhileVehicleStateIsUnknown() {
+        val light = Light()
+        val controller = CarPlayNightModeController(light, Clock(), false, {}, vehicleLightEnabled = true)
+        controller.configure(CarPlayNightMode.SYSTEM, false, delaySeconds = 0)
+        controller.resume(false)
+        controller.systemChanged(true)
+        assertTrue(controller.night)
+        light.emit(1_000f)
+        assertFalse(controller.night)
+        controller.systemChanged(true)
+        assertFalse(controller.night)
+        light.emit(Float.NaN)
+        assertTrue(controller.night)
+    }
+
     @Test fun stableOnChangeReadingTransitionsOnlyAfterFiveSeconds() {
         val f = Fixture()
         f.light.emit(19f)

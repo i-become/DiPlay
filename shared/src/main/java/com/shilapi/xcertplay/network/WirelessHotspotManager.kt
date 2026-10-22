@@ -51,6 +51,9 @@ interface WirelessHotspotManager : Closeable {
 
     /** Counts reported by the framework, when available; never contains station identities. */
     fun connectionDiagnosticSnapshot(): String = "association=not_exposed"
+
+    /** Non-blocking discovery hint only; an associated client is not proof of an authenticated phone. */
+    fun hasAssociatedClient(): Boolean = false
 }
 
 /**

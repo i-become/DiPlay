@@ -168,6 +168,7 @@ private fun ConnectionPhaseRow(snapshot: NewUiConnectionSnapshot) {
         NewUiConnectionPhase.FAILED -> NewUiColors.HongqiRed to NewUiColors.HongqiRed.copy(alpha = 0.85f)
         NewUiConnectionPhase.NEEDS_SETUP -> NewUiColors.HongqiRed to NewUiColors.TextPrimary
         NewUiConnectionPhase.READY -> NewUiColors.StatusReady to NewUiColors.StatusReadySoft
+        NewUiConnectionPhase.DISCONNECTED -> NewUiColors.TextMuted to NewUiColors.TextSecondary
     }
     val pulse = snapshot.phase == NewUiConnectionPhase.CONNECTING
     val reduceMotion = rememberNewUiReduceMotion()

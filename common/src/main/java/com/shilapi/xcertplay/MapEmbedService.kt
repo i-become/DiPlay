@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -104,7 +106,7 @@ class MapEmbedService : Service() {
         )
         embeds[client.binder] = embed
         runCatching { client.binder.linkToDeath({ main.post { embeds.remove(client.binder)?.release() } }, 0) }
-        Log.i(TAG, "$caller shows the map ${data.getInt(KEY_WIDTH)}x${data.getInt(KEY_HEIGHT)}")
+        DiagnosticLogging.logcat { Log.i(TAG, "$caller shows the map ${data.getInt(KEY_WIDTH)}x${data.getInt(KEY_HEIGHT)}") }
         send(client, MSG_ATTACHED, Bundle().apply {
             putParcelable(KEY_SURFACE_PACKAGE, embed.surfacePackage)
             putBoolean(KEY_STREAM_ACTIVE, MapMirrors.streamActive)
@@ -112,7 +114,7 @@ class MapEmbedService : Service() {
     }
 
     private fun refuse(client: Messenger, caller: String, error: String) {
-        Log.w(TAG, "$caller asked for the map: $error")
+        DiagnosticLogging.logcat { Log.w(TAG, "$caller asked for the map: $error") }
         send(client, MSG_ERROR, Bundle().apply { putString(KEY_ERROR, error) })
     }
 

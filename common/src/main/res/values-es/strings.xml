@@ -736,6 +736,10 @@
     <string name="update_verifying">Verificando…</string>
     <string name="update_install">Instalar %1$s</string>
     <string name="update_failed">Error de actualización</string>
+    <string name="update_install_preparing">Preparando la actualización para el instalador del sistema…</string>
+    <string name="update_install_requested">Actualización enviada al sistema. Esperando el resultado de la instalación…</string>
+    <string name="update_install_permission">Permite que DiPlay instale aplicaciones en los ajustes del sistema y vuelve a pulsar Instalar. Si no aparece la pantalla de permiso, exporta un informe de diagnóstico.</string>
+    <string name="update_install_missing">El APK descargado no está disponible. Busca actualizaciones y vuelve a descargarlo.</string>
     <string name="update_available_home">Actualización disponible</string>
     <string name="update_saved_to">Guardado en %1$s</string>
     <string name="backup_title">Copia de seguridad de ajustes</string>
@@ -880,4 +884,18 @@
     <string name="new_ui_location_title">Send location to iPhone</string>
     <string name="new_ui_location_subtitle">Show vehicle location in CarPlay</string>
     <string name="new_ui_section_coming_soon">%1$s is coming soon in the new UI.</string>
+    <string name="new_ui_theme_follow_system">Automático</string>
+    <string name="new_ui_shell_display_theme_sub">Automático: luces de posición encendidas para noche y apagadas para día. Si no están disponibles, usa el sensor de luz y después el sistema.</string>
+    <string name="new_ui_status_disconnected">Desconectado</string>
+    <string name="update_install_confirm">Confirma la actualización en el instalador del sistema.</string>
+    <string name="update_install_success">La actualización se ha instalado.</string>
+    <string name="update_install_cancelled">Instalación cancelada. Pulsa Instalar para intentarlo de nuevo.</string>
+    <string name="update_install_blocked">El sistema bloqueó la instalación. Revisa el permiso para instalar aplicaciones y las restricciones del vehículo.</string>
+    <string name="update_install_conflict">La actualización entra en conflicto con una aplicación instalada. Exporta un informe de diagnóstico para ver el motivo.</string>
+    <string name="update_install_incompatible">Este APK no se puede instalar en esta unidad. Descarga una versión compatible.</string>
+    <string name="update_install_storage">No hay suficiente espacio para instalar la actualización.</string>
+    <string name="update_install_failure">Error de instalación. Se ha registrado el motivo del sistema; exporta un informe de diagnóstico.</string>
+    <string name="new_ui_about_sec5_title">5. Agradecimientos</string>
+    <string name="new_ui_about_sec5_body">Gracias a Douyin @YiMeng谁的梦还没醒 (1768868288) por proporcionar la interfaz de las luces de posición del vehículo.</string>
+    <string name="new_ui_diag_log_record_sub">Activa para registrar datos de diagnóstico y crear informes. Al desactivar, se detienen los registros y el muestreo de diagnóstico en segundo plano.</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -81,13 +83,13 @@ internal class AudioChannelPreview(private val onUnavailable: (Int) -> Unit) : C
                     written += count
                 }
                 if (!closed && generation.get() == request && written == pcm.size) {
-                    Log.i(TAG, "Preview started channel=$channel navigation=$navigation")
+                    DiagnosticLogging.logcat { Log.i(TAG, "Preview started channel=$channel navigation=$navigation") }
                 }
                 Thread.sleep(120L)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             } catch (error: Exception) {
-                Log.w(TAG, "Channel preview unavailable channel=$channel", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Channel preview unavailable channel=$channel", error) }
                 mainHandler.post {
                     if (!closed && generation.get() == request) onUnavailable(channel)
                 }

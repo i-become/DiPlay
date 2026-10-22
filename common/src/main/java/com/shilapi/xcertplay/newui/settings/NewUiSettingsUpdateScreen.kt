@@ -31,7 +31,7 @@ fun NewUiSettingsUpdateScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
 ) {
-    val primaryLabel = when (state.stage) {
+    val primaryLabel = if (state.installPreparing) null else when (state.stage) {
         NewUiUpdateStage.IDLE, NewUiUpdateStage.FAILED -> stringResource(R.string.update_check)
         NewUiUpdateStage.AVAILABLE -> stringResource(R.string.update_download)
         NewUiUpdateStage.READY -> stringResource(R.string.update_install, state.releaseTag.orEmpty())
@@ -40,7 +40,7 @@ fun NewUiSettingsUpdateScreen(
         NewUiUpdateStage.VERIFYING,
         -> null
     }
-    val primaryAction: (() -> Unit)? = when (state.stage) {
+    val primaryAction: (() -> Unit)? = if (state.installPreparing) null else when (state.stage) {
         NewUiUpdateStage.IDLE, NewUiUpdateStage.FAILED -> onCheck
         NewUiUpdateStage.AVAILABLE -> onDownload
         NewUiUpdateStage.READY -> onInstall
@@ -117,7 +117,7 @@ fun NewUiSettingsUpdateScreen(
                 }
                 else -> Unit
             }
-            if (state.stage != NewUiUpdateStage.IDLE && state.stage != NewUiUpdateStage.FAILED && primaryLabel == null) {
+            if (!state.installPreparing && state.stage != NewUiUpdateStage.IDLE && state.stage != NewUiUpdateStage.FAILED && primaryLabel == null) {
                 NewUiSecondaryActionButton(
                     label = stringResource(R.string.update_check),
                     modifier = Modifier.padding(top = NewUiLayout.MainGap),

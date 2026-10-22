@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat as AndroidAudioFormat
@@ -66,19 +68,19 @@ internal class AudioFocusCoordinator(
                 // track closing and media reopening, a head unit that keeps focus looks like
                 // nothing at all. Say the callback arrived and why it was not acted on.
                 runCatching {
-                    report("Audio: focus change=$change dropped" +
+                    DiagnosticLogging.record { report("Audio: focus change=$change dropped" +
                         " stale=${generation != focusGeneration} noRequest=${request == null}" +
-                        " activeTracks=${active.size}")
+                        " activeTracks=${active.size}") }
                 }
                 return@synchronized
             }
-            runCatching { report("Audio: focus change=$change activeTracks=${active.size}") }
+            runCatching { DiagnosticLogging.record { report("Audio: focus change=$change activeTracks=${active.size}") } }
             when (change) {
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> setMediaVolume(DUCKED_VOLUME)
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                     if (muteMediaOnTransientLoss) {
                         // This reports a temporary Android focus owner, not a confirmed call.
-                        Log.i(TAG, "Audio: muting media during transient focus loss")
+                        DiagnosticLogging.logcat { Log.i(TAG, "Audio: muting media during transient focus loss") }
                         setMediaVolume(0f)
                     }
                 }
@@ -142,8 +144,8 @@ internal class AudioFocusCoordinator(
         val result = manager?.let(next::request)
         if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) setMediaVolume(FULL_VOLUME)
         val line = "Audio: focus requested channel=${primary.channel} gain=$gain granted=$result activeTracks=${active.size}"
-        Log.i(TAG, line)
-        runCatching { report(line) }
+        DiagnosticLogging.logcat { Log.i(TAG, line) }
+        runCatching { DiagnosticLogging.record { report(line) } }
     }
 
     private fun setMediaVolume(volume: Float) {
@@ -284,7 +286,7 @@ class AndroidMediaSink(
         try {
             recoveryExecutor.execute {
                 try { videoRecoveryHandlers[type]?.invoke() }
-                catch (error: Exception) { Log.w("xcertplay-usb", "Video keyframe request failed", error) }
+                catch (error: Exception) { DiagnosticLogging.logcat { Log.w("xcertplay-usb", "Video keyframe request failed", error) } }
                 finally { recoveryPending.set(false) }
             }
         } catch (_: java.util.concurrent.RejectedExecutionException) { recoveryPending.set(false) }
@@ -350,7 +352,7 @@ class AndroidMediaSink(
 
     private fun settleDetach(type: Int, decoder: VideoDecoder, request: SurfaceDetachRequest, deadline: Long): Boolean {
         if (decoder.awaitDetach(request, deadline)) return true
-        Log.w("xcertplay-usb", "Video detach not confirmed in time type=$type; closing that decoder")
+        DiagnosticLogging.logcat { Log.w("xcertplay-usb", "Video detach not confirmed in time type=$type; closing that decoder") }
         videoDiagnosticHandlers[type]?.invoke("surface detach not confirmed; decoder closed")
         // The stream's next frame starts a fresh decoder on no surface, so it cannot compete for this one.
         retire(type, decoder)
@@ -552,7 +554,7 @@ class AndroidMediaSink(
                 restoreAudioMode(id)
             }
         } catch (error: Exception) {
-            Log.e("xcertplay-usb", "microphone start failed stream=$id", error)
+            DiagnosticLogging.logcat { Log.e("xcertplay-usb", "microphone start failed stream=$id", error) }
             MicrophoneCaptureStats.reportStartFailure(config, error, onAudioDiagnostic)
             onMicrophoneStopped(id)
         }
@@ -583,7 +585,7 @@ class AndroidMediaSink(
             savedAudioMode = manager.mode
             manager.mode = AudioManager.MODE_IN_COMMUNICATION
             communicationModeStream = id
-            Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id")
+            DiagnosticLogging.logcat { Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id") }
             // The report, not just logcat: a head unit left in the voice path plays no media,
             // and that cannot be diagnosed from a car without adb. A failing report must not
             // disturb the mode, so it is the last thing done and it cannot throw out of here.
@@ -604,10 +606,10 @@ class AndroidMediaSink(
             // would let a failing callback be caught as a failed restore.
             val line = try {
                 manager.mode = savedAudioMode
-                Log.i("xcertplay-usb", "audio mode restored to ${manager.mode}")
+                DiagnosticLogging.logcat { Log.i("xcertplay-usb", "audio mode restored to ${manager.mode}") }
                 "Audio: mode restored requested=$savedAudioMode now=${manager.mode} stream=$active"
             } catch (error: RuntimeException) {
-                Log.w("xcertplay-usb", "could not restore audio mode $savedAudioMode", error)
+                DiagnosticLogging.logcat { Log.w("xcertplay-usb", "could not restore audio mode $savedAudioMode", error) }
                 val currentMode = runCatching { manager.mode.toString() }.getOrDefault("unknown")
                 "Audio: mode restore failed requested=$savedAudioMode now=$currentMode" +
                     " error=${error.javaClass.simpleName}"
@@ -669,7 +671,10 @@ class AndroidMediaSink(
         videoHeight,
         preferSoftwareHevcDecoder,
         requestKeyFrame = { requestVideoRecovery(type) },
-        report = { videoDiagnosticHandlers[type]?.invoke(it) },
+        report = {
+            DiagnosticLogging.record { com.shilapi.xcertplay.orchestration.ConnectionDiagnosticTrace.record("video stream=$type $it") }
+            videoDiagnosticHandlers[type]?.invoke(it)
+        },
         statsLabel = statsLabel,
         onExit = ::onVideoDecoderExit,
         // Only the main screen goes to the host's SurfaceView; mirrors and the cluster keep their path.
@@ -960,7 +965,7 @@ private class VideoDecoder(
     }
 
     fun submit(nalus: ByteArray, senderNanos: Long = 0L, arrivalNanos: Long = 0L) {
-        stats.onReceived(nalus.size)
+        DiagnosticLogging.record { stats.onReceived(nalus.size) }
         liveReceived.incrementAndGet()
         // Pacing runs on the worker, in queue order: callbacks of a replaced stream may still deliver here.
         queue.offer(VideoJob.Frame(nalus, senderNanos = senderNanos, arrivalNanos = arrivalNanos))
@@ -1069,7 +1074,7 @@ private class VideoDecoder(
     }
 
     private fun onJobFailure(stage: String, error: Exception) {
-        if (running) Log.e(TAG, "video decoder job failed: $stage", error)
+        if (running) DiagnosticLogging.logcat { Log.e(TAG, "video decoder job failed: $stage", error) }
         if (running) reportFailure("stage=$stage", error)
         // MTK vendor failures may surface as CodecException or the broader IllegalStateException.
         // Retire the active experimental mode before recreating the decoder.
@@ -1127,6 +1132,8 @@ private class VideoDecoder(
     }
 
     private fun configureDecoder(config: VideoJob.Config) {
+        val diagnosticStarted = System.nanoTime()
+        DiagnosticLogging.record { report("configure-enter surfacePresent=${outputSurface != null}") }
         val previous = lastConfig
         if (
             decoder != null &&
@@ -1135,7 +1142,7 @@ private class VideoDecoder(
         ) {
             if (!duplicateConfigLogged) {
                 duplicateConfigLogged = true
-                Log.i(TAG, "video decoder config unchanged; keeping existing decoder")
+                DiagnosticLogging.logcat { Log.i(TAG, "video decoder config unchanged; keeping existing decoder") }
             }
             return
         }
@@ -1180,11 +1187,11 @@ private class VideoDecoder(
         }
         if (configured == null) {
             queue.discardCurrentChain()
-            report("decoder configuration failed mime=$mime size=${width}x$height")
+            DiagnosticLogging.record { report("decoder configuration failed mime=$mime size=${width}x$height") }
         }
         if (nextOperatingRate(requestedRate, used) != requestedRate) dropOperatingRate("refused at configure")
         if (nextLowLatencyDecoder(requestedLowLatency, used) != requestedLowLatency) {
-            report("low-latency decoder $requestedLowLatency dropped: refused at configure")
+            DiagnosticLogging.record { report("low-latency decoder $requestedLowLatency dropped: refused at configure") }
             lowLatencyDecoderRefused = true
         }
         renderedFrameLogged = false
@@ -1199,8 +1206,8 @@ private class VideoDecoder(
             configured.codecName.equals(requestedMtkCodec2, ignoreCase = true)
         if (configured != null && MtkDecoderTuning.supportsLegacyAcodecKeys(configured.codecName) &&
             configuredMtkMode.ordinal < requestedMtkMode.ordinal) {
-            report("MTK decoder tuning fell back at configure from=${requestedMtkMode.diagnosticName} " +
-                "to=${configuredMtkMode.diagnosticName}")
+            DiagnosticLogging.record { report("MTK decoder tuning fell back at configure from=${requestedMtkMode.diagnosticName} " +
+                "to=${configuredMtkMode.diagnosticName}") }
             maximumMtkMode = configuredMtkMode
         }
         if (configured != null) {
@@ -1214,17 +1221,18 @@ private class VideoDecoder(
                     " mtkTuning=${configuredMtkMode.diagnosticName}"
                 else -> ""
             }
-            report("decoder=${configured.codecName} mime=$mime size=${width}x$height" +
-                "$rate$lowLatency$output$atOnceReport$mtk")
-            Log.i(
+            DiagnosticLogging.record { report("decoder=${configured.codecName} mime=$mime size=${width}x$height" +
+                "$rate$lowLatency$output$atOnceReport$mtk") }
+            DiagnosticLogging.record { report("configure-completed elapsedMs=${(System.nanoTime() - diagnosticStarted) / 1_000_000}") }
+            DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "video decoder configured name=${configured.codecName} mime=$mime size=${width}x$height$mtk",
-            )
+            ) }
         }
     }
 
     private fun dropOperatingRate(reason: String) {
-        report("operating rate $operatingRate dropped: $reason")
+        DiagnosticLogging.record { report("operating rate $operatingRate dropped: $reason") }
         operatingRate = 0
     }
 
@@ -1233,15 +1241,15 @@ private class VideoDecoder(
         if (previous == MtkDecoderMode.NONE) return
         val fallback = previous.fallback()
         if (fallback.ordinal < maximumMtkMode.ordinal) maximumMtkMode = fallback
-        report("MTK decoder tuning ${previous.diagnosticName} dropped: $reason; " +
-            "next=${fallback.diagnosticName}")
+        DiagnosticLogging.record { report("MTK decoder tuning ${previous.diagnosticName} dropped: $reason; " +
+            "next=${fallback.diagnosticName}") }
     }
 
     private fun dropMtkCodec2LowLatency(reason: String) {
         if (!configuredMtkCodec2LowLatency) return
         configuredMtkCodec2LowLatency = false
         lowLatencyDecoderRefused = true
-        report("MTK Codec2 low-latency decoder dropped: $reason; next=default")
+        DiagnosticLogging.record { report("MTK Codec2 low-latency decoder dropped: $reason; next=default") }
     }
 
     private fun buildFormat(
@@ -1311,18 +1319,18 @@ private class VideoDecoder(
             val phaseMs = (System.nanoTime() - phaseStartNs) / 1_000_000
             val elapsedMs = (System.nanoTime() - startedNs) / 1_000_000
             runCatching { candidate?.release() }.onFailure {
-                Log.w(TAG, "video decoder candidate release failed name=$codecName", it)
+                DiagnosticLogging.logcat { Log.w(TAG, "video decoder candidate release failed name=$codecName", it) }
             }
             reportFailure("stage=configure phase=$phase phaseMs=$phaseMs elapsedMs=$elapsedMs " +
                 "tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} " +
                 "mtkTuning=${mtkMode.diagnosticName} mime=$mime", error)
-            Log.w(
+            DiagnosticLogging.logcat { Log.w(
                 TAG,
                 "video decoder configure failed name=$codecName phase=$phase phaseMs=$phaseMs elapsedMs=$elapsedMs " +
                     "tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} " +
                     "mtkTuning=${mtkMode.diagnosticName} mime=$mime size=${width}x$height",
                 error,
-            )
+            ) }
             null
         }
     }
@@ -1368,7 +1376,7 @@ private class VideoDecoder(
                 try {
                     return MediaCodec.createByCodecName(software.name)
                 } catch (error: Exception) {
-                    Log.w(TAG, "software HEVC decoder unavailable name=${software.name}", error)
+                    DiagnosticLogging.logcat { Log.w(TAG, "software HEVC decoder unavailable name=${software.name}", error) }
                 }
             }
         }
@@ -1392,9 +1400,9 @@ private class VideoDecoder(
                     try {
                         checkNotNull(decoder).setOutputSurface(consumer.surface)
                         outputSurface = consumer.surface
-                        Log.i(TAG, "video decoder parked off screen")
+                        DiagnosticLogging.logcat { Log.i(TAG, "video decoder parked off screen") }
                     } catch (error: Exception) {
-                        Log.w(TAG, "video decoder could not park; releasing it", error)
+                        DiagnosticLogging.logcat { Log.w(TAG, "video decoder could not park; releasing it", error) }
                         outcome = DetachOutcome.RELEASED
                         outputSurface = null
                         releaseDecoder()
@@ -1403,7 +1411,7 @@ private class VideoDecoder(
                 DetachOutcome.RELEASED -> {
                     outputSurface = null
                     releaseDecoder()
-                    Log.i(TAG, "video decoder detached from surface")
+                    DiagnosticLogging.logcat { Log.i(TAG, "video decoder detached from surface") }
                 }
             }
         } catch (error: Exception) {
@@ -1422,17 +1430,17 @@ private class VideoDecoder(
         if (surface == null) {
             releaseDecoder()
             queue.discardCurrentChain()
-            Log.i(TAG, "video decoder detached from surface")
+            DiagnosticLogging.logcat { Log.i(TAG, "video decoder detached from surface") }
             return
         }
         val codec = decoder
         if (codec != null) {
             try {
                 codec.setOutputSurface(surface)
-                Log.i(TAG, "video decoder output surface updated")
+                DiagnosticLogging.logcat { Log.i(TAG, "video decoder output surface updated") }
                 return
             } catch (error: Exception) {
-                Log.w(TAG, "video decoder output surface update failed; reconfiguring", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "video decoder output surface update failed; reconfiguring", error) }
             }
         }
         releaseDecoder()
@@ -1463,10 +1471,11 @@ private class VideoDecoder(
         }
         if (!submittedFrameLogged) {
             submittedFrameLogged = true
-            Log.i(
+            DiagnosticLogging.record { report("first input avccBytes=${nalus.size} annexBBytes=${annexB.size}") }
+            DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "video decoder first input avcc=${nalus.size} annexB=${annexB.size}",
-            )
+            ) }
         }
         val index = DecoderInputPump.acquire(
             running = { running }, drain = { if (outputThread == null) drainOutput(codec) },
@@ -1514,9 +1523,9 @@ private class VideoDecoder(
     }
 
     private fun recover(reason: String) {
-        Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
-        stats.onRecovery()
-        report("recovery: $reason; waiting for keyframe")
+        DiagnosticLogging.logcat { Log.w(TAG, "Video recovery: $reason; waiting for keyframe") }
+        DiagnosticLogging.record { stats.onRecovery() }
+        DiagnosticLogging.record { report("recovery: $reason; waiting for keyframe") }
         // Recreate with codec-specific data: flush can discard CSD before the first output.
         releaseDecoder()
         queue.discardCurrentChain()
@@ -1556,7 +1565,7 @@ private class VideoDecoder(
                 val queued = if (slot >= 0) queuedAtNanos[slot] else 0L
                 val heldOverGap = queued in 1 until resumedAtNanos
                 if (queued > 0 && !heldOverGap) {
-                    stats.onDecodeLatency(now - queued)
+                    DiagnosticLogging.record { stats.onDecodeLatency(now - queued) }
                     liveDecodeNanos.addAndGet(now - queued)
                     liveDecodeSamples.incrementAndGet()
                 }
@@ -1566,23 +1575,24 @@ private class VideoDecoder(
                 val pauseHeld = paced && queuedBeforePause[slot]
                 val targetNs = if (paced && delay != null) {
                     if (!heldOverGap && !pauseHeld) delay.onFrame(now - localNs)
-                    stats.onPacingDelay(delay.nanos)
+                    DiagnosticLogging.record { stats.onPacingDelay(delay.nanos) }
                     localNs + delay.nanos
                 } else 0L
                 if (targetNs - now in 1..MAX_PACING_AHEAD_NS) {
                     codec.releaseOutputBuffer(index, targetNs)
                 } else {
-                    if (shown && delay != null && !heldOverGap && !pauseHeld) stats.onLate()
+                    if (shown && delay != null && !heldOverGap && !pauseHeld) DiagnosticLogging.record { stats.onLate() }
                     codec.releaseOutputBuffer(index, render)
                 }
                 if (shown) {
-                    stats.onRendered()
+                    DiagnosticLogging.record { stats.onRendered() }
                     liveRendered.incrementAndGet()
                 }
                 if (shown && !renderedFrameLogged) {
                     renderedFrameLogged = true
+                    // The host also uses this event to finish its connection progress UI.
                     report("first frame rendered")
-                    Log.i(TAG, "video decoder rendered first frame bytes=${info.size}")
+                    DiagnosticLogging.logcat { Log.i(TAG, "video decoder rendered first frame bytes=${info.size}") }
                 }
                 if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return false
             }
@@ -1592,13 +1602,13 @@ private class VideoDecoder(
     }
 
     private fun logOutputFormat(format: MediaFormat) {
-        report("output format requested=${width}x${height} " +
+        DiagnosticLogging.record { report("output format requested=${width}x${height} " +
             "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
             "crop=${format.intOrNull("crop-left")},${format.intOrNull("crop-top")}," +
             "${format.intOrNull("crop-right")},${format.intOrNull("crop-bottom")} " +
             "stride=${format.intOrNull(MediaFormat.KEY_STRIDE)} slice=${format.intOrNull(MediaFormat.KEY_SLICE_HEIGHT)} " +
-            "color=${format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)}/${format.intOrNull(MediaFormat.KEY_COLOR_RANGE)}/${format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)}")
-        Log.i(
+            "color=${format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)}/${format.intOrNull(MediaFormat.KEY_COLOR_RANGE)}/${format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)}") }
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "video decoder output format " +
                 "size=${format.intOrNull(MediaFormat.KEY_WIDTH)}x" +
@@ -1608,15 +1618,15 @@ private class VideoDecoder(
                 "standard=${format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)} " +
                 "range=${format.intOrNull(MediaFormat.KEY_COLOR_RANGE)} " +
                 "transfer=${format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)}",
-        )
+        ) }
     }
 
     private fun reportFailure(context: String, error: Throwable) {
         // A bad decoder can fail again on every frame; exported detail stays bounded per worker.
         if (failureReports >= 8) return
         failureReports++
-        runCatching { report("decoder failed api=${Build.VERSION.SDK_INT} $context " +
-            MediaFailureSummary.describe(error)) }
+        runCatching { DiagnosticLogging.record { report("decoder failed api=${Build.VERSION.SDK_INT} $context " +
+            MediaFailureSummary.describe(error)) } }
     }
 
     // Worker only; [outputLock] orders it against the output thread.
@@ -1793,18 +1803,18 @@ private class AudioRenderer(
     }
 
     fun submit(rtp: ByteArray, sample: Int) {
-        if (started) {
+        if (started && DiagnosticLogging.enabled) {
             packetsReceived.incrementAndGet()
             val now = System.nanoTime()
             val previous = lastArrivalNs.getAndSet(now)
             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
         }
         if (!started || !queue.offer(AudioPacket(rtp, sample))) {
-            if (started) packetsDropped.incrementAndGet()
-            if (started && !droppedPacketsLogged) {
+            if (started && DiagnosticLogging.enabled) packetsDropped.incrementAndGet()
+            if (started && DiagnosticLogging.enabled && !droppedPacketsLogged) {
                 droppedPacketsLogged = true
-                Log.w(TAG, "audio queue full; dropping newest packets to bound latency")
-                report("Audio: queue full audioType=${format.audioType}")
+                DiagnosticLogging.logcat { Log.w(TAG, "audio queue full; dropping newest packets to bound latency") }
+                DiagnosticLogging.record { report("Audio: queue full audioType=${format.audioType}") }
             }
         }
     }
@@ -1818,10 +1828,10 @@ private class AudioRenderer(
 
     private fun run() {
         try {
-            runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
+            runCatching { DiagnosticLogging.record { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
                 "mapping=${if (advancedAudioChannelMapping) "automotive" else "mobile"} " +
-                "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") }
+                "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") } }
             when (format.codec) {
                 AudioCodecKind.AAC_LC -> configureCodec(MediaFormat.MIMETYPE_AUDIO_AAC)
                 AudioCodecKind.OPUS -> configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
@@ -1846,7 +1856,7 @@ private class AudioRenderer(
             // Worker shut down.
         } catch (error: Exception) {
             if (running) {
-                Log.e(TAG, "audio renderer worker failed", error)
+                DiagnosticLogging.logcat { Log.e(TAG, "audio renderer worker failed", error) }
                 reportFailure(error)
             }
         } catch (error: LinkageError) {
@@ -1876,11 +1886,11 @@ private class AudioRenderer(
             }
         }
         if (mime == MediaFormat.MIMETYPE_AUDIO_AAC) {
-            Log.i(
+            DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "audio AAC config rate=${format.sampleRate} channels=${format.channels} " +
                     "csd0=${aacAudioSpecificConfig().toHexString()}",
-            )
+            ) }
         }
         codec = try {
             MediaCodecStartup.create(
@@ -1892,12 +1902,12 @@ private class AudioRenderer(
                 // A vendor name getter or diagnostic callback must not discard a started codec.
                 runCatching {
                     val name = it.name
-                    Log.i(TAG, "audio decoder configured mime=$mime name=$name")
-                    report("Audio: decoder ready audioType=${format.audioType} codec=${format.codec} name=$name")
+                    DiagnosticLogging.logcat { Log.i(TAG, "audio decoder configured mime=$mime name=$name") }
+                    DiagnosticLogging.record { report("Audio: decoder ready audioType=${format.audioType} codec=${format.codec} name=$name") }
                 }
             }
         } catch (error: Exception) {
-            Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "audio decoder configuration failed mime=$mime", error) }
             reportFailure(error)
             null
         }
@@ -1910,10 +1920,10 @@ private class AudioRenderer(
         else AndroidAudioFormat.CHANNEL_OUT_MONO
         val minBuffer = AudioTrack.getMinBufferSize(format.sampleRate, channelMask, encoding)
         if (minBuffer <= 0) {
-            Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}")
-            runCatching { report("Audio: track unavailable api=${Build.VERSION.SDK_INT} stage=$diagnosticStage " +
+            DiagnosticLogging.logcat { Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}") }
+            runCatching { DiagnosticLogging.record { report("Audio: track unavailable api=${Build.VERSION.SDK_INT} stage=$diagnosticStage " +
                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} " +
-                "channels=${format.channels} minBufferResult=$minBuffer") }
+                "channels=${format.channels} minBufferResult=$minBuffer") } }
             return
         }
         val selection = mappedSelection()
@@ -1951,7 +1961,7 @@ private class AudioRenderer(
                     diagnosticStage = "track-fallback-build"
                     routeLabel = "streamType=$streamType(fallback=usage)"
                     actualLegacyStreamType = null
-                    Log.w(TAG, "streamType=$streamType rejected by this ROM; falling back to usage-based track")
+                    DiagnosticLogging.logcat { Log.w(TAG, "streamType=$streamType rejected by this ROM; falling back to usage-based track") }
                     attributes = audioAttributesFor(selection)
                     AudioTrack.Builder()
                         .setAudioAttributes(attributes)
@@ -1978,20 +1988,20 @@ private class AudioRenderer(
                 "usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType} " +
                 "attributesSource=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "track" else "configured"}"
         }.getOrDefault("api=${Build.VERSION.SDK_INT} trackMetadata=unavailable")
-        report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
+        DiagnosticLogging.record { report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
             "rate=${format.sampleRate} channels=${format.channels} " +
             "route=$routeLabel " +
             "bufferMs=${capacityBytes * 1000L / bytesPerSecond} startMs=${startThresholdBytes * 1000L / bytesPerSecond} " +
-            trackMetadata)
-        Log.i(
+            trackMetadata) }
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
                 "codec=${format.codec} " +
                 "rate=${format.sampleRate} channels=${format.channels} " +
                 "route=$routeLabel " +
                 "buffer=${capacityBytes * 1000L / bytesPerSecond}ms start=${startThresholdBytes * 1000L / bytesPerSecond}",
-        )
-        Log.i(
+        ) }
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "audio route type=${format.payloadType} audioType=${format.audioType} " +
                 "mode=${if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE} " +
@@ -1999,7 +2009,7 @@ private class AudioRenderer(
                 "contentType=${contentTypeFor(selection.contentType)} " +
                 "streamOverride=$streamOverride " +
                 "focus=${if (audioFocusEnabled) "on" else "off"}",
-        )
+        ) }
     }
 
     /** 0 uses usage-based routing; 1–20 attempt legacy stream types supported by the head unit. */
@@ -2020,7 +2030,7 @@ private class AudioRenderer(
             try {
                 return AudioAttributes.Builder().setLegacyStreamType(streamOverride).build()
             } catch (error: Exception) {
-                Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error) }
             }
         }
         return AudioAttributes.Builder()
@@ -2057,7 +2067,7 @@ private class AudioRenderer(
         val channel = mappedChannel ?: return
         val attributes = trackAttributes ?: return
         if (channel == AudioChannel.NAVIGATION) {
-            Log.i(TAG, "audio focus skipped channel=NAVIGATION; overlays without ducking")
+            DiagnosticLogging.logcat { Log.i(TAG, "audio focus skipped channel=NAVIGATION; overlays without ducking") }
             return
         }
         track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
@@ -2149,10 +2159,10 @@ private class AudioRenderer(
                 if (accessUnit.isNotEmpty()) {
                     if (!firstAacPayloadLogged) {
                         firstAacPayloadLogged = true
-                        Log.i(
+                        DiagnosticLogging.logcat { Log.i(
                             TAG,
                             "audio AAC access unit bytes=${accessUnit.size}",
-                        )
+                        ) }
                     }
                     feedCodec(
                         MediaCodecSupport.adtsFrame(accessUnit, format.sampleRate, format.channels),
@@ -2166,10 +2176,10 @@ private class AudioRenderer(
                     shortOpusPackets++
                     if (!firstOpusShortPacketLogged) {
                         firstOpusShortPacketLogged = true
-                        Log.i(
+                        DiagnosticLogging.logcat { Log.i(
                             TAG,
                             "audio Opus skipping short packet bytes=${accessUnit.size}",
-                        )
+                        ) }
                     }
                     return
                 }
@@ -2194,11 +2204,11 @@ private class AudioRenderer(
         if (index < 0) {
             inputDropped++
             if (inputDropped == 1) {
-                Log.w(
+                DiagnosticLogging.logcat { Log.w(
                     TAG,
                     "audio decoder input unavailable codec=${format.codec} " +
                         "queued=$inputQueued dropped=$inputDropped",
-                )
+                ) }
             }
             return
         }
@@ -2210,10 +2220,10 @@ private class AudioRenderer(
             inputQueued++
             if (!firstInputQueuedLogged) {
                 firstInputQueuedLogged = true
-                Log.i(
+                DiagnosticLogging.logcat { Log.i(
                     TAG,
                     "audio decoder first input codec=${format.codec} bytes=${payload.size}",
-                )
+                ) }
             }
         } else {
             codec.queueInputBuffer(index, 0, 0, 0, 0)
@@ -2240,7 +2250,7 @@ private class AudioRenderer(
                         if (metadata != lastDecoderOutputMetadata) {
                             lastDecoderOutputMetadata = metadata
                             decoderOutputReports++
-                            report("Audio: decoded format audioType=${format.audioType} codec=${format.codec} $metadata")
+                            DiagnosticLogging.record { report("Audio: decoded format audioType=${format.audioType} codec=${format.codec} $metadata") }
                         }
                     }
                 }
@@ -2249,12 +2259,12 @@ private class AudioRenderer(
                     if (size > 0) {
                         outputBuffers++
                         if (outputBuffers == 1 || outputBuffers % DECODED_BUFFER_LOG_INTERVAL == 0) {
-                            Log.i(
+                            DiagnosticLogging.logcat { Log.i(
                                 TAG,
                                 "audio decoder output codec=${format.codec} " +
                                     "buffers=$outputBuffers bytes=$size " +
                                     "queued=$inputQueued dropped=$inputDropped",
-                            )
+                            ) }
                         }
                     }
                     var copied = false
@@ -2285,10 +2295,10 @@ private class AudioRenderer(
         diagnosticStage = "track-write"
         if (!firstPcmLogged && length > 0) {
             firstPcmLogged = true
-            Log.i(
+            DiagnosticLogging.logcat { Log.i(
                 TAG,
                 "audio first PCM type=${format.payloadType} bytes=$length",
-            )
+            ) }
         }
         voiceFilter?.process(data, offset, length)
         if (!fadeApplied) {
@@ -2302,10 +2312,10 @@ private class AudioRenderer(
             } else {
                 minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES)
             }
-            val writeStarted = System.nanoTime()
+            val writeStarted = if (DiagnosticLogging.enabled) System.nanoTime() else 0L
             diagnosticStage = "track-write"
             val count = track.write(data, offset + written, writeLength, AudioTrack.WRITE_BLOCKING)
-            maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
+            DiagnosticLogging.record { maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L) }
             if (count < 0) {
                 writeErrorsThisWindow++
                 lastWriteErrorCode = count
@@ -2332,7 +2342,7 @@ private class AudioRenderer(
                 prebufferBytes += count
                 if (prebufferBytes >= startThresholdBytes) {
                     startPlayback(track)
-                    Log.i(TAG, "audio playback started type=${format.payloadType}")
+                    DiagnosticLogging.logcat { Log.i(TAG, "audio playback started type=${format.payloadType}") }
                 }
             }
             echoReference?.let { reference ->
@@ -2355,6 +2365,7 @@ private class AudioRenderer(
     }
 
     private fun reportNavigationPlayback(track: AudioTrack) {
+        if (!DiagnosticLogging.enabled) return
         if (!running) return
         val priorityVoice = mappedChannel == AudioChannel.PHONE || mappedChannel == AudioChannel.ASSISTANT
         if (mappedChannel != AudioChannel.NAVIGATION && !priorityVoice) return
@@ -2391,6 +2402,7 @@ private class AudioRenderer(
 
     // Persist counters even during packet starvation, and flush before disconnect releases the track.
     private fun logStatsIfDue(force: Boolean = false) {
+        if (!DiagnosticLogging.enabled) return
         val now = System.nanoTime()
         if (statsWindowStartNs == 0L) statsWindowStartNs = now
         if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
@@ -2420,16 +2432,16 @@ private class AudioRenderer(
             "lastWriteError=${lastWriteErrorCode ?: "none"} zeroWrites=$zeroWritesThisWindow " +
             "partialWrites=$partialWritesThisWindow " +
             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
-        Log.i(STATS_TAG, line)
-        report(line)
+        DiagnosticLogging.logcat { Log.i(STATS_TAG, line) }
+        DiagnosticLogging.record { report(line) }
         if (format.codec != AudioCodecKind.LPCM) {
             // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                 "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                 "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
                 "outputBuffersTotal=$outputBuffers ended=$force"
-            Log.i(STATS_TAG, decoderLine)
-            runCatching { report(decoderLine) }
+            DiagnosticLogging.logcat { Log.i(STATS_TAG, decoderLine) }
+            runCatching { DiagnosticLogging.record { report(decoderLine) } }
         }
         statsLastUnderruns = underruns
         maxWriteMs = 0L
@@ -2442,9 +2454,9 @@ private class AudioRenderer(
     }
 
     private fun reportFailure(error: Throwable) {
-        runCatching { report("Audio: renderer failed api=${Build.VERSION.SDK_INT} " +
+        runCatching { DiagnosticLogging.record { report("Audio: renderer failed api=${Build.VERSION.SDK_INT} " +
             "audioType=${format.audioType} codec=${format.codec} stage=$diagnosticStage " +
-            MediaFailureSummary.describe(error)) }
+            MediaFailureSummary.describe(error)) } }
     }
 
     private fun applyFadeIn(data: ByteArray, offset: Int, length: Int) {

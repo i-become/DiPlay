@@ -6,12 +6,14 @@ internal object TouchLatencyProbe {
     @Volatile var maxSendNs = 0L
 
     fun onTouchSent(sentAtNs: Long, sendDurationNs: Long) {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return
         if (pendingTouchNs == 0L) pendingTouchNs = sentAtNs
         if (sendDurationNs > maxSendNs) maxSendNs = sendDurationNs
     }
 
     /** Returns touch-to-frame latency for the first frame after a touch, or -1. */
     fun onFrame(nowNs: Long): Long {
+        if (!com.shilapi.xcertplay.diagnostics.DiagnosticLogging.enabled) return -1
         val touch = pendingTouchNs
         if (touch == 0L) return -1
         pendingTouchNs = 0L

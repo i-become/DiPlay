@@ -5,11 +5,13 @@ import android.content.Context
 import android.net.wifi.SupplicantState
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -220,6 +222,58 @@ class WifiP2pLegacyGroupManagerTest {
         assertEquals(0, radio.operatingChannel)
     }
 
+    @Test fun associatedClientObservationIsNonBlockingAndRateLimited() {
+        WifiP2pGroupManager(context, preferredChannel = 149).use { manager ->
+            background { manager.start(5000) }
+            radio.deferGroupInfo = true
+            try {
+                assertFalse(background { manager.hasAssociatedClient() })
+                assertFalse(manager.hasAssociatedClient())
+                assertEquals(1, radio.deferredGroupListeners.size)
+                addClient(radio.group!!)
+                radio.deferredGroupListeners.single().onGroupInfoAvailable(radio.group)
+                assertTrue(manager.hasAssociatedClient())
+                assertEquals(1, radio.deferredGroupListeners.size)
+            } finally { radio.deferGroupInfo = false }
+        }
+    }
+
+    @Test fun associationFromAnotherGroupIsIgnored() {
+        WifiP2pGroupManager(context, preferredChannel = 149).use { manager ->
+            background { manager.start(5000) }
+            radio.group = radio.makeGroup("DIRECT-another-app").also(::addClient)
+            assertFalse(manager.hasAssociatedClient())
+        }
+    }
+
+    @Test fun associationWithoutGroupOwnershipIsIgnored() {
+        WifiP2pGroupManager(context, preferredChannel = 149).use { manager ->
+            background { manager.start(5000) }
+            addClient(radio.group!!)
+            shadowOf(radio.group!!).setIsGroupOwner(false)
+            assertFalse(manager.hasAssociatedClient())
+        }
+    }
+
+    @Test fun lateAssociationAfterCloseCannotTriggerRecovery() {
+        val manager = WifiP2pGroupManager(context, preferredChannel = 149)
+        background { manager.start(5000) }
+        addClient(radio.group!!)
+        val previousGroup = radio.group
+        radio.deferGroupInfo = true
+        assertFalse(manager.hasAssociatedClient())
+        val callback = radio.deferredGroupListeners.single()
+        radio.deferGroupInfo = false
+        background { manager.close() }
+        callback.onGroupInfoAvailable(previousGroup)
+        assertFalse(manager.hasAssociatedClient())
+    }
+
+    private fun addClient(group: WifiP2pGroup) {
+        ReflectionHelpers.callInstanceMethod<Void>(group, "addClient",
+            ReflectionHelpers.ClassParameter.from(WifiP2pDevice::class.java, WifiP2pDevice()))
+    }
+
     private fun failure(block: () -> Any): Throwable {
         try { background(block); fail("Expected failure") }
         catch (failure: ExecutionException) { return failure.cause!! }
@@ -249,6 +303,8 @@ class WifiP2pLegacyGroupManagerTest {
         var deferSelection = false
         var missingInterface = false
         var throwAfterSelection = false
+        var deferGroupInfo = false
+        val deferredGroupListeners = mutableListOf<WifiP2pManager.GroupInfoListener>()
         @Volatile var deferredListener: WifiP2pManager.ActionListener? = null
         val selectionIssued = CountDownLatch(1)
 
@@ -275,7 +331,8 @@ class WifiP2pLegacyGroupManagerTest {
             channel: WifiP2pManager.Channel,
             listener: WifiP2pManager.GroupInfoListener,
         ) {
-            listener.onGroupInfoAvailable(group)
+            if (deferGroupInfo) deferredGroupListeners.add(listener)
+            else listener.onGroupInfoAvailable(group)
         }
 
         @Implementation override fun requestConnectionInfo(

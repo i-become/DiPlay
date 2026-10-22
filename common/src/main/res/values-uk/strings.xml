@@ -748,6 +748,10 @@
     <string name="update_verifying">Перевірка…</string>
     <string name="update_install">Установити %1$s</string>
     <string name="update_failed">Не вдалося оновити</string>
+    <string name="update_install_preparing">Підготовка оновлення для системного інсталятора…</string>
+    <string name="update_install_requested">Оновлення передано системі. Очікування результату встановлення…</string>
+    <string name="update_install_permission">Дозвольте DiPlay встановлювати програми в налаштуваннях системи, а потім знову натисніть «Установити». Якщо екран дозволу не з’явився, експортуйте звіт діагностики.</string>
+    <string name="update_install_missing">Завантажений APK недоступний. Перевірте оновлення та завантажте його повторно.</string>
     <string name="update_available_home">Доступне оновлення</string>
     <string name="update_saved_to">Збережено в %1$s</string>
     <string name="backup_title">Резервна копія налаштувань</string>
@@ -892,4 +896,18 @@
     <string name="new_ui_location_title">Send location to iPhone</string>
     <string name="new_ui_location_subtitle">Show vehicle location in CarPlay</string>
     <string name="new_ui_section_coming_soon">%1$s is coming soon in the new UI.</string>
+    <string name="new_ui_theme_follow_system">Автоматично</string>
+    <string name="new_ui_shell_display_theme_sub">Автоматично: габаритні вогні ввімкнено — ніч, вимкнено — день. Якщо сигнал недоступний, використовується датчик світла, потім тема системи.</string>
+    <string name="new_ui_status_disconnected">З’єднання розірвано</string>
+    <string name="update_install_confirm">Підтвердьте оновлення в системному інсталяторі.</string>
+    <string name="update_install_success">Оновлення встановлено.</string>
+    <string name="update_install_cancelled">Встановлення скасовано. Натисніть «Встановити», щоб повторити.</string>
+    <string name="update_install_blocked">Система заблокувала встановлення. Перевірте дозвіл на встановлення застосунків і обмеження головного пристрою.</string>
+    <string name="update_install_conflict">Оновлення конфліктує зі встановленим застосунком. Експортуйте діагностичний звіт із причиною.</string>
+    <string name="update_install_incompatible">Цей APK не можна встановити на цьому пристрої. Завантажте сумісну версію.</string>
+    <string name="update_install_storage">Недостатньо місця для встановлення оновлення.</string>
+    <string name="update_install_failure">Помилка встановлення. Причину збережено; експортуйте діагностичний звіт.</string>
+    <string name="new_ui_about_sec5_title">5. Подяки</string>
+    <string name="new_ui_about_sec5_body">Дякуємо користувачу Douyin @YiMeng谁的梦还没醒 (1768868288) за надання інтерфейсу габаритних вогнів автомобіля.</string>
+    <string name="new_ui_diag_log_record_sub">Увімкніть для запису журналів, збору діагностичних даних і створення звітів. Після вимкнення запис і фоновий збір діагностичних даних припиняються.</string>
 </resources>

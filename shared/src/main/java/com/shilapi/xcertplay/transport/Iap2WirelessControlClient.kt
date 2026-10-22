@@ -29,6 +29,8 @@ class Iap2WirelessControlClient(
         onReady: () -> Unit = {},
         beforeStartSession: () -> Unit = {},
         onStartSessionSent: (Iap2StartSessionSent) -> Unit = {},
+        // Optional bounded recovery, evaluated on this loop's thread after authentication.
+        retryStartSession: (() -> Boolean)? = null,
         onIncoming: (Iap2Frame) -> Unit = {},
         // Evaluated only in the authenticated control loop when its original deadline expires.
         // The caller must prove that the current CarPlay session is usable before keeping it alive.
@@ -92,7 +94,14 @@ class Iap2WirelessControlClient(
                 }
                 location.tick(::sendControl)
                 vehicleStatus.tick(::sendControl)
+                if (carPlayStartSessionsSent > 0 && retryStartSession?.invoke() == true) {
+                    beforeStartSession()
+                    sendStartSession(endpoint, ::sendControl, onStartSessionSent)
+                    carPlayStartSessionsSent++
+                    onProgress("iap2 tx=0x4301 carplay-start-session recovery")
+                }
                 val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                    .let { if (retryStartSession != null) min(it, 500L) else it }
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {

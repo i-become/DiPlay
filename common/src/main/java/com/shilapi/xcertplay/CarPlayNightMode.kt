@@ -50,6 +50,8 @@ internal class CarPlayNightModeController(
     initialNight: Boolean,
     private val onNightChanged: (Boolean) -> Unit,
     private val timeSource: NightTimeSource = SystemNightTimeSource,
+    private val vehicleLightEnabled: Boolean = false,
+    initialVehicleNight: Boolean? = null,
 ) {
     interface LightSource {
         val available: Boolean
@@ -66,16 +68,22 @@ internal class CarPlayNightModeController(
         private set
     private var mode = CarPlayNightMode.SYSTEM
     private var systemNight = initialNight
+    private var vehicleNight = initialVehicleNight
+    private val automatic: Boolean
+        get() = mode == CarPlayNightMode.SYSTEM || mode == CarPlayNightMode.AMBIENT
+    private val ambientFallback: Boolean
+        get() = mode == CarPlayNightMode.AMBIENT || (mode == CarPlayNightMode.SYSTEM && vehicleLightEnabled)
     private var threshold = AmbientLightThreshold()
     private var delaySeconds = 2
     private var schedule = CarPlayNightSchedule()
     private var resumed = false
     private var listening = false
+    private var ambientKnown = false
     private var pending: Boolean? = null
     private val transition = Runnable {
         val target = pending
         pending = null
-        if (resumed && listening && mode == CarPlayNightMode.AMBIENT && target != null) {
+        if (resumed && listening && ambientFallback && vehicleNight == null && target != null) {
             applyNight(target)
         }
     }
@@ -115,33 +123,58 @@ internal class CarPlayNightModeController(
 
     fun systemChanged(night: Boolean) {
         systemNight = night
-        val ambientFallback = mode == CarPlayNightMode.AMBIENT &&
-            (!light.available || (resumed && !listening))
-        if (mode == CarPlayNightMode.SYSTEM || ambientFallback) applyNight(night)
+        if (vehicleLightEnabled && automatic && vehicleNight != null) return
+        if ((mode == CarPlayNightMode.SYSTEM && !vehicleLightEnabled) ||
+            (ambientFallback && (!light.available || (resumed && !listening) ||
+                (vehicleLightEnabled && !ambientKnown)))) applyNight(night)
+    }
+
+    /** A valid vehicle signal is authoritative, including while the projection UI is paused. */
+    fun vehicleChanged(night: Boolean?) {
+        if (!vehicleLightEnabled || vehicleNight == night) return
+        vehicleNight = night
+        if (!automatic) return
+        stopListening()
+        applyMode()
     }
 
     private fun applyMode() {
+        if (vehicleLightEnabled && automatic) {
+            vehicleNight?.let {
+                stopListening()
+                applyNight(it)
+                return
+            }
+        }
         when (mode) {
-            CarPlayNightMode.SYSTEM -> applyNight(systemNight)
+            CarPlayNightMode.SYSTEM -> if (vehicleLightEnabled) applyAmbientFallback() else applyNight(systemNight)
             CarPlayNightMode.DAY -> applyNight(false)
             CarPlayNightMode.NIGHT -> applyNight(true)
             CarPlayNightMode.SCHEDULE -> applySchedule()
-            CarPlayNightMode.AMBIENT -> {
-                if (!light.available) {
-                    applyNight(systemNight)
-                } else if (resumed && !listening) {
-                    listening = light.start(::onLux)
-                    if (!listening) {
-                        light.stop()
-                        applyNight(systemNight)
-                    }
-                }
+            CarPlayNightMode.AMBIENT -> applyAmbientFallback()
+        }
+    }
+
+    private fun applyAmbientFallback() {
+        if (!light.available || (vehicleLightEnabled && !listening)) applyNight(systemNight)
+        if (light.available && resumed && !listening) {
+            listening = true
+            if (!light.start(::onLux)) {
+                listening = false
+                light.stop()
+                applyNight(systemNight)
             }
         }
     }
 
     private fun onLux(lux: Float) {
-        if (!resumed || !listening || mode != CarPlayNightMode.AMBIENT) return
+        if (!resumed || !listening || !ambientFallback || vehicleNight != null) return
+        ambientKnown = lux.isFinite() && lux >= 0f
+        if (vehicleLightEnabled && !ambientKnown) {
+            cancelPending()
+            applyNight(systemNight)
+            return
+        }
         val target = when {
             !lux.isFinite() || lux < 0f -> null
             !night && lux < threshold.lux.toFloat() -> true
@@ -161,6 +194,7 @@ internal class CarPlayNightModeController(
     private fun stopListening() {
         if (listening) light.stop()
         listening = false
+        ambientKnown = false
         cancelPending()
         scheduler.remove(scheduleTick)
     }

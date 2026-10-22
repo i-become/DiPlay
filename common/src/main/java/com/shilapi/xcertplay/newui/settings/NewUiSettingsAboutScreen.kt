@@ -74,6 +74,10 @@ fun NewUiSettingsAboutScreen(
                         titleRes = R.string.new_ui_about_sec4_title,
                         bodyRes = R.string.new_ui_about_sec4_body,
                     )
+                    AboutSection(
+                        titleRes = R.string.new_ui_about_sec5_title,
+                        bodyRes = R.string.new_ui_about_sec5_body,
+                    )
                     Text(
                         stringResource(R.string.new_ui_about_thanks),
                         style = NewUiTypography.SettingSubtitle,

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import java.net.Socket
 import java.net.InetSocketAddress
@@ -41,7 +43,7 @@ object BydStarterBridge {
         context.getSharedPreferences("hud_starter", Context.MODE_PRIVATE).edit().putString("token", secret).apply()
         initialize(context)
         token = parsed
-        Log.i(TAG, "Temporary starter credentials received")
+        DiagnosticLogging.logcat { Log.i(TAG, "Temporary starter credentials received") }
     }
 
     private fun decodeToken(secret: String?): ByteArray? = secret?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
@@ -58,7 +60,7 @@ object BydStarterBridge {
     fun demonstrate(context: Context) {
         initialize(context)
         demoStartMs = SystemClock.elapsedRealtime()
-        Log.i(TAG, "Parked demo requested: left 500m, right 800m, then clear")
+        DiagnosticLogging.logcat { Log.i(TAG, "Parked demo requested: left 500m, right 800m, then clear") }
     }
 
     private fun tick() {
@@ -115,6 +117,6 @@ object BydStarterBridge {
     }
 
     private fun notice(message: String) {
-        if (message != lastNotice) { Log.i(TAG, message); lastNotice = message }
+        if (message != lastNotice) { DiagnosticLogging.logcat { Log.i(TAG, message) }; lastNotice = message }
     }
 }

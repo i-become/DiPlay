@@ -38,6 +38,8 @@ class WirelessStartupPolicyTest {
         assertEquals(100L, WirelessStartupPolicy.interfacePollMillis(context))
         assertEquals(2, WirelessStartupPolicy.stableSamples(context))
         assertEquals(2_500L, WirelessStartupPolicy.wirelessLinkPrepareMaxMillis(context))
+        assertEquals(18_000L, WirelessStartupPolicy.bluetoothRadioReadyMillis(context, allowBootWait = true))
+        assertEquals(8_000L, WirelessStartupPolicy.bluetoothRadioReadyMillis(context, allowBootWait = false))
     }
 
     @Test fun hongqiOptimisticWifiDirectSkipsPrepareBudget() {

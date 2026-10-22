@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.net.wifi.p2p.WifiP2pManager
 import android.util.Log
@@ -55,7 +57,7 @@ internal object WifiP2pBrandedDeviceName {
             latch.await(timeoutMillis.coerceIn(250L, 1_500L), TimeUnit.MILLISECONDS)
         } catch (error: ReflectiveOperationException) {
             log("Wi-Fi P2P branded name unavailable type=${error.javaClass.simpleName}")
-            Log.i(TAG, "Wi-Fi P2P branded name unavailable", error)
+            DiagnosticLogging.logcat { Log.i(TAG, "Wi-Fi P2P branded name unavailable", error) }
         } catch (error: InterruptedException) {
             Thread.currentThread().interrupt()
         }

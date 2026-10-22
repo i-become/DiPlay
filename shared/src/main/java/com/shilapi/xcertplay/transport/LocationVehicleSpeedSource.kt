@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
@@ -74,13 +76,13 @@ class LocationVehicleSpeedSource(
                 )
                 subscribed++
             } catch (error: Exception) {
-                Log.w(TAG, "Could not subscribe to $provider for vehicle speed", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Could not subscribe to $provider for vehicle speed", error) }
             }
         }
         if (subscribed == 0) {
-            Log.w(TAG, "No location provider for simulated vehicle speed")
+            DiagnosticLogging.logcat { Log.w(TAG, "No location provider for simulated vehicle speed") }
         } else if (demoMetersPerSecondWhenStationary != null) {
-            Log.i(TAG, "Simulated cluster vehicle speed active demo=${demoMetersPerSecondWhenStationary}m/s when stationary")
+            DiagnosticLogging.logcat { Log.i(TAG, "Simulated cluster vehicle speed active demo=${demoMetersPerSecondWhenStationary}m/s when stationary") }
         }
     }
 

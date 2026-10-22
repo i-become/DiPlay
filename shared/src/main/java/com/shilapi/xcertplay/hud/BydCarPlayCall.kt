@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Base64
@@ -156,7 +158,7 @@ object BydCarPlayCall {
             if (!state.accept(frame)) return
             state.current()
         }
-        Log.i(TAG, "CarPlay call ${card?.phase ?: "ended"}")
+        DiagnosticLogging.logcat { Log.i(TAG, "CarPlay call ${card?.phase ?: "ended"}") }
         callChanged?.invoke(card)
         PhoneAudioRoute.carPlayCall(card != null)
         val app = context ?: return
@@ -195,7 +197,7 @@ object BydCarPlayCall {
         watcherToken = token
         prepared = true
         if (run(app, "prepare - $token ${android.os.Process.myPid()}") && ensureWatcher(app, token)) {
-            Log.i(TAG, "call watcher armed")
+            DiagnosticLogging.logcat { Log.i(TAG, "call watcher armed") }
             return
         }
         if (run(app, "cancel - $token")) clearLocalOwnership() else cleanupPending = true
@@ -320,7 +322,7 @@ object BydCarPlayCall {
             if (System.nanoTime() >= deadline) break
             Thread.sleep(WATCHER_PROBE_INTERVAL_MILLIS)
         }
-        Log.w(TAG, "call watcher not ready after $watcherReadyMillis ms")
+        DiagnosticLogging.logcat { Log.w(TAG, "call watcher not ready after $watcherReadyMillis ms") }
         return false
     }
 
@@ -339,7 +341,7 @@ object BydCarPlayCall {
         // show/end; empty or partial replies leave recovery ownership pending.
         val failed = output.lineSequence().map { it.trim() }.filter { it.contains('=') }
             .filter { line -> line.substringAfter('=').trim().toIntOrNull() != 0 }.toList()
-        if (failed.isNotEmpty()) Log.w(TAG, "call writes not accepted: ${failed.joinToString().take(200)}")
+        if (failed.isNotEmpty()) DiagnosticLogging.logcat { Log.w(TAG, "call writes not accepted: ${failed.joinToString().take(200)}") }
         return output.lineSequence().any { it.trim() == "write=0" } && failed.none { it.startsWith("write=") }
     }
 }

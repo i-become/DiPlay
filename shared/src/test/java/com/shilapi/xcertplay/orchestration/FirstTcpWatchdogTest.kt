@@ -123,4 +123,105 @@ class FirstTcpWatchdogTest {
             assertEquals(1, outcomes.get())
         }
     }
+
+    @Test fun recoveryOccursAtSixAndTwelveSecondsAndDoesNotExtendDeadline() {
+        val watch = watchdog()
+        assertFalse(watch.takeRecoveryRequest())
+        watch.startSessionSent(0)
+        now = 5_999
+        assertFalse(watch.takeRecoveryRequest())
+        now = 6_000
+        assertTrue(watch.takeRecoveryRequest())
+        assertFalse(watch.takeRecoveryRequest())
+        watch.startSessionSent(now * 1_000_000)
+        now = 11_999
+        assertFalse(watch.takeRecoveryRequest())
+        now = 12_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 29_999
+        assertFalse(watch.takeRecoveryRequest())
+        assertEquals(30_000L, deadline)
+        now = 30_000
+        timer!!()
+        assertEquals(1, failures)
+    }
+
+    @Test fun firstTcpSessionSuccessAndCloseAllSuppressRecovery() {
+        for (stop in listOf<(FirstTcpWatchdog) -> Unit>(
+            { it.accepted(event()) }, { it.sessionEstablished() }, { it.terminate() },
+        )) {
+            now = 0
+            val watch = watchdog()
+            watch.startSessionSent(0)
+            stop(watch)
+            now = 12_000
+            assertFalse(watch.takeRecoveryRequest())
+        }
+    }
+
+    @Test fun lateControlPollCannotRecoverAfterTheHardDeadline() {
+        val watch = watchdog()
+        watch.startSessionSent(0)
+        now = 30_000
+        assertFalse(watch.takeRecoveryRequest())
+    }
+
+    @Test fun unrelatedAndInternalTcpDoNotSuppressDiscoveryRecovery() {
+        val watch = watchdog()
+        watch.startSessionSent(0)
+        watch.accepted(event(internal = true))
+        watch.accepted(event(AirPlayListenerIdentity(8)))
+        now = 6_000
+        assertTrue(watch.takeRecoveryRequest())
+    }
+
+    @Test fun associatedClientCanAdvanceOnlyTheFirstRecoveryAfterTheInitialGrace() {
+        val watch = watchdog()
+        watch.startSessionSent(0)
+        now = 1_999
+        assertFalse(watch.shouldObserveAssociation())
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        now = 2_000
+        assertTrue(watch.shouldObserveAssociation())
+        assertTrue(watch.takeRecoveryRequest(clientAssociated = true))
+        assertFalse(watch.shouldObserveAssociation())
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        now = 6_000
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        now = 12_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 20_000
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        assertEquals(30_000L, deadline)
+        now = 30_000
+        timer!!()
+        assertEquals(1, failures)
+    }
+
+    @Test fun unknownAssociationKeepsSixSecondFallbackAndSamplingStopsAtItsDeadline() {
+        val watch = watchdog()
+        assertFalse(watch.shouldObserveAssociation())
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        watch.startSessionSent(0)
+        now = 5_999
+        assertTrue(watch.shouldObserveAssociation())
+        assertFalse(watch.takeRecoveryRequest())
+        now = 6_000
+        assertFalse(watch.shouldObserveAssociation())
+        assertTrue(watch.takeRecoveryRequest())
+    }
+
+    @Test fun associationCannotTriggerRecoveryOrFurtherSamplingAfterTcpSuccessCancellationOrTimeout() {
+        for (stop in listOf<(FirstTcpWatchdog) -> Unit>(
+            { it.accepted(event()) }, { it.sessionEstablished() }, { it.terminate() }, { timer!!() },
+        )) {
+            now = 0
+            val watch = watchdog()
+            watch.startSessionSent(0)
+            stop(watch)
+            now = 3_000
+            assertFalse(watch.shouldObserveAssociation())
+            assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        }
+    }
 }

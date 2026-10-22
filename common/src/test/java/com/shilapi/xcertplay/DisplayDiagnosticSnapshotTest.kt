@@ -10,6 +10,8 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class DisplayDiagnosticSnapshotTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private val context get() = RuntimeEnvironment.getApplication()
 
     @Test fun requestedSizeSurvivesAFallbackAndSubsequentPreferenceReset() {

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.provider.Settings
@@ -36,15 +38,15 @@ internal object CarHotspotSetup {
     fun grant(context: Context, permissions: List<Permission>, adb: LocalAdb = LocalAdb(AdbKeys.load(context))): LocalAdb.Access =
         adb.use {
             val access = it.connect(mayAsk = true)
-            Log.i("DiPlay-ADB", "switch connection: $access")
+            DiagnosticLogging.logcat { Log.i("DiPlay-ADB", "switch connection: $access") }
             if (access == LocalAdb.Access.READY) {
                 for (permission in permissions) {
                     if (!permission.granted(context)) {
-                        Log.i("DiPlay-ADB", "request permission: ${permission.appOp}")
+                        DiagnosticLogging.logcat { Log.i("DiPlay-ADB", "request permission: ${permission.appOp}") }
                         it.shell("appops set ${context.packageName} ${permission.appOp} allow")
                     }
                     val granted = permission.granted(context)
-                    Log.i("DiPlay-ADB", "permission ${permission.appOp}: granted=$granted")
+                    DiagnosticLogging.logcat { Log.i("DiPlay-ADB", "permission ${permission.appOp}: granted=$granted") }
                     if (!granted) break
                 }
             }

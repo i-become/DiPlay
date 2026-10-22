@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.network
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -184,6 +186,7 @@ class CarPlayBonjour(
     @Volatile
     private var activeSocket: Socket? = null
     private val interfaceMdns = mutableListOf<JmDNS>()
+    private val publishedServices = mutableListOf<ServiceInfo>()
 
     private val interfaceListener = object : ServiceListener {
         override fun serviceAdded(event: ServiceEvent) {
@@ -227,23 +230,23 @@ class CarPlayBonjour(
         override fun onServiceRegistered(serviceInfo: NsdServiceInfo) = Unit
 
         override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-            Log.w(TAG, "AirPlay NSD registration failed code=$errorCode")
+            DiagnosticLogging.logcat { Log.w(TAG, "AirPlay NSD registration failed code=$errorCode") }
         }
 
         override fun onServiceUnregistered(serviceInfo: NsdServiceInfo) = Unit
 
         override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-            Log.w(TAG, "AirPlay NSD unregistration failed code=$errorCode")
+            DiagnosticLogging.logcat { Log.w(TAG, "AirPlay NSD unregistration failed code=$errorCode") }
         }
     }
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.w(TAG, "CarPlay control discovery failed code=$errorCode")
+            DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control discovery failed code=$errorCode") }
         }
 
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.w(TAG, "CarPlay control discovery stop failed code=$errorCode")
+            DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control discovery stop failed code=$errorCode") }
         }
 
         override fun onDiscoveryStarted(serviceType: String) = Unit
@@ -283,10 +286,12 @@ class CarPlayBonjour(
                         val dns = JmDNS.create(address, "carplay-${config.deviceId.replace(":", "")}")
                         interfaceMdns.add(dns)
                         dns.addServiceListener("$CARPLAY_CONTROL_SERVICE_TYPE.local.", interfaceListener)
-                        dns.registerService(ServiceInfo.create(
+                        val service = ServiceInfo.create(
                             "$AIRPLAY_SERVICE_TYPE.local.", config.deviceName, config.port,
                             0, 0, CarPlayBonjourProtocol.airPlayTxtRecords(config, identity),
-                        ))
+                        )
+                        publishedServices.add(service)
+                        dns.registerService(service)
                     }
                     publishedFamilies = advertisedAddresses.joinToString(",") {
                         if (it is Inet4Address) "IPv4" else "IPv6"
@@ -319,11 +324,26 @@ class CarPlayBonjour(
                 worker = null
                 interfaceMdns.forEach { dns -> runCatching { dns.close() } }
                 interfaceMdns.clear()
+                publishedServices.clear()
                 publishedFamilies = "none"
                 if (multicastLock.isHeld) multicastLock.release()
                 throw error
             }
         }
+    }
+
+    /** Reannounce without withdrawing the AP service or closing the AirPlay listener. */
+    fun refreshDiscovery(): Boolean = synchronized(lifecycleLock) {
+        if (closed || !started || !useInterfaceMdns) return@synchronized false
+        publishedServices.forEach { it.setText(CarPlayBonjourProtocol.airPlayTxtRecords(config, identity)) }
+        seenServices.clear()
+        // Renew the service-type query using the same listener, including when the first browse
+        // happened before the iPhone joined the AP. JmDNS retains its registry and open sockets.
+        interfaceMdns.forEach { dns ->
+            dns.removeServiceListener("$CARPLAY_CONTROL_SERVICE_TYPE.local.", interfaceListener)
+            dns.addServiceListener("$CARPLAY_CONTROL_SERVICE_TYPE.local.", interfaceListener)
+        }
+        true
     }
 
     override fun close() {
@@ -347,6 +367,7 @@ class CarPlayBonjour(
             discoveryEvents.clear()
             dnsToClose = interfaceMdns.toList()
             interfaceMdns.clear()
+            publishedServices.clear()
             publishedFamilies = "none"
             workerToJoin = worker
             worker = null
@@ -404,7 +425,7 @@ class CarPlayBonjour(
                 } catch (_: InterruptedException) {
                     return
                 } catch (error: Exception) {
-                    if (!closed) Log.w(TAG, "Interface CarPlay service handling failed", error)
+                    if (!closed) DiagnosticLogging.logcat { Log.w(TAG, "Interface CarPlay service handling failed", error) }
                 }
                 continue
             }
@@ -419,7 +440,7 @@ class CarPlayBonjour(
             } catch (_: InterruptedException) {
                 return
             } catch (error: Exception) {
-                if (!closed) Log.w(TAG, "CarPlay control service handling failed", error)
+                if (!closed) DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control service handling failed", error) }
             }
         }
     }
@@ -473,7 +494,7 @@ class CarPlayBonjour(
                     }
                 }
             } catch (error: RuntimeException) {
-                Log.w(TAG, "CarPlay control service resolution failed", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control service resolution failed", error) }
                 false
             }
             if (!submitted) return null
@@ -483,12 +504,12 @@ class CarPlayBonjour(
                 throw error
             }
             if (!completed) {
-                Log.w(TAG, "CarPlay control service resolution timed out")
+                DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control service resolution timed out") }
                 return null
             }
             resolved.get()?.let { return it }
             if (failure.get() != NsdManager.FAILURE_ALREADY_ACTIVE) {
-                Log.w(TAG, "CarPlay control service resolution failed code=${failure.get()}")
+                DiagnosticLogging.logcat { Log.w(TAG, "CarPlay control service resolution failed code=${failure.get()}") }
                 return null
             }
             if (!closed && attempt + 1 < RESOLVE_ATTEMPTS) {
@@ -625,7 +646,7 @@ class CarPlayBonjour(
         try {
             onEvent(event)
         } catch (error: RuntimeException) {
-            Log.w(TAG, "CarPlay Bonjour event callback failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "CarPlay Bonjour event callback failed", error) }
         }
     }
 

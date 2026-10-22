@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -74,7 +76,7 @@ internal object GeelyWheelKeys {
         val intent = Intent().setComponent(ComponentName(INPUT_PACKAGE, INPUT_CLASS))
         bound = runCatching { context.bindService(intent, connection, Context.BIND_AUTO_CREATE) }
             .getOrDefault(false)
-        Log.i(TAG, "bind geely input service requested=$bound")
+        DiagnosticLogging.logcat { Log.i(TAG, "bind geely input service requested=$bound") }
     }
 
     private val connection = object : ServiceConnection {
@@ -89,10 +91,11 @@ internal object GeelyWheelKeys {
                 override fun onHoldingPressStarted(keyCode: Int, softKeyFunction: Int) {}
                 override fun onHoldingPressStopped(keyCode: Int, softKeyFunction: Int) {}
                 override fun onLongPressTriggered(keyCode: Int, softKeyFunction: Int) {
-                    Log.i(TAG, "long press key=$keyCode func=$softKeyFunction")
+                    DiagnosticLogging.logcat { Log.i(TAG, "long press key=$keyCode func=$softKeyFunction") }
                     // The microphone key's long press: Siri, once the car's HiCar app is disabled.
                     if (keyCode == GeelyWheelKeyCodes.KEY_VOICE_ASSIST) {
-                        Log.i(TAG, "Siri requested=${CarPlayMediaKeys.onExternalSiriKey()}")
+                        val sent = CarPlayMediaKeys.onExternalSiriKey()
+                        DiagnosticLogging.logcat { Log.i(TAG, "Siri requested=$sent") }
                     }
                 }
                 override fun onDoubleClick(keyCode: Int, softKeyFunction: Int) {}
@@ -108,13 +111,13 @@ internal object GeelyWheelKeys {
                 val bluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(context)
                 val codes = GeelyWheelKeyCodes.registeredCodes(bluetoothAudio)
                 if (bluetoothAudio) {
-                    Log.i(TAG, "car Bluetooth audio on: media keys pass to the head unit, only the Siri key is wired")
+                    DiagnosticLogging.logcat { Log.i(TAG, "car Bluetooth audio on: media keys pass to the head unit, only the Siri key is wired") }
                 }
                 input.registerListener(registered, context.packageName, codes)
                 codes
             }
-                .onSuccess { Log.i(TAG, "registered for wheel key codes=${it.joinToString()}") }
-                .onFailure { Log.w(TAG, "registerListener failed", it) }
+                .onSuccess { DiagnosticLogging.logcat { Log.i(TAG, "registered for wheel key codes=${it.joinToString()}") } }
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "registerListener failed", it) } }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {

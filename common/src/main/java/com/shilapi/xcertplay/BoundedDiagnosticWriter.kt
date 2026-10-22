@@ -73,4 +73,11 @@ internal class BoundedDiagnosticWriter<T : Any>(
         closed = true
         monitor.notifyAll()
     }
+
+    /** Turning recording off discards queued writes instead of draining them. */
+    fun cancel() = synchronized(monitor) {
+        pending.clear()
+        closed = true
+        monitor.notifyAll()
+    }
 }

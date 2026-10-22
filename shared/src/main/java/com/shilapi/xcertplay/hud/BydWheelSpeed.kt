@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -72,7 +74,7 @@ internal object BydWheelSpeedSource : VehicleSpeedSource {
         executor = Executors.newSingleThreadScheduledExecutor { runnable ->
             Thread(runnable, "diplay-wheel-speed").apply { isDaemon = true }
         }.also { it.scheduleWithFixedDelay(::poll, 0, READ_MILLIS, TimeUnit.MILLISECONDS) }
-        Log.i(TAG, "wheel speed started")
+        DiagnosticLogging.logcat { Log.i(TAG, "wheel speed started") }
     }
 
     override fun stop() {
@@ -80,7 +82,7 @@ internal object BydWheelSpeedSource : VehicleSpeedSource {
         // Close adb on the reader thread, after any read in flight, then let the thread end.
         running.execute { shell.close() }
         running.shutdown()
-        Log.i(TAG, "wheel speed stopped")
+        DiagnosticLogging.logcat { Log.i(TAG, "wheel speed stopped") }
     }
 
     @Synchronized
@@ -95,7 +97,7 @@ internal object BydWheelSpeedSource : VehicleSpeedSource {
         if (reads++ % GEAR_EVERY_READS == 0) {
             BydWheelSpeed.gear(shell.run(app, BydWheelSpeed.gearCommand(app)))?.let { next ->
                 val changed = synchronized(this) { (gear != next).also { gear = next } }
-                if (changed) Log.i(TAG, "gear $next")
+                if (changed) DiagnosticLogging.logcat { Log.i(TAG, "gear $next") }
             }
         }
         val before = SystemClock.elapsedRealtime()
@@ -107,7 +109,7 @@ internal object BydWheelSpeedSource : VehicleSpeedSource {
         }
         if (!firstSampleLogged) {
             firstSampleLogged = true
-            Log.i(TAG, "first wheel speed ${"%.1f".format(speed * 3.6)} km/h")
+            DiagnosticLogging.logcat { Log.i(TAG, "first wheel speed ${"%.1f".format(speed * 3.6)} km/h") }
         }
     }
 }

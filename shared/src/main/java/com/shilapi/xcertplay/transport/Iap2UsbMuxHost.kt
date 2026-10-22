@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.util.Log
 import java.io.Closeable
 import java.util.ArrayDeque
@@ -26,7 +28,7 @@ class Iap2UsbMuxHost private constructor(
     private var nextSourcePort = FIRST_SOURCE_PORT
     private lateinit var readerThread: Thread
     private val receiveFrames = UsbMuxFrameBuffer { line ->
-        Log.w("xcertplay-usb", line)
+        DiagnosticLogging.logcat { Log.w("xcertplay-usb", line) }
         runCatching { onDiagnostic(line) }
     }
 
@@ -83,7 +85,7 @@ class Iap2UsbMuxHost private constructor(
         flags: Int,
         payload: ByteArray,
     ) {
-        if (payload.size > 512) Log.i("xcertplay-usb", "usbmux TX source=$sourcePort destination=$destinationPort bytes=${payload.size} seq=$sequence ack=$acknowledgement")
+        if (payload.size > 512) DiagnosticLogging.logcat { Log.i("xcertplay-usb", "usbmux TX source=$sourcePort destination=$destinationPort bytes=${payload.size} seq=$sequence ack=$acknowledgement") }
         val tcp = ByteArray(TCP_HEADER_BYTES + payload.size)
         putU16(tcp, 0, sourcePort)
         putU16(tcp, 2, destinationPort)
@@ -139,9 +141,9 @@ class Iap2UsbMuxHost private constructor(
                         "length=${reply.length} version=${reply.word8}",
                 )
             }
-            Log.i("xcertplay-usb", "discarding stale usbmux TCP frame before version reply")
+            DiagnosticLogging.logcat { Log.i("xcertplay-usb", "discarding stale usbmux TCP frame before version reply") }
         }
-        Log.i("xcertplay-usb", "usbmux version accepted: ${reply.word8}")
+        DiagnosticLogging.logcat { Log.i("xcertplay-usb", "usbmux version accepted: ${reply.word8}") }
         // Optional reply padding is handled by the incremental framer. Retain a possible
         // fragmented/coalesced next frame instead of discarding the entire remainder.
         sendFrame(PROTOCOL_SETUP, byteArrayOf(SETUP_VALUE.toByte()))
@@ -160,11 +162,11 @@ class Iap2UsbMuxHost private constructor(
                 receiveFrames.takeFrame()?.let { frame ->
                     // LIVI only trusts the length field on receive: iPhone replies do not
                     // carry the 0xFEEDFACE word in the header's fourth field.
-                    Log.i(
+                    DiagnosticLogging.logcat { Log.i(
                         "xcertplay-usb",
                         "usbmux rx proto=${frame.protocol} length=${frame.length} word8=0x" +
                             frame.word8.toUInt().toString(16),
-                    )
+                    ) }
                     nextMuxAcknowledgement = frame.sequence
                     return frame
                 }
@@ -229,7 +231,7 @@ class Iap2UsbMuxHost private constructor(
             throw IphoneUsbException.Protocol("Invalid USBMUX TCP header length")
         }
         val destinationPort = readU16(frame, offset + 2)
-        if (length == tcpHeaderBytes) Log.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}")
+        if (length == tcpHeaderBytes) DiagnosticLogging.logcat { Log.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}") }
         val connection = synchronized(stateLock) { connections[destinationPort] } ?: return
         connection.onPacket(
             flags = frame[offset + 13].toInt() and 0xff,

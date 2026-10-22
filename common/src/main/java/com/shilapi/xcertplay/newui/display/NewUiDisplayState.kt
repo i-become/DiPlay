@@ -43,7 +43,7 @@ data class NewUiDisplayState(
             hudNavigationEnabled = true,
             clusterMapEnabled = true,
             clusterFlyScreenDefaultOnConnect = true,
-            clusterFlyScreenWindowEnabled = true,
+            clusterFlyScreenWindowEnabled = false,
             clusterHorizontalGestureEnabled = true,
             carPlayNightMode = CarPlayNightMode.SYSTEM,
         )

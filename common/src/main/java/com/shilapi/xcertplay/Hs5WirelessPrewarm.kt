@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -34,12 +36,12 @@ internal object Hs5WirelessPrewarm {
                             WirelessStartupPolicy.hotspotReadyMillis(app, mode)
                         }
                         val outcome = if (WirelessStartupPolicy.clientWifiEnabled(app)) {
-                            Log.i(TAG, "prewarm station Wi-Fi reads on; confirming stable")
+                            DiagnosticLogging.logcat { Log.i(TAG, "prewarm station Wi-Fi reads on; confirming stable") }
                             WifiStationReady.confirmStableWhenOn(
                                 app,
                                 isCancelled = { false },
                                 timeoutMillis = timeoutMillis,
-                                log = { Log.i(TAG, it) },
+                                log = { DiagnosticLogging.logcat { Log.i(TAG, it) } },
                             )
                         } else {
                             WifiStationReady.ensure(
@@ -47,14 +49,14 @@ internal object Hs5WirelessPrewarm {
                                 isCancelled = { false },
                                 timeoutMillis = timeoutMillis,
                                 tryEnable = true,
-                                log = { Log.i(TAG, it) },
+                                log = { DiagnosticLogging.logcat { Log.i(TAG, it) } },
                             )
                         }
-                        Log.i(TAG, "prewarm finished outcome=$outcome")
+                        DiagnosticLogging.logcat { Log.i(TAG, "prewarm finished outcome=$outcome") }
                     }
                     WirelessHotspotMode.MANUAL -> {
                         WirelessLinkPrepare.prewarmManualHotspotInterface(app)
-                        Log.i(TAG, "prewarm manual hotspot interface sampled")
+                        DiagnosticLogging.logcat { Log.i(TAG, "prewarm manual hotspot interface sampled") }
                     }
                     else -> Unit
                 }

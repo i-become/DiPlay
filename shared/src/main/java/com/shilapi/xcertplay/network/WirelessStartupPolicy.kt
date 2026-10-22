@@ -19,6 +19,13 @@ object WirelessStartupPolicy {
     /** After boot, Hongqi Wi-Fi / P2P can look ready while the radio is still starting. */
     private const val HONGQI_BOOT_GRACE_MILLIS = 180_000L
     private const val GENERIC_BOOT_GRACE_MILLIS = 120_000L
+    /**
+     * Some Hongqi firmware keeps Bluetooth OFF for more than twelve seconds after accepting
+     * enable(). Keep the first boot connection alive long enough to observe the later
+     * TURNING_ON -> ON change instead of tearing down the Wi-Fi/P2P stack and starting over.
+     */
+    private const val HONGQI_BOOT_BLUETOOTH_READY_MILLIS = 18_000L
+    private const val DEFAULT_BLUETOOTH_READY_MILLIS = 8_000L
     const val INTERFACE_POLL_MILLIS = 250L
     private const val HONGQI_INTERFACE_POLL_MILLIS = 100L
     private const val HONGQI_FAST_INTERFACE_POLL_MILLIS = 50L
@@ -72,6 +79,17 @@ object WirelessStartupPolicy {
      */
     fun bootGraceMillis(context: Context): Long =
         if (Hs5HeadUnit.isHeadUnit(context)) HONGQI_BOOT_GRACE_MILLIS else GENERIC_BOOT_GRACE_MILLIS
+
+    /**
+     * Bound the Bluetooth radio wait independently from Wi-Fi/P2P startup. The longer budget is
+     * only used during the early Hongqi boot window; regular connections retain the old bound.
+     */
+    fun bluetoothRadioReadyMillis(context: Context, allowBootWait: Boolean): Long =
+        if (allowBootWait && Hs5HeadUnit.isHeadUnit(context)) {
+            HONGQI_BOOT_BLUETOOTH_READY_MILLIS
+        } else {
+            DEFAULT_BLUETOOTH_READY_MILLIS
+        }
 
     fun wifiP2pStartTimeoutMillis(context: Context): Long {
         if (Hs5HeadUnit.isHeadUnit(context) &&

@@ -109,6 +109,9 @@ object AirPlayPersistence {
     private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
     private const val KEY_MAX_DETECTED_WIDTH = "display_max_detected_width"
     private const val KEY_MAX_DETECTED_HEIGHT = "display_max_detected_height"
+    private const val KEY_STARTUP_DISPLAY_CONFIGURATION = "startup_display_configuration"
+    private const val KEY_STARTUP_DISPLAY_WIDTH = "startup_display_width"
+    private const val KEY_STARTUP_DISPLAY_HEIGHT = "startup_display_height"
     private const val KEY_RIGHT_HAND_DRIVE = "right_hand_drive"
     private const val KEY_HIDE_TOP_BAR = "hide_top_bar"
     private const val KEY_HIDE_BOTTOM_BAR = "hide_bottom_bar"
@@ -478,9 +481,11 @@ object AirPlayPersistence {
             .getBoolean(KEY_SESSION_LOG_RECORDING, false)
 
     fun saveSessionLogRecordingEnabled(context: Context, enabled: Boolean) {
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(enabled)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_SESSION_LOG_RECORDING, enabled)
             .apply()
+        CarPlayStartupDiagnostics.recordingPreferenceChanged(context, enabled)
     }
 
     /** Uses any presentation display (e.g. developer simulated secondary) as the cluster output. */
@@ -840,6 +845,23 @@ object AirPlayPersistence {
             .apply()
     }
 
+    internal fun loadStartupDisplay(context: Context, configuration: String): Pair<Int, Int>? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_STARTUP_DISPLAY_CONFIGURATION, null) != configuration) return null
+        val width = prefs.getInt(KEY_STARTUP_DISPLAY_WIDTH, 0)
+        val height = prefs.getInt(KEY_STARTUP_DISPLAY_HEIGHT, 0)
+        return if (width > 0 && height > 0) width to height else null
+    }
+
+    internal fun saveStartupDisplay(context: Context, configuration: String, width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_STARTUP_DISPLAY_CONFIGURATION, configuration)
+            .putInt(KEY_STARTUP_DISPLAY_WIDTH, width)
+            .putInt(KEY_STARTUP_DISPLAY_HEIGHT, height)
+            .apply()
+    }
+
     fun loadClusterMapEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(KEY_CLUSTER_MAP)) {
@@ -893,7 +915,7 @@ object AirPlayPersistence {
     /** Hongqi 仪表飞屏 as its own activity on the cluster display instead of a presentation. */
     fun loadHs5ClusterActivityWindow(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HS5_CLUSTER_ACTIVITY_WINDOW, true)
+            .getBoolean(KEY_HS5_CLUSTER_ACTIVITY_WINDOW, false)
 
     fun saveHs5ClusterActivityWindow(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

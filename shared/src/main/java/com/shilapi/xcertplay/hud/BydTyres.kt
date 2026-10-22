@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -83,12 +85,12 @@ object BydTyreStatus {
         if (reading == null) {
             if (missing) {
                 noService = true
-                Log.i(TAG, "no BYD autoservice; tyres are not read")
+                DiagnosticLogging.logcat { Log.i(TAG, "no BYD autoservice; tyres are not read") }
                 stop()
             }
             return
         }
-        if (reading != latest) Log.i(TAG, "tyres kPa ${reading.pressureKpa} °C ${reading.temperatureC}")
+        if (reading != latest) DiagnosticLogging.logcat { Log.i(TAG, "tyres kPa ${reading.pressureKpa} °C ${reading.temperatureC}") }
         latest = reading
         latestMillis = SystemClock.elapsedRealtime()
     }

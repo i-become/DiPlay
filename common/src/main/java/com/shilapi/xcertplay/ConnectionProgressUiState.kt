@@ -14,11 +14,21 @@ internal object ConnectionProgressUiState {
     @Volatile
     private var failureDetail: String? = null
 
+    @Volatile
+    private var disconnected = false
+
     fun litCount(): Int = litCount
 
     fun failed(): Boolean = failed
 
     fun failureDetail(): String? = failureDetail
+
+    fun disconnected(): Boolean = disconnected
+
+    fun markDisconnected() {
+        reset()
+        disconnected = true
+    }
 
     fun advance(step: Int) {
         val clamped = step.coerceIn(0, CarPlayConnectionProgress.STEP_COUNT)
@@ -36,5 +46,6 @@ internal object ConnectionProgressUiState {
         litCount = 0
         failed = false
         failureDetail = null
+        disconnected = false
     }
 }

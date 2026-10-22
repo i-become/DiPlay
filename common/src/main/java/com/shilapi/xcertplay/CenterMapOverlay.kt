@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Color
@@ -115,7 +117,7 @@ internal object CenterMapOverlay {
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(texture: SurfaceTexture, w: Int, h: Int) {
                     surface = Surface(texture).also(onSurface)
-                    Log.i(TAG, "card surface ${w}x$h")
+                    DiagnosticLogging.logcat { Log.i(TAG, "card surface ${w}x$h") }
                 }
 
                 override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, w: Int, h: Int) = Unit
@@ -233,7 +235,7 @@ internal object CenterMapOverlay {
                     pinched || dragging -> {
                         prefs.edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).putInt(KEY_WIDTH, params.width)
                             .putLong(KEY_ASPECT, java.lang.Double.doubleToRawLongBits(aspect)).apply()
-                        if (pinched) Log.i(TAG, "card resized ${params.width}x${params.height}")
+                        if (pinched) DiagnosticLogging.logcat { Log.i(TAG, "card resized ${params.width}x${params.height}") }
                     }
                     else -> onTap()
                 }
@@ -243,10 +245,10 @@ internal object CenterMapOverlay {
         return try {
             windows.addView(card, params)
             root = card
-            Log.i(TAG, "card shown ${width}x$height at ${params.x},${params.y}")
+            DiagnosticLogging.logcat { Log.i(TAG, "card shown ${width}x$height at ${params.x},${params.y}") }
             true
         } catch (error: RuntimeException) {
-            Log.w(TAG, "card failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "card failed", error) }
             false
         }
     }
@@ -256,7 +258,7 @@ internal object CenterMapOverlay {
         val view = root ?: return
         root = null
         runCatching { view.context.getSystemService(WindowManager::class.java)?.removeViewImmediate(view) }
-        Log.i(TAG, "card hidden")
+        DiagnosticLogging.logcat { Log.i(TAG, "card hidden") }
     }
 
     // A DiPlay activity in front makes the process foreground; the session service alone does not.

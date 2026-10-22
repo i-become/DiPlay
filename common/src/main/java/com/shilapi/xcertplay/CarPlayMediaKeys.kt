@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -191,7 +193,7 @@ internal object CarPlayMediaKeys {
     }
 
     private fun logAlbumRecoveryEvents(recovery: InitialAlbumRecovery) {
-        recovery.takeEvents().forEach { Log.i(TAG, "album recovery=$it") }
+        recovery.takeEvents().forEach { DiagnosticLogging.logcat { Log.i(TAG, "album recovery=$it") } }
         if (!recovery.timerPending) {
             initialAlbumRetry?.let(mainHandler::removeCallbacks)
             initialAlbumRetry = null
@@ -206,7 +208,7 @@ internal object CarPlayMediaKeys {
         initialAlbumRetry?.let(mainHandler::removeCallbacks)
         initialAlbumRetry = null
         val token = recovery.pendingToken
-        Log.i(TAG, "album recovery=scheduled reference=${nowPlaying.artworkTransferId}")
+        DiagnosticLogging.logcat { Log.i(TAG, "album recovery=scheduled reference=${nowPlaying.artworkTransferId}") }
         val retry = Runnable {
             synchronized(this) {
                 if (controller !== expected || initialAlbumRecovery !== recovery) return@Runnable
@@ -227,7 +229,7 @@ internal object CarPlayMediaKeys {
                             val claimed = controller === expected && initialAlbumRecovery === recovery &&
                                 recovery.claimSend(token, nowPlaying, hasCurrentAlbumColor(), ::albumRecoveryEnabled)
                             if (initialAlbumRecovery === recovery) logAlbumRecoveryEvents(recovery)
-                            if (claimed) Log.i(TAG, "album recovery=requested reference=${nowPlaying.artworkTransferId}")
+                            if (claimed) DiagnosticLogging.logcat { Log.i(TAG, "album recovery=requested reference=${nowPlaying.artworkTransferId}") }
                             claimed
                         }
                     },
@@ -240,7 +242,7 @@ internal object CarPlayMediaKeys {
                                     CarPlayController.InitialAlbumRefreshResult.FAILED -> "failed"
                                     else -> "skipped reason=${result.name.lowercase()}"
                                 }
-                                Log.i(TAG, "album recovery=$state")
+                                DiagnosticLogging.logcat { Log.i(TAG, "album recovery=$state") }
                                 logAlbumRecoveryEvents(recovery)
                             }
                         }
@@ -261,7 +263,7 @@ internal object CarPlayMediaKeys {
         val audio = appContext?.getSystemService(AudioManager::class.java) ?: return
         focusHeld = request.request(audio) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         if (focusHeld) forwardGrantedFocusLocked()
-        Log.i(TAG, "audio focus regained=$focusHeld")
+        DiagnosticLogging.logcat { Log.i(TAG, "audio focus regained=$focusHeld") }
     }
 
     private fun updateLocked(active: Boolean) {
@@ -306,7 +308,7 @@ internal object CarPlayMediaKeys {
             setMetadata(androidMetadata(nowPlaying, shownArtworkLocked()))
             isActive = true
         }
-        Log.i(TAG, "media keys active focusDisabled=$focusDisabled focusGranted=$granted")
+        DiagnosticLogging.logcat { Log.i(TAG, "media keys active focusDisabled=$focusDisabled focusGranted=$granted") }
     }
 
     private fun forwardGrantedFocusLocked() {
@@ -333,7 +335,7 @@ internal object CarPlayMediaKeys {
             }
         }
         if (!current) return
-        Log.i(TAG, "audio focus change=$change")
+        DiagnosticLogging.logcat { Log.i(TAG, "audio focus change=$change") }
         // Resolve the matching sink and invoke it outside the media-key monitor. An abandoned
         // request must never mute a newer controller, and these owners must not nest locks.
         val background = CarPlayBackgroundSession.snapshot()
@@ -388,11 +390,11 @@ internal object CarPlayMediaKeys {
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
         if (CarPlayVideo.onMediaKey(index)) {
-            Log.i(TAG, "media key $source -> car video player $index")
+            DiagnosticLogging.logcat { Log.i(TAG, "media key $source -> car video player $index") }
             return true
         }
         val sent = synchronized(this) { controller }?.sendMediaButton(index) ?: false
-        Log.i(TAG, "media key $source -> CarPlay $index sent=$sent")
+        DiagnosticLogging.logcat { Log.i(TAG, "media key $source -> CarPlay $index sent=$sent") }
         return sent
     }
 

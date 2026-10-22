@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.media.AudioFormat as AndroidAudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -40,14 +42,14 @@ internal class MicrophoneUplink(
         MicrophoneOpusEncoders.create(
             bitrate = bitrate,
             software = { value ->
-                SoftwareOpusEncoder(value, onError = { message, error -> Log.w(TAG, message, error) })
+                SoftwareOpusEncoder(value, onError = { message, error -> DiagnosticLogging.logcat { Log.w(TAG, message, error) } })
             },
         )
     },
 ) : Closeable {
     private val running = AtomicBoolean(false)
     private val stats = MicrophoneCaptureStats(config, report = { message ->
-        Log.i(TAG, message)
+        DiagnosticLogging.logcat { Log.i(TAG, message) }
         onDiagnostic(message)
     })
     @Volatile private var recorder: AudioRecord? = null
@@ -71,7 +73,7 @@ internal class MicrophoneUplink(
             AndroidAudioFormat.ENCODING_PCM_16BIT,
         )
         if (minBuffer <= 0) {
-            Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
+            DiagnosticLogging.logcat { Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}") }
             stats.failure(MicrophoneFailureStage.MIN_BUFFER, code = minBuffer)
             running.set(false)
             return false
@@ -96,7 +98,7 @@ internal class MicrophoneUplink(
             null
         }
         if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
-            Log.w(TAG, "microphone Opus encoder is unavailable")
+            DiagnosticLogging.logcat { Log.w(TAG, "microphone Opus encoder is unavailable") }
             stats.failure(MicrophoneFailureStage.ENCODER)
             running.set(false)
             return false
@@ -104,7 +106,7 @@ internal class MicrophoneUplink(
         if (nextEncoder != null) {
             val message = "Microphone: encoder type=${config.audioType} codec=OPUS " +
                 "implementation=${nextEncoder.implementation}"
-            Log.i(TAG, message)
+            DiagnosticLogging.logcat { Log.i(TAG, message) }
             runCatching { onDiagnostic(message) }
         }
         val bufferSize = maxOf(minBuffer * 2, config.frameBytes * 4)
@@ -128,7 +130,7 @@ internal class MicrophoneUplink(
                 bind(InetSocketAddress(InetAddress.getByName("::"), 0))
             }
         } catch (error: Exception) {
-            Log.e(TAG, "microphone socket creation failed", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "microphone socket creation failed", error) }
             stats.failure(MicrophoneFailureStage.SOCKET_CREATION, error)
             nextRecorder.release()
             nextEncoder?.close()
@@ -144,7 +146,7 @@ internal class MicrophoneUplink(
                 echoCanceller = createEchoCanceller()
                 if (!speakerphoneCall) effects = voiceEffects(nextRecorder.audioSessionId)
                 if (echoReference != null) {
-                    Log.i(TAG, "microphone echo canceller enabled=${echoCanceller != null} tail=${ECHO_TAIL_MILLIS}ms")
+                    DiagnosticLogging.logcat { Log.i(TAG, "microphone echo canceller enabled=${echoCanceller != null} tail=${ECHO_TAIL_MILLIS}ms") }
                 }
             }
             nextRecorder.startRecording()
@@ -155,7 +157,7 @@ internal class MicrophoneUplink(
             }
             true
         } catch (error: Exception) {
-            Log.e(TAG, "microphone recording failed", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "microphone recording failed", error) }
             stats.failure(MicrophoneFailureStage.RECORDING, error)
             release()
             false
@@ -176,12 +178,12 @@ internal class MicrophoneUplink(
                 .setBufferSizeInBytes(bufferSize)
                 .build()
         } catch (error: Exception) {
-            Log.e(TAG, "microphone recorder creation failed source=$source", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "microphone recorder creation failed source=$source", error) }
             stats.failure(MicrophoneFailureStage.RECORDER_CREATION, error)
             return null
         }
         if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-            Log.w(TAG, "microphone recorder failed to initialize source=$source")
+            DiagnosticLogging.logcat { Log.w(TAG, "microphone recorder failed to initialize source=$source") }
             stats.failure(MicrophoneFailureStage.RECORDER_INITIALIZATION, code = recorder.state)
             recorder.release()
             return null
@@ -192,7 +194,7 @@ internal class MicrophoneUplink(
     private fun createEchoCanceller(): CallEchoCanceller? {
         val reference = echoReference ?: return null
         if (config.channels != 1 || config.sampleRate != reference.sampleRate) {
-            Log.i(TAG, "microphone echo canceller skipped rate=${config.sampleRate} channels=${config.channels}")
+            DiagnosticLogging.logcat { Log.i(TAG, "microphone echo canceller skipped rate=${config.sampleRate} channels=${config.channels}") }
             return null
         }
         return echoCancellerFactory(config.frameBytes / 2, config.sampleRate, ECHO_TAIL_MILLIS)
@@ -202,7 +204,7 @@ internal class MicrophoneUplink(
         if (PhoneAudioRoute.carPlayCallsUseCarAudio()) {
             // In the car's phone audio state its own processing handles echo and noise, and was only measured
             // with the platform effects off.
-            Log.i(TAG, "microphone effects left to the car's phone audio state")
+            DiagnosticLogging.logcat { Log.i(TAG, "microphone effects left to the car's phone audio state") }
             return emptyList()
         }
         var aec: AudioEffect? = null
@@ -215,7 +217,7 @@ internal class MicrophoneUplink(
                 if (aec == null) {
                     echoCanceller?.close()
                     echoCanceller = null
-                    Log.w(TAG, "microphone native echo canceller skipped: platform AEC could not be disabled")
+                    DiagnosticLogging.logcat { Log.w(TAG, "microphone native echo canceller skipped: platform AEC could not be disabled") }
                 }
             }
         }
@@ -249,15 +251,15 @@ internal class MicrophoneUplink(
             if (effect != null) {
                 val status = effect.setEnabled(enabled)
                 if (status == AudioEffect.SUCCESS && effect.enabled == enabled) {
-                    Log.i(TAG, "microphone effect=$name enabled=$enabled")
+                    DiagnosticLogging.logcat { Log.i(TAG, "microphone effect=$name enabled=$enabled") }
                     return effect
                 }
-                Log.w(TAG, "microphone effect=$name could not be ${if (enabled) "enabled" else "disabled"} status=$status")
+                DiagnosticLogging.logcat { Log.w(TAG, "microphone effect=$name could not be ${if (enabled) "enabled" else "disabled"} status=$status") }
             } else {
-                Log.i(TAG, "microphone effect=$name unavailable")
+                DiagnosticLogging.logcat { Log.i(TAG, "microphone effect=$name unavailable") }
             }
         } catch (error: RuntimeException) {
-            Log.w(TAG, "microphone effect=$name unavailable; continuing without it", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "microphone effect=$name unavailable; continuing without it", error) }
         }
         effect?.let(::releaseEffect)
         return null
@@ -267,7 +269,7 @@ internal class MicrophoneUplink(
         try {
             effect.release()
         } catch (error: RuntimeException) {
-            Log.w(TAG, "microphone effect release failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "microphone effect release failed", error) }
         }
     }
 
@@ -288,7 +290,7 @@ internal class MicrophoneUplink(
                 if (count > 0) clock?.read(recorder, count / 2)
                 if (count < 0) {
                     if (running.get()) {
-                        Log.e(TAG, "microphone read failed code=$count")
+                        DiagnosticLogging.logcat { Log.e(TAG, "microphone read failed code=$count") }
                         stats.failure(MicrophoneFailureStage.READ, code = count)
                     }
                     return
@@ -310,10 +312,10 @@ internal class MicrophoneUplink(
                             val processed = try {
                                 canceller.process(frame, reference)
                             } catch (error: RuntimeException) {
-                                Log.w(TAG, "microphone native echo processing failed; restoring platform AEC", error)
+                                DiagnosticLogging.logcat { Log.w(TAG, "microphone native echo processing failed; restoring platform AEC", error) }
                                 false
                             } catch (error: LinkageError) {
-                                Log.w(TAG, "microphone native echo processing unavailable; restoring platform AEC", error)
+                                DiagnosticLogging.logcat { Log.w(TAG, "microphone native echo processing unavailable; restoring platform AEC", error) }
                                 false
                             }
                             if (!processed) {
@@ -329,7 +331,7 @@ internal class MicrophoneUplink(
             }
         } catch (error: Exception) {
             if (running.get()) {
-                Log.e(TAG, "microphone capture failed", error)
+                DiagnosticLogging.logcat { Log.e(TAG, "microphone capture failed", error) }
                 stats.failure(MicrophoneFailureStage.CAPTURE, error)
             }
         } finally {
@@ -389,13 +391,13 @@ internal class MicrophoneUplink(
         if (!running.get()) return // close/release already owns all recorder effects.
         effects.filterIsInstance<NoiseSuppressor>().forEach { ns ->
             runCatching { ns.setEnabled(true) }
-                .onFailure { Log.w(TAG, "microphone platform NS could not be restored", it) }
+                .onFailure { DiagnosticLogging.logcat { Log.w(TAG, "microphone platform NS could not be restored", it) } }
         }
         val aec = effects.filterIsInstance<AcousticEchoCanceler>().firstOrNull()
         if (aec != null) {
             val enabled = runCatching { aec.setEnabled(true) == AudioEffect.SUCCESS && aec.enabled }.getOrDefault(false)
             if (enabled) {
-                Log.i(TAG, "microphone native echo processing stopped; platform AEC restored")
+                DiagnosticLogging.logcat { Log.i(TAG, "microphone native echo processing stopped; platform AEC restored") }
                 return
             }
             effects = effects - aec
@@ -404,7 +406,7 @@ internal class MicrophoneUplink(
         enabledEffect("AEC") {
             if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(recorder!!.audioSessionId) else null
         }?.let { effects = effects + it }
-        Log.i(TAG, "microphone native echo processing stopped; using platform effects")
+        DiagnosticLogging.logcat { Log.i(TAG, "microphone native echo processing stopped; using platform effects") }
     }
 
     override fun close() {

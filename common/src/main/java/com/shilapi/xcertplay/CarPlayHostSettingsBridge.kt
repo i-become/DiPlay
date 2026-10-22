@@ -1,11 +1,18 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.Context
 import java.lang.ref.WeakReference
 
 /** Lets [NewUiActivity] push display settings into a running [CarPlayHostActivity]. */
 internal object CarPlayHostSettingsBridge {
     private var hostRef: WeakReference<CarPlayHostActivity>? = null
+    private val vehicleNightCommands by lazy {
+        java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+            Thread(task, "DiPlay-VehicleNight").apply { isDaemon = true }
+        }
+    }
 
     fun register(host: CarPlayHostActivity) {
         hostRef = WeakReference(host)
@@ -27,6 +34,25 @@ internal object CarPlayHostSettingsBridge {
 
     fun notifyClusterMapSettingsChanged() {
         hostRef?.get()?.reloadClusterMapFromSettings()
+    }
+
+    fun notifyVehicleNightChanged(context: Context, night: Boolean?) {
+        val host = hostRef?.get()
+        if (host != null) {
+            host.vehicleNightChanged(night)
+        } else {
+            // A retained CarPlay session can outlive its host Activity.
+            val controller = CarPlayBackgroundSession.snapshot()?.controller ?: return
+            vehicleNightCommands.execute {
+                val mode = AirPlayPersistence.loadCarPlayNightMode(context)
+                if ((mode == CarPlayNightMode.SYSTEM || mode == CarPlayNightMode.AMBIENT) &&
+                    CarPlayBackgroundSession.snapshot()?.controller === controller) {
+                    val target = CarPlayNightModePolicy.effectiveNight(context)
+                    val sent = controller.syncCarPlayNightMode(target)
+                    DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("QISI_POSITION_LIGHT background-sync night=$target commandWritten=$sent") }
+                }
+            }
+        }
     }
 
     fun flyScreenShown(): Boolean = hostRef?.get()?.flyScreenShown() == true

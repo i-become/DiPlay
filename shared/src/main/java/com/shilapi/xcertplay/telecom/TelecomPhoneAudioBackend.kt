@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.telecom
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
@@ -27,7 +29,7 @@ private const val START_TIMEOUT_MILLIS = 3_000L
 internal class TelecomPhoneAudioBackend(private val context: Context) : PhoneAudioBackend {
     override fun start(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            Log.i(TAG, "self-managed calls need Android 8 or newer")
+            DiagnosticLogging.logcat { Log.i(TAG, "self-managed calls need Android 8 or newer") }
             return false
         }
         return place()
@@ -51,10 +53,10 @@ internal class TelecomPhoneAudioBackend(private val context: Context) : PhoneAud
             )
             created.await(START_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) && PhoneAudioCall.isActive()
         } catch (error: SecurityException) {
-            Log.w(TAG, "Telecom call not allowed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Telecom call not allowed", error) }
             false
         } catch (error: RuntimeException) {
-            Log.w(TAG, "Telecom call failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Telecom call failed", error) }
             false
         }
     }
@@ -82,11 +84,11 @@ internal object PhoneAudioCall {
             connection = it
             created?.countDown()
         }
-        Log.i(TAG, "Telecom call active")
+        DiagnosticLogging.logcat { Log.i(TAG, "Telecom call active") }
     }
 
     fun failed() {
-        Log.w(TAG, "Telecom did not create the call")
+        DiagnosticLogging.logcat { Log.w(TAG, "Telecom did not create the call") }
         synchronized(lock) { created?.countDown() }
     }
 
@@ -98,7 +100,7 @@ internal object PhoneAudioCall {
         val current = synchronized(lock) { connection.also { connection = null } } ?: return
         current.setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
         current.destroy()
-        Log.i(TAG, "Telecom call ended")
+        DiagnosticLogging.logcat { Log.i(TAG, "Telecom call ended") }
     }
 }
 

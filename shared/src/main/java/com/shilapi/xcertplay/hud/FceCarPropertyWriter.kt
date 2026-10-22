@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.os.DeadObjectException
 import android.os.IBinder
 import android.os.Parcel
@@ -34,11 +36,11 @@ internal class FceCarPropertyWriter : FcePropertyWriter {
             reply.readException()
             true
         } catch (_: DeadObjectException) {
-            Log.w(TAG, "property service died, will look it up again")
+            DiagnosticLogging.logcat { Log.w(TAG, "property service died, will look it up again") }
             binder = null
             false
         } catch (e: Exception) {
-            Log.w(TAG, "setProperty 0x${Integer.toHexString(propertyId)} failed", e)
+            DiagnosticLogging.logcat { Log.w(TAG, "setProperty 0x${Integer.toHexString(propertyId)} failed", e) }
             false
         } finally {
             reply.recycle()
@@ -47,7 +49,7 @@ internal class FceCarPropertyWriter : FcePropertyWriter {
     }
 
     private fun lookup(): IBinder? = serviceManager("getService")
-        .also { if (it == null) Log.w(TAG, "$SERVICE_NAME not available on this head unit") }
+        .also { if (it == null) DiagnosticLogging.logcat { Log.w(TAG, "$SERVICE_NAME not available on this head unit") } }
 
     companion object {
         private const val TAG = "DiPlay-FCE-Cluster"

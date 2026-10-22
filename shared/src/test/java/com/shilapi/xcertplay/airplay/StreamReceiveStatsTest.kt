@@ -4,6 +4,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StreamReceiveStatsTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     @Test fun linksSequenceGapsToTheSameLongReadAndResetsOnlyWindowCounters() {
         var clock = 1L
         val output = mutableListOf<String>()

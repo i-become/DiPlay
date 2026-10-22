@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Base64
@@ -262,7 +264,7 @@ internal object BydClusterSong {
             shown = song
             if (!firstLogged) {
                 firstLogged = true
-                Log.i(TAG, "song on the dashboard")
+                DiagnosticLogging.logcat { Log.i(TAG, "song on the dashboard") }
             }
         }
     }
@@ -277,7 +279,7 @@ internal object BydClusterSong {
         val output = shell.run(app, "CLASSPATH=$apk app_process /system/bin ${BydClusterSongTool::class.java.name} $args")
             ?: return false
         val succeeded = ClusterSongWriteResult.accepted(output, clearing)
-        if (!succeeded) Log.w(TAG, "dashboard write failed: incomplete or rejected vendor response")
+        if (!succeeded) DiagnosticLogging.logcat { Log.w(TAG, "dashboard write failed: incomplete or rejected vendor response") }
         return succeeded
     }
 }

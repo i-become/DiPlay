@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.Manifest
 import android.content.ContentResolver
 import android.content.ContentValues
@@ -41,7 +43,7 @@ internal object DiagnosticExportStore {
             try {
                 return saveInDirectory(context, directory, fileName, report)
             } catch (error: Exception) {
-                Log.w(TAG, "Custom diagnostic folder unavailable; using default locations", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Custom diagnostic folder unavailable; using default locations", error) }
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -49,14 +51,14 @@ internal object DiagnosticExportStore {
                 return SavedReport(saveToDownloads(context.contentResolver, fileName, report))
             } catch (error: Exception) {
                 // Preserve the report even when the OEM's public storage provider is absent.
-                Log.w(TAG, "MediaStore Downloads unavailable; trying the public folder directly", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "MediaStore Downloads unavailable; trying the public folder directly", error) }
             }
         }
         if (canWritePublicDownloads(context)) {
             try {
                 return saveToPublicDownloads(context, fileName, report)
             } catch (error: Exception) {
-                Log.w(TAG, "Public Downloads folder unavailable; saving in app storage", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Public Downloads folder unavailable; saving in app storage", error) }
             }
         }
         try {
@@ -146,7 +148,7 @@ internal object DiagnosticExportStore {
         } catch (error: IllegalArgumentException) {
             // Some storage layouts resolve Downloads outside the provider's external root.
             // Share a private copy instead; the visible file in Downloads/DiPlay stays.
-            Log.w(TAG, "Downloads/DiPlay is not shareable through the provider; sharing a private copy", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Downloads/DiPlay is not shareable through the provider; sharing a private copy", error) }
             privateShareCopy(context, fileName, report)
         }
         return SavedReport(uri, savedPath = file.absolutePath)

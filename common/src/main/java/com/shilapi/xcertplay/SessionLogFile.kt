@@ -2,13 +2,17 @@ package com.shilapi.xcertplay
 
 import java.io.Closeable
 import java.io.File
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
 /** Bounded, private diagnostics. Each write is redacted before touching storage. */
 internal class SessionLogFile(val file: File) : Closeable {
+    private val recordingToken = DiagnosticLogging.generation
     private val lock = Any()
     private var closed = false
+    internal val recordingActive: Boolean
+        get() = DiagnosticLogging.enabled && recordingToken == DiagnosticLogging.generation
     fun reset(header: String) = synchronized(lock) {
-        if (!closed) {
+        if (!closed) DiagnosticLogging.write(recordingToken) {
             file.parentFile?.mkdirs()
             rotate()
             file.writeText("")
@@ -16,15 +20,15 @@ internal class SessionLogFile(val file: File) : Closeable {
         }
     }
     fun append(line: String) = synchronized(lock) {
-        if (closed) return@synchronized
+        if (closed || !recordingActive) return@synchronized
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
-        runCatching {
+        DiagnosticLogging.write(recordingToken) { runCatching {
             if (file.length() > MAX_BYTES) {
                 rotate()
                 file.writeText("")
             }
             file.appendText(safe + "\n")
-        }
+        } }
         Unit
     }
     private fun rotate() {

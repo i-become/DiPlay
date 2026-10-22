@@ -9,13 +9,24 @@ internal object UpdateReleaseLookup {
         userAgent: String,
         openConnection: (URL) -> URLConnection = { it.openConnection() },
     ): UpdateRelease? {
-        val json = UpdateClient.fetchText(
-            UpdateClient.RELEASES_URL,
-            "application/vnd.github+json",
-            userAgent,
-            openConnection,
-        )
-        val release = UpdateCatalog.parse(json) ?: return null
+        val release = try {
+            fetch(UpdateClient.RELEASES_URL, userAgent, openConnection)
+        } catch (primaryFailure: Exception) {
+            try {
+                fetch(UpdateClient.FALLBACK_RELEASES_URL, userAgent, openConnection)
+            } catch (fallbackFailure: Exception) {
+                primaryFailure.addSuppressed(fallbackFailure)
+                throw primaryFailure
+            }
+        } ?: return null
         return release.takeIf { UpdateVersion.isNewer(it.tagName, installedVersion) }
     }
+
+    private fun fetch(
+        url: String,
+        userAgent: String,
+        openConnection: (URL) -> URLConnection,
+    ): UpdateRelease? = UpdateCatalog.parse(
+        UpdateClient.fetchText(url, "application/json", userAgent, openConnection),
+    )
 }

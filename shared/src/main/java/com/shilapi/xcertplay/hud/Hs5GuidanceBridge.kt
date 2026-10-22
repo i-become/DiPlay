@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -64,10 +66,10 @@ internal object Hs5GuidanceBridge {
         useQisi = Hs5NavPackages.isQisiStack(appContext)
         available = !Hs5HeadUnit.isBydHeadUnit(appContext) &&
             (useQisi || outputPackages.isNotEmpty())
-        Log.i(
+        DiagnosticLogging.logcat { Log.i(
             TAG,
             "hs5 guidance available=$available qisi=$useQisi target=$amapTargetPackage outputs=$outputPackages",
-        )
+        ) }
         if (available && useQisi) mainHandler.post { bindAdapterLocked() }
         if (available && !senderStarted) {
             senderStarted = true
@@ -126,7 +128,7 @@ internal object Hs5GuidanceBridge {
             ticksSinceSend = 0
             if (!guidanceLogged) {
                 guidanceLogged = true
-                Log.i(TAG, "guidance frame sent $frame qisi=$useQisi")
+                DiagnosticLogging.logcat { Log.i(TAG, "guidance frame sent $frame qisi=$useQisi") }
             }
         }
     }
@@ -149,7 +151,7 @@ internal object Hs5GuidanceBridge {
             }
             true
         } catch (error: Exception) {
-            Log.w(TAG, "adapter service not reachable${error.message?.let { ": $it" }.orEmpty()}", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable${error.message?.let { ": $it" }.orEmpty()}", error) }
             resetModulesLocked()
             scheduleBindRetryLocked()
             false
@@ -222,7 +224,7 @@ internal object Hs5GuidanceBridge {
                         QisiVehicleBinder.HUD_SET_ROUNDABOUT,
                         intArrayOf(0),
                     )
-                    Log.i(TAG, "HUD guidance cleared")
+                    DiagnosticLogging.logcat { Log.i(TAG, "HUD guidance cleared") }
                 }
             }
             instrumentBinder?.let { instrument ->
@@ -239,13 +241,13 @@ internal object Hs5GuidanceBridge {
                 }
             }
         } catch (error: Exception) {
-            Log.w(TAG, "adapter service not reachable", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable", error) }
             resetModulesLocked()
             scheduleBindRetryLocked()
         } finally {
             hudActive = false
             instrumentNavActive = false
-            Log.i(TAG, "guidance output ended")
+            DiagnosticLogging.logcat { Log.i(TAG, "guidance output ended") }
         }
     }
 
@@ -270,7 +272,7 @@ internal object Hs5GuidanceBridge {
                     intArrayOf(1),
                 )
                 instrumentMapActive = true
-                Log.i(TAG, "cluster map projection started")
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster map projection started") }
             } else if (!clusterMapShown && instrumentMapActive) {
                 QisiVehicleBinder.transactInts(
                     instrument,
@@ -285,10 +287,10 @@ internal object Hs5GuidanceBridge {
                     intArrayOf(0, 0),
                 )
                 instrumentMapActive = false
-                Log.i(TAG, "cluster map projection stopped")
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster map projection stopped") }
             }
         } catch (error: Exception) {
-            Log.w(TAG, "instrument map stream failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "instrument map stream failed", error) }
         }
     }
 
@@ -311,12 +313,12 @@ internal object Hs5GuidanceBridge {
         try {
             binding = appContext.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             if (!binding) {
-                Log.w(TAG, "adapter service bind denied")
+                DiagnosticLogging.logcat { Log.w(TAG, "adapter service bind denied") }
                 scheduleBindRetryLocked()
             }
         } catch (error: Exception) {
             binding = false
-            Log.w(TAG, "adapter service bind failed: ${error.javaClass.simpleName}", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "adapter service bind failed: ${error.javaClass.simpleName}", error) }
             scheduleBindRetryLocked()
         }
     }
@@ -347,12 +349,12 @@ internal object Hs5GuidanceBridge {
             )
             if (!modulesReadyLogged) {
                 modulesReadyLogged = true
-                Log.i(TAG, "navigation modules ready hud=${hudBinder != null}")
+                DiagnosticLogging.logcat { Log.i(TAG, "navigation modules ready hud=${hudBinder != null}") }
             }
             applyInstrumentMapLocked()
             queueApplyLocked(force = true)
         } catch (error: Exception) {
-            Log.w(TAG, "adapter service not reachable", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable", error) }
             resetModulesLocked()
             scheduleBindRetryLocked()
         }
@@ -421,7 +423,7 @@ internal object Hs5GuidanceBridge {
             putExtra("ROUTE_REMAIN_TIME", -1)
         }
         if (!broadcastLocked(intent)) return
-        Log.i(TAG, "hongqi guidance ended")
+        DiagnosticLogging.logcat { Log.i(TAG, "hongqi guidance ended") }
     }
 
     private fun baseIntent(keyType: Int): Intent {
@@ -452,7 +454,7 @@ internal object Hs5GuidanceBridge {
             appContext.sendBroadcast(copy)
             true
         } catch (error: RuntimeException) {
-            Log.w(TAG, "nav broadcast failed pkg=$packageName", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "nav broadcast failed pkg=$packageName", error) }
             false
         }
     }

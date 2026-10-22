@@ -17,6 +17,7 @@ internal class FirstTcpWatchdog(
     private var firstStartNanos: Long? = null
     private var firstAcceptNanos: Long? = null
     private var success = false
+    private var recoveries = 0
     private var cancelTimer: (() -> Unit)? = null
 
     @Synchronized fun startSessionSent(sentAtNanos: Long) {
@@ -36,6 +37,30 @@ internal class FirstTcpWatchdog(
         }
         cancel()
         return true
+    }
+
+    /** Only sample association briefly before the first timed recovery; never after real TCP. */
+    @Synchronized fun shouldObserveAssociation(): Boolean {
+        val ageMillis = recoveryAgeMillis() ?: return false
+        return recoveries == 0 && ageMillis in 2_000L until 6_000L
+    }
+
+    /** Called only by the authenticated control loop; retries never extend the hard deadline. */
+    @Synchronized fun takeRecoveryRequest(clientAssociated: Boolean = false): Boolean {
+        val ageMillis = recoveryAgeMillis() ?: return false
+        val earlyAssociation = recoveries == 0 && clientAssociated && ageMillis >= 2_000
+        if (!earlyAssociation && ageMillis < (recoveries + 1) * 6_000L) return false
+        recoveries++
+        log("discovery recovery attempt=$recoveries startRequestAgeMs=$ageMillis " +
+            "reason=${if (earlyAssociation) "client_associated" else "timer"}")
+        return true
+    }
+
+    private fun recoveryAgeMillis(): Long? {
+        val started = firstStartNanos ?: return null
+        if (terminated || success || firstAcceptNanos != null || recoveries >= 2) return null
+        val ageMillis = (nowNanos() - started) / 1_000_000
+        return ageMillis.takeIf { it < timeoutMillis }
     }
 
     @Synchronized fun sessionEstablished(): Boolean {

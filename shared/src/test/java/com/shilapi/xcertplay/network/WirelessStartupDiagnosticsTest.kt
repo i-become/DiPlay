@@ -8,6 +8,38 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WirelessStartupDiagnosticsTest {
+    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
+    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
+    @Test fun detailedStartupSamplingReturnsToTheOriginalRateAfterThreeMinutes() {
+        var clock = 1_000_000_000L
+        val diagnostics = WirelessStartupDiagnostics({ "" }, {}, nowNs = { clock })
+        try {
+            assertEquals(1_000L, diagnostics.samplingIntervalMillis())
+            clock += 179_999_000_000L
+            assertEquals(1_000L, diagnostics.samplingIntervalMillis())
+            clock += 1_000_000L
+            assertEquals(10_000L, diagnostics.samplingIntervalMillis())
+            assertTrue(diagnostics.summary().contains("elapsedMs=180000"))
+        } finally { diagnostics.close() }
+    }
+
+    @Test fun defaultSamplingCapturesAChangeInsideTheFormerTenSecondBlindSpot() {
+        val samples = java.util.concurrent.atomic.AtomicInteger()
+        val changed = CountDownLatch(1)
+        val logs = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val diagnostics = WirelessStartupDiagnostics(
+            sample = { "association=${if (samples.incrementAndGet() == 1) "waiting" else "observed"}" },
+            log = { logs.add(it); if (it.contains("association=observed")) changed.countDown() },
+        )
+        try {
+            diagnostics.start()
+            assertTrue(changed.await(4, TimeUnit.SECONDS))
+        } finally { diagnostics.close() }
+        assertTrue(logs.any { it.contains("association=waiting") })
+        assertTrue(logs.any { it.contains("sampleDurationMs=") && it.contains("intervalMs=1000") })
+        assertTrue(logs.any { it.contains("cachedAgeMs=") && !it.contains("cachedAgeMs=none") })
+    }
+
     @Test fun observerExportsSummaryAndAllFourSnapshotLinesSeparately() {
         val sampled = CountDownLatch(4)
         val logs = java.util.concurrent.CopyOnWriteArrayList<String>()

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -91,14 +93,14 @@ class CarPlayVideoActivity : Activity() {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY && !prepared) {
                     prepared = true
-                    Log.i(TAG, "prepared duration=${player.duration} ms size=${player.videoSize.width}x${player.videoSize.height}")
+                    DiagnosticLogging.logcat { Log.i(TAG, "prepared duration=${player.duration} ms size=${player.videoSize.width}x${player.videoSize.height}") }
                 }
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) = logEncryption()
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.w(TAG, "player error ${error.errorCodeName}: ${causes(error)}")
+                DiagnosticLogging.logcat { Log.w(TAG, "player error ${error.errorCodeName}: ${causes(error)}") }
                 CarPlayVideo.onPlayerFailed(
                     when (error.errorCode) {
                         in 2000..2999 -> VideoInCar.ERROR_NETWORK // IO
@@ -268,7 +270,7 @@ class CarPlayVideoActivity : Activity() {
         loadedUrl = url
         prepared = false
         encryptionLogged = false
-        Log.i(TAG, "loading video scheme=${Uri.parse(url).scheme.orEmpty()} ${playbackNetworkSummary()}")
+        DiagnosticLogging.logcat { Log.i(TAG, "loading video scheme=${Uri.parse(url).scheme.orEmpty()} ${playbackNetworkSummary()}") }
         val item = MediaItem.Builder().setUri(url)
             .apply { if (CarPlayVideo.streaming) setMimeType(MimeTypes.APPLICATION_M3U8) }
             .build()
@@ -308,8 +310,8 @@ class CarPlayVideoActivity : Activity() {
             (0 until init.schemeDataCount).map { init.get(it).uuid }
         }
         val sessionKeys = manifest.multivariantPlaylist.sessionKeyDrmInitData.map { it.schemeType }
-        Log.i(TAG, "HLS encryption aes128KeyScheme=$keyScheme sampleAesSchemeType=${media.protectionSchemes?.schemeType} " +
-            "drmUuids=$drm sessionKeys=$sessionKeys segments=${media.segments.size}")
+        DiagnosticLogging.logcat { Log.i(TAG, "HLS encryption aes128KeyScheme=$keyScheme sampleAesSchemeType=${media.protectionSchemes?.schemeType} " +
+            "drmUuids=$drm sessionKeys=$sessionKeys segments=${media.segments.size}") }
     }
 
     private fun causes(error: Throwable): String = generateSequence(error) { it.cause }.take(4)

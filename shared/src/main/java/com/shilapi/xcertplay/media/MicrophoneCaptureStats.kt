@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 
 internal enum class MicrophoneFailureStage {
@@ -16,7 +18,7 @@ internal class MicrophoneCaptureStats(
     private val type = typeAndSource(config.audioType).first
     private val format = format(config)
     private var metadata = metadata(config)
-    private var windowStart = nowNs()
+    private var windowStart = if (DiagnosticLogging.enabled) nowNs() else 0L
     private var readStart = windowStart
     private var capturedBytes = 0L
     private var reads = 0L
@@ -32,6 +34,7 @@ internal class MicrophoneCaptureStats(
     private var routedDeviceType: Int? = null
 
     fun started(routeType: Int?) {
+        if (!DiagnosticLogging.enabled) return
         routedDeviceType = routeType
         emit("Microphone: start $metadata routedDeviceType=${routeType ?: "unknown"}")
     }
@@ -39,9 +42,10 @@ internal class MicrophoneCaptureStats(
     /** Call before the capture thread starts; [metadata] is not volatile. */
     fun useVoiceCommunicationSource() { metadata = "type=$type source=VOICE_COMMUNICATION $format" }
 
-    fun reading() { readStart = nowNs() }
+    fun reading() { if (DiagnosticLogging.enabled) readStart = nowNs() }
 
     fun read(count: Int) {
+        if (!DiagnosticLogging.enabled) return
         reads++
         readMaxNs = maxOf(readMaxNs, (nowNs() - readStart).coerceAtLeast(0))
         when {
@@ -52,24 +56,28 @@ internal class MicrophoneCaptureStats(
     }
 
     fun encoded(frameCount: Int, emptyCount: Int) {
+        if (!DiagnosticLogging.enabled) return
         encodedFrames += frameCount.coerceAtLeast(0)
         emptyEncodedFrames += emptyCount.coerceAtLeast(0)
     }
 
     fun sent() {
+        if (!DiagnosticLogging.enabled) return
         val now = nowNs()
         lastSentNs?.let { sendGapMaxNs = maxOf(sendGapMaxNs, (now - it).coerceAtLeast(0)) }
         lastSentNs = now
         udpSent++
     }
 
-    fun sendFailed() { sendErrors++ }
+    fun sendFailed() { if (DiagnosticLogging.enabled) sendErrors++ }
 
     fun failure(stage: MicrophoneFailureStage, error: Throwable? = null, code: Int? = null) {
+        if (!DiagnosticLogging.enabled) return
         emit(failureMessage(metadata, stage, error, code))
     }
 
     fun flush(ended: Boolean = false, routeType: (() -> Int?)? = null) {
+        if (!DiagnosticLogging.enabled) return
         val now = nowNs()
         if (!ended && now - windowStart < REPORT_INTERVAL_NS) return
         if (routeType != null) routedDeviceType = runCatching { routeType() }.getOrNull()
@@ -91,7 +99,7 @@ internal class MicrophoneCaptureStats(
         sendGapMaxNs = 0
     }
 
-    private fun emit(message: String) { runCatching { report(message) } }
+    private fun emit(message: String) { runCatching { DiagnosticLogging.record { report(message) } } }
 
     companion object {
         private const val REPORT_INTERVAL_NS = 5_000_000_000L
@@ -120,7 +128,7 @@ internal class MicrophoneCaptureStats(
             "code=${code ?: "none"}"
 
         fun reportStartFailure(config: MicrophoneConfig, error: Throwable, report: (String) -> Unit) {
-            runCatching { report(failureMessage(metadata(config), MicrophoneFailureStage.START, error, null)) }
+            runCatching { DiagnosticLogging.record { report(failureMessage(metadata(config), MicrophoneFailureStage.START, error, null)) } }
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.media
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
@@ -28,10 +30,10 @@ internal class OpusEncoder(bitrate: Int) : MicrophoneOpusEncoder {
                 MediaCodec.CONFIGURE_FLAG_ENCODE,
             )
             it.start()
-            Log.i(TAG, "Opus microphone encoder started bitrate=$bitrate")
+            DiagnosticLogging.logcat { Log.i(TAG, "Opus microphone encoder started bitrate=$bitrate") }
         }
     } catch (error: Exception) {
-        Log.w(TAG, "Opus microphone encoder unavailable", error)
+        DiagnosticLogging.logcat { Log.w(TAG, "Opus microphone encoder unavailable", error) }
         null
     }
     private val bufferInfo = MediaCodec.BufferInfo()
@@ -50,7 +52,7 @@ internal class OpusEncoder(bitrate: Int) : MicrophoneOpusEncoder {
         val inputIndex = try {
             codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
         } catch (error: Exception) {
-            Log.w(TAG, "Opus microphone input dequeue failed", error)
+            DiagnosticLogging.logcat { Log.w(TAG, "Opus microphone input dequeue failed", error) }
             return emptyList()
         }
         if (inputIndex >= 0) {
@@ -80,7 +82,7 @@ internal class OpusEncoder(bitrate: Int) : MicrophoneOpusEncoder {
             val index = try {
                 codec.dequeueOutputBuffer(bufferInfo, 0)
             } catch (error: Exception) {
-                Log.w(TAG, "Opus microphone output dequeue failed", error)
+                DiagnosticLogging.logcat { Log.w(TAG, "Opus microphone output dequeue failed", error) }
                 return output
             }
             when {
@@ -100,11 +102,11 @@ internal class OpusEncoder(bitrate: Int) : MicrophoneOpusEncoder {
                         output.add(bytes)
                         outputPackets++
                         if (outputPackets <= FIRST_PACKET_LOG_COUNT) {
-                            Log.i(
+                            DiagnosticLogging.logcat { Log.i(
                                 TAG,
                                 "Opus microphone packet=$outputPackets bytes=${bytes.size} " +
                                     "head=${bytes.copyOf(minOf(bytes.size, 16)).toHexString()}",
-                            )
+                            ) }
                         }
                     }
                     codec.releaseOutputBuffer(index, false)
