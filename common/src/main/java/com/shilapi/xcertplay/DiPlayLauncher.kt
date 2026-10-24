@@ -15,6 +15,7 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 internal object DiPlayLauncher {
     /** Start the configured Hongqi connection before constructing either full UI. */
     fun startAutomaticConnection(context: Context, fromBoot: Boolean = false): Boolean {
+        if (ConnectionProgressUiState.disconnected()) return false
         val diagnosticStarted = android.os.SystemClock.elapsedRealtime()
         DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch enter fromBoot=$fromBoot") }
         val wireless = DiPlayPreferences.autoConnectWireless(context)
@@ -26,7 +27,8 @@ internal object DiPlayLauncher {
                 hotspotMode = AirPlayPersistence.loadWirelessHotspotMode(context),
                 notificationsAllowed = Build.VERSION.SDK_INT < 33 ||
                     context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
-                sessionRunning = CarPlayBackgroundSession.hasSession(),
+                // A boot service may already be connecting. The Activity adopts that controller.
+                sessionRunning = CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(Hs5BootSession),
                 setupReady = true,
             )) {
             DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=policy_skipped elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }

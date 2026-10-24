@@ -79,6 +79,7 @@ internal object CarPlayMediaKeys {
         }
         appContext = context.applicationContext
         controller = next
+        SteeringWheelEvents.attach(context, next)
         GeelyWheelKeys.start(context)
         Hs5SteeringKeys.attach(context, next)
         com.shilapi.xcertplay.media.AmbientMusicController.claimPlaybackOwner(next)
@@ -102,6 +103,7 @@ internal object CarPlayMediaKeys {
         expected.nowPlayingListener = null
         expected.artworkListener = null
         controller = null
+        SteeringWheelEvents.detach(expected)
         Hs5SteeringKeys.detach(expected)
         GeelyWheelKeys.stop()
         releaseLocked()

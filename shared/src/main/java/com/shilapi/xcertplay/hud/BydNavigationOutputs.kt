@@ -41,6 +41,12 @@ object BydNavigationOutputs {
         Hs5GuidanceBridge.setClusterMapShown(shown)
     }
 
+    fun setHs5ClusterExitListener(listener: (() -> Unit)?) {
+        Hs5GuidanceBridge.setClusterMapCloseRequest(listener)
+    }
+
+    fun hs5ClusterDiagnosticReport(): String = Hs5GuidanceBridge.clusterMapDiagnosticReport()
+
     /** The running CarPlay session: told every second whether the cluster currently shows the map. */
     fun setClusterStreamControl(control: (Boolean) -> Unit) { BydClusterMapPause.streamControl = control }
 

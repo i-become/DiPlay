@@ -95,6 +95,7 @@ import com.shilapi.xcertplay.newui.settings.NewUiSettingsSubpage
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsUpdateScreen
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsVehicleIconScreen
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsVehicleNameScreen
+import com.shilapi.xcertplay.newui.settings.NewUiSettingsVoiceAssistantKeyScreen
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateController
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateStage
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateUiState
@@ -491,6 +492,24 @@ class NewUiActivity : ComponentActivity() {
                                 },
                                 onPreview = { previewAudioChannel(it, navigation = true) },
                             )
+                            NewUiSettingsSubpage.VOICE_ASSISTANT_KEY -> NewUiSettingsVoiceAssistantKeyScreen(
+                                customVoiceKeyEnabled = settingsState.carPlayWheelSiri,
+                                singleTarget = settingsState.voiceAssistantKeySingle,
+                                doubleTarget = settingsState.voiceAssistantKeyDouble,
+                                onCustomVoiceKeyEnabledChanged = { enabled ->
+                                    NewUiSettingsActions.saveCarPlayWheelSiri(activity, enabled)
+                                    refreshAll()
+                                },
+                                onSingleTargetChanged = { target ->
+                                    NewUiSettingsActions.saveVoiceAssistantKeySingle(activity, target)
+                                    refreshAll()
+                                },
+                                onDoubleTargetChanged = { target ->
+                                    NewUiSettingsActions.saveVoiceAssistantKeyDouble(activity, target)
+                                    refreshAll()
+                                },
+                                onBack = { popSettingsSubpage() },
+                            )
                             NewUiSettingsSubpage.MAIN -> NewUiSettingsScreen(
                                 state = settingsState,
                                 onAutoStartChanged = { enabled ->
@@ -537,9 +556,8 @@ class NewUiActivity : ComponentActivity() {
                                     NewUiSettingsActions.saveCarPlayWheelMedia(activity, enabled)
                                     refreshAll()
                                 },
-                                onCarPlayWheelSiriChanged = { enabled ->
-                                    NewUiSettingsActions.saveCarPlayWheelSiri(activity, enabled)
-                                    refreshAll()
+                                onVoiceAssistantKeyConfig = {
+                                    pushSettingsSubpage(NewUiSettingsSubpage.VOICE_ASSISTANT_KEY)
                                 },
                             )
                         }

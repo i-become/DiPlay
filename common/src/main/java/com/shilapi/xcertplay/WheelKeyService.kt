@@ -131,7 +131,13 @@ class WheelKeyService : AccessibilityService() {
         val down = event.action == KeyEvent.ACTION_DOWN
         if (Hs5HeadUnit.isHeadUnit(this)) {
             if (event.keyCode in Hs5ClusterActivity.CLOSE_KEYS && Hs5ClusterActivityOutput.isOpen()) {
-                if (!down && !event.isCanceled) Hs5ClusterActivityOutput.closeByDriver("key ${event.keyCode}")
+                if (!down && !event.isCanceled) {
+                    val reason = "key ${event.keyCode}"
+                    if (event.keyCode != KeyEvent.KEYCODE_BACK ||
+                        !CarPlayHostSettingsBridge.closeFromAndroidBack(reason)) {
+                        Hs5ClusterActivityOutput.closeByDriver(reason)
+                    }
+                }
                 return true
             }
         }

@@ -90,7 +90,6 @@ import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.CarPlayMediaEngine
 import com.shilapi.xcertplay.airplay.SafeAreaRect
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.location.AndroidCarPlayLocationProvider
 import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.media.CarPlayTouchMapper
 import com.shilapi.xcertplay.media.CarPlayVideoLayout
@@ -110,12 +109,8 @@ import com.shilapi.xcertplay.settings.ConnectionSettingsSection
 import com.shilapi.xcertplay.settings.DisplaySettingsSection
 import com.shilapi.xcertplay.settings.SettingsTheme
 import com.shilapi.xcertplay.settings.SettingsWidgets
-import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
-import com.shilapi.xcertplay.transport.Iap2LocationProvider
 import com.shilapi.xcertplay.transport.BluetoothLinkCheck
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
-import com.shilapi.xcertplay.transport.UsbDeviceId
-import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -143,6 +138,7 @@ class CarPlayHostActivity : ComponentActivity() {
     )
 
     private var newUiConnectionHub = false
+    private var projectionExitRequested = false
     private var preparingConnectionBeforeUi = false
     private var lastHubReturnUptime = 0L
     private var connectionPanel: View? = null
@@ -166,55 +162,23 @@ class CarPlayHostActivity : ComponentActivity() {
         super.attachBaseContext(AppLocale.wrap(newBase))
     }
 
-    // CH341 USB\VID_1A86&PID_5512&REV_0304 is the deployment-supplied bridge identity.
-    private fun createRuntimeConfig(): CarPlayRuntimeConfig = CarPlayRuntimeConfig(
+    private fun createRuntimeConfig(): CarPlayRuntimeConfig = CarPlayRuntimeConfigFactory.create(
+        context = this,
+        identity = airPlayIdentity,
         mfiTarget = mfiTarget,
-        ch341Devices = if (mfiTarget == MfiTarget.USB_CH341) {
-            listOf(UsbDeviceId(0x1a86, 0x5512))
-        } else {
-            emptyList()
-        },
-        // The CP latches its I2C address from the RST level at its own power-up, so the host must
-        // not pulse RST before discovery. Driving D0 re-latches the part onto the alternate
-        // address (0x10), where the accessory certificate is not readable. Leave RST at its
-        // hardware pull (VCC -> 0x11) and let the scanner find the part with its certificate.
-        // Set this back to 0 to restore the D0 pulse.
-        ch341MfiResetGpio = null,
-        linuxI2cPath = if (mfiTarget == MfiTarget.I2C) mfiI2cPath.trim() else null,
-        remoteMfiServer = remoteMfiServer.trim().takeIf { it.isNotEmpty() },
-        remoteMfiToken = remoteMfiToken.takeIf { it.isNotEmpty() },
-        identification = Iap2IdentificationConfig(
-            name = "DiPlay",
-            modelIdentifier = normalizedModel(),
-            manufacturer = normalizedManufacturer(),
-            serialNumber = "DIPLAY-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", ""),
-            firmwareVersion = "0.1.0",
-            hardwareVersion = "1.0",
-            carPlayUsbInterfaceNumber = 3,
-            locationInformationEnabled = locationReportingEnabled,
-            vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
-            chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
-            vehicleSpeedEnabled = locationReportingEnabled && (
-                com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this) ||
-                    AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)
-                ),
-        ),
-        label = "DiPlay",
-        hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
-        hostMac = DiPlayBootstrap.deviceId(airPlayIdentity).split(":").map { it.toInt(16).toByte() }.toByteArray(),
-        wirelessBluetoothDeviceAddress = DiPlayPreferences.phoneAddress(this),
-        transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
-        wirelessHotspotMode = wirelessHotspotMode,
-        wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
-        manualHotspotSsid = manualHotspotSsid,
-        manualHotspotPassphrase = manualHotspotPassphrase,
-        manualHotspotBand = manualHotspotBand,
-        manualHotspotChannel = manualHotspotChannel,
-        manualHotspotSecurity = manualHotspotSecurity,
-        existingWifiSsid = existingWifiSsid,
-        existingWifiPassphrase = existingWifiPassphrase,
-        locationReportingEnabled = locationReportingEnabled,
-        availableCurrentMilliAmps = AirPlayPersistence.loadUsbChargingCurrent(this).milliAmps,
+        mfiI2cPath = mfiI2cPath,
+        remoteMfiServer = remoteMfiServer,
+        remoteMfiToken = remoteMfiToken,
+        wirelessEnabled = wirelessEnabled,
+        hotspotMode = wirelessHotspotMode,
+        manualSsid = manualHotspotSsid,
+        manualPassphrase = manualHotspotPassphrase,
+        manualBand = manualHotspotBand,
+        manualChannel = manualHotspotChannel,
+        manualSecurity = manualHotspotSecurity,
+        existingSsid = existingWifiSsid,
+        existingPassphrase = existingWifiPassphrase,
+        locationEnabled = locationReportingEnabled,
     )
 
     private val vpnConsent =
@@ -710,6 +674,18 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The OEM can deliver an old boot Activity launch after a headless session has ended.
+        // Explicit Connect clears this process-local flag before starting a new host.
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this) &&
+            ConnectionProgressUiState.disconnected() && !CarPlayBackgroundSession.hasSession() &&
+            !isIphoneUsbAttachment(intent)) {
+            startupRetryStopped = true
+            startActivity(Intent(this, com.shilapi.xcertplay.newui.NewUiActivity::class.java)
+                .putExtra(DiPlayLauncher.EXTRA_PAGE, "home")
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION))
+            finish()
+            return
+        }
         CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_CREATED)
         NavigationWidgetUpdater.attach(applicationContext)
         CarPlayCallKeys.install(applicationContext)
@@ -763,6 +739,8 @@ class CarPlayHostActivity : ComponentActivity() {
                         closePicturePanel()
                     } else if (menuOpen) {
                         if (safeAreaEditorActive) closeSafeAreaEditor() else leaveSettingsMenu()
+                    } else if (projectionShown()) {
+                        exitProjection("Android BACK")
                     } else {
                         showDiPlayHome()
                     }
@@ -1166,6 +1144,7 @@ class CarPlayHostActivity : ComponentActivity() {
             refreshClusterStreamRoutingAfterToggle()
             applyUltraClusterDashboardIfNeeded()
         }
+        Hs5SteeringKeys.applySettings(this)
     }
 
     override fun onResume() {
@@ -1323,6 +1302,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun ensureClusterPresentation() {
         if (!AirPlayPersistence.loadClusterMapEnabled(this) || !carPlaySessionActive()) {
+            dismissClusterPresentation()
+            return
+        }
+        if (!clusterFlyScreenVisible && com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) {
+            // Display and lifecycle callbacks must not reopen a window the driver just closed.
             dismissClusterPresentation()
             return
         }
@@ -1841,7 +1825,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     /** Shows the dashboard map as a card on the centre screen while DiPlay is in the background. */
     private fun showCenterMap() {
-        if (isDestroyed || shuttingDown.get() || sink == null || isActivityStarted) return
+        if (isDestroyed || projectionExitRequested || shuttingDown.get() || sink == null || isActivityStarted) return
         if (!AirPlayPersistence.loadCenterMapOverlay(this) || !AirPlayPersistence.loadClusterMapEnabled(this)) return
         if (!AirPlayPersistence.loadCenterMapFollowsDashboard(this)) return
         if (MapMirrors.launcherShowsMap) return // the launcher has the map on its own screen
@@ -1977,6 +1961,10 @@ class CarPlayHostActivity : ComponentActivity() {
         currentSurfaceTexture = null
         fallbackVideoView = null
         fallbackVideoBounds = null
+        if (projectionExitRequested) {
+            airPlayCommandExecutor.shutdown()
+            teardownExecutor.shutdown()
+        }
         sessionLog?.append("Activity destroyed")
         sessionLog?.close()
         sessionLog = null
@@ -5021,10 +5009,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
             override fun onSessionActive(session: AirPlaySession) {
                 runOnUiThread {
-                    if (controllerGeneration != restartGeneration || shuttingDown.get() || startupRetryStopped) {
+                    if (controllerGeneration != restartGeneration || shuttingDown.get() || startupRetryStopped ||
+                        projectionExitRequested) {
                         return@runOnUiThread
                     }
                     activeAirPlaySession = session
+                    Hs5SteeringKeys.applySettings(this@CarPlayHostActivity)
                     CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.SESSION_ACTIVE)
                     CarPlayBackgroundSession.active = true
                     callPopupSessionReady = true
@@ -5347,24 +5337,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 "simulatedPresentation=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(this)} " +
                 "vehicleSpeedSim=${AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)}",
         ) }
-        val locationProvider: Iap2LocationProvider? =
-            when {
-                !config.locationReportingEnabled -> null
-                config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
-                    AndroidCarPlayLocationProvider(this),
-                    if (AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(this)) {
-                        com.shilapi.xcertplay.transport.LocationVehicleSpeedSource(
-                            this,
-                            demoMetersPerSecondWhenStationary =
-                                com.shilapi.xcertplay.transport.DEBUG_CLUSTER_DEMO_SPEED_METERS_PER_SECOND,
-                            onSpeedSample = SimulatedClusterSpeedHub::publishMetersPerSecond,
-                        )
-                    } else {
-                        com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(applicationContext)
-                    },
-                )
-                else -> AndroidCarPlayLocationProvider(this)
-            }
+        val locationProvider = CarPlayRuntimeConfigFactory.locationProvider(this, config)
         DiagnosticLogging.record { appendLog(
             "Starting CarPlay controller at ${size.width}x${size.height} -> " +
                 "${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
@@ -5417,11 +5390,7 @@ class CarPlayHostActivity : ComponentActivity() {
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
             locationProvider = locationProvider,
-            vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this)) {
-                com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext)
-            } else {
-                null
-            },
+            vehicleStatusProvider = CarPlayRuntimeConfigFactory.vehicleStatusProvider(this),
         )
         controller = next
         resetSidePanel() // a new session starts without the side panel
@@ -5433,6 +5402,7 @@ class CarPlayHostActivity : ComponentActivity() {
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
             viewAreas = pendingViewAreas,
         )
+        Hs5BootProfileCache.saveAsync(this, airPlayConfig, display, size.width, size.height)
         sessionDisplay = display
         videoView?.let { updateVideoLayout(it.width, it.height) }
         CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display) { completion ->
@@ -5713,7 +5683,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun maybeStartCarPlay() {
-        if (shuttingDown.get()) return
+        if (shuttingDown.get() || startupRetryStopped) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
             val retryMs = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) 150L else 500L
             if (!adoptBackgroundSession()) mainHandler.postDelayed({ maybeStartCarPlay() }, retryMs)
@@ -6289,12 +6259,45 @@ class CarPlayHostActivity : ComponentActivity() {
     internal fun flyScreenShown(): Boolean =
         !isDestroyed && AirPlayPersistence.loadClusterMapEnabled(this) && clusterFlyScreenVisible
 
+    internal fun projectionShown(): Boolean =
+        !projectionExitRequested && !isFinishing && !isDestroyed && !newUiConnectionHub &&
+            (isActivityStarted || flyScreenShown()) && controller?.activeAirPlaySessionToken() != null
+
+    /** Leave the full-screen projection, keeping the controller and its USB/wireless link alive. */
+    internal fun exitProjection(reason: String): Boolean {
+        if (!projectionShown()) return false
+        if (!ProjectionBackgroundOwner.retain(this, this, activeAirPlaySession)) return false
+        projectionExitRequested = true
+        // Invalidate callbacks already queued by this Activity's former session listener.
+        restartGeneration += 1
+        restoreBootForeground = false
+        controller?.sendTouch(emptyList())
+        closeFlyScreen(reason)
+        dismissClusterPresentation()
+        videoSurfaceOwner.clear()
+        mainHandler.removeCallbacks(hideIdleCenterMap)
+        CenterMapOverlay.hide()
+        closePicturePanel()
+        videoView?.visibility = View.INVISIBLE
+        gestureOverlay?.visibility = View.GONE
+        pauseHostUi()
+        Hs5SteeringKeys.applySettings(this)
+        DiagnosticLogging.record { appendLog("Projection UI closed by $reason; CarPlay connection retained") }
+        finish()
+        return true
+    }
+
     internal fun closeFlyScreen(reason: String): Boolean {
         if (!flyScreenShown()) return false
         clusterFlyScreenVisible = false
-        clusterPresentation?.setMapVisible(false)
-        clusterLayers.values.forEach { it.setMapVisible(false) }
-        if (Hs5ClusterActivityOutput.isOpen()) closeHs5ClusterWindow(reason)
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) {
+            // Release the actual instrument window and its input focus, as well as the OEM map mode.
+            dismissClusterPresentation()
+        } else {
+            clusterPresentation?.setMapVisible(false)
+            clusterLayers.values.forEach { it.setMapVisible(false) }
+            if (Hs5ClusterActivityOutput.isOpen()) closeHs5ClusterWindow(reason)
+        }
         currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
         updateClusterMapShown()
         syncClusterPresentationStreamState()
@@ -6356,7 +6359,10 @@ class CarPlayHostActivity : ComponentActivity() {
             if (shuttingDown.get() || generation != restartGeneration) return@runOnUiThread
             if (active) {
                 activeScreenStreamTypes.add(type)
-                if (type == SCREEN_TYPE_MAIN) advanceConnectionProgress(CarPlayConnectionProgress.STEP_COUNT)
+                if (type == SCREEN_TYPE_MAIN) {
+                    advanceConnectionProgress(CarPlayConnectionProgress.STEP_COUNT)
+                    Hs5SteeringKeys.applySettings(this@CarPlayHostActivity)
+                }
             } else {
                 activeScreenStreamTypes.remove(type)
             }
@@ -6754,7 +6760,7 @@ internal data class CarPlaySessionDisplay(
     val windowHeight: Int,
     /** The view areas this session declared, or null for the whole screen as one area. */
     val viewAreas: CarPlayViewAreas? = null,
-)
+) : java.io.Serializable
 
 /** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */
 internal object CarPlayBackgroundSession {
@@ -6768,6 +6774,7 @@ internal object CarPlayBackgroundSession {
     private val stopWaiters = mutableListOf<() -> Unit>()
 
     fun stop(completion: () -> Unit = {}) {
+        Hs5BootSession.cancelPending()
         com.shilapi.xcertplay.orchestration.BluetoothBootPreconnect.cancel()
         val action: (((() -> Unit)) -> Unit)?
         synchronized(this) {

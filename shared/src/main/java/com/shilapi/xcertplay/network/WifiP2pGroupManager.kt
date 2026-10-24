@@ -47,6 +47,7 @@ class WifiP2pGroupManager(
     context: Context,
     private val diagnostic: (String) -> Unit = {},
     private val preferredChannel: Int = WifiP2pChannels.AUTO,
+    private val onPeerLeft: () -> Unit = {},
 ) : WirelessHotspotManager {
     init {
         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -87,6 +88,7 @@ class WifiP2pGroupManager(
     private var clientObservationStartedNs: Long? = null
     private var clientObservationReceivedNs: Long? = null
     private var associatedClient = false
+    private var peerMonitor: WifiP2pPeerMonitor? = null
 
     override fun hasAssociatedClient(): Boolean {
         val now = System.nanoTime()
@@ -346,6 +348,20 @@ class WifiP2pGroupManager(
                     }
                 } else null
             }
+            synchronized(stateLock) {
+                if (!closed) {
+                    val activeChannel = requireNotNull(channel)
+                    val handler = android.os.Handler(requireNotNull(callbackThread).looper)
+                    peerMonitor = WifiP2pPeerMonitor(appContext, group.ssid, handler,
+                        requestGroup = { p2pManager.requestGroupInfo(activeChannel, it) },
+                        onPeerLeft = onPeerLeft, diagnostic = diagnostic)
+                    runCatching { peerMonitor?.start() }.onFailure {
+                        peerMonitor?.close()
+                        peerMonitor = null
+                        diagnostic("Wi-Fi P2P peer monitoring unavailable type=${it.javaClass.simpleName}")
+                    }
+                }
+            }
             return group
         } catch (failure: Exception) {
             diagnostic("Wi-Fi P2P startup stopped type=${failure.javaClass.simpleName}")
@@ -371,6 +387,8 @@ class WifiP2pGroupManager(
         synchronized(stateLock) {
             if (closed) return
             closed = true
+            peerMonitor?.close()
+            peerMonitor = null
             if (!carPlayConfirmed) rememberedAttempt?.let {
                 if (configurationMemory.forget(it)) diagnostic("Wi-Fi P2P remembered cleared=session_unconfirmed")
             }

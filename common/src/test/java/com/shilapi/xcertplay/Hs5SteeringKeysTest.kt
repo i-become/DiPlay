@@ -12,6 +12,7 @@ class Hs5SteeringKeysTest {
         assertEquals(1, QisiSteeringServiceClient.carPlayActionForFactoryKey(KeyEvent.KEYCODE_MEDIA_NEXT))
         assertEquals(2, QisiSteeringServiceClient.carPlayActionForFactoryKey(KeyEvent.KEYCODE_CALL))
         assertEquals(3, QisiSteeringServiceClient.carPlayActionForFactoryKey(259))
+        assertEquals(3, QisiSteeringServiceClient.carPlayActionForFactoryKey(231))
         assertNull(QisiSteeringServiceClient.carPlayActionForFactoryKey(KeyEvent.KEYCODE_VOLUME_UP))
     }
 }

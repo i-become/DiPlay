@@ -5,26 +5,33 @@ import android.view.KeyEvent
 
 /** Which QiSi factory hard keys DiPlay may temporarily register for CarPlay. */
 internal object Hs5SteeringKeyPolicy {
-    /** Back codes taken while the fly screen shows; the engineering key test's "send 4" closes it. */
-    val FLY_SCREEN_BACK_CODES = intArrayOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)
+    /** Only the verified SystemService BACK code is claimed while the fly screen shows. */
+    val FLY_SCREEN_BACK_CODES = intArrayOf(QisiSteeringServiceClient.KEYCODE_BACK)
 
     /** The phone key is taken only during a CarPlay call or while CarPlay plays telephony audio. */
     fun factoryKeyCodes(context: Context, carPlayCall: Boolean, flyScreen: Boolean = false): IntArray {
         val codes = LinkedHashSet<Int>()
-        if (AirPlayPersistence.loadCarPlayWheelMedia(context)) {
+        val wheelKeys = shouldRegisterFactoryKeys(context)
+        val bluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(context)
+        if (wheelKeys && !bluetoothAudio && AirPlayPersistence.loadCarPlayWheelMedia(context)) {
             codes += KeyEvent.KEYCODE_MEDIA_PREVIOUS
             codes += KeyEvent.KEYCODE_MEDIA_NEXT
         }
-        if (AirPlayPersistence.loadCarPlayWheelSiri(context)) {
-            codes += 259
+        if (wheelKeys && AirPlayPersistence.loadCarPlayWheelSiri(context)) {
+            codes += QisiSteeringServiceClient.KEYCODE_VOICE_ASSIST
+            codes += QisiSteeringServiceClient.KEYCODE_SDS_CAR_LINK
         }
-        if (carPlayCall) codes += KeyEvent.KEYCODE_CALL
-        codes += 110
+        if (wheelKeys && !bluetoothAudio && carPlayCall) codes += KeyEvent.KEYCODE_CALL
+        if (wheelKeys) codes += 110
         if (flyScreen) codes += FLY_SCREEN_BACK_CODES.toList()
         return codes.toIntArray()
     }
 
-    fun shouldRegisterFactoryKeys(context: Context): Boolean =
-        AirPlayPersistence.loadCarPlayWheelMedia(context) ||
-            AirPlayPersistence.loadCarPlayWheelSiri(context)
+    fun shouldRegisterFactoryKeys(context: Context, flyScreen: Boolean = false): Boolean =
+        flyScreen || AirPlayPersistence.loadCarPlayWheelSiri(context) ||
+            (!AirPlayPersistence.loadCarBluetoothAudio(context) && AirPlayPersistence.loadCarPlayWheelMedia(context))
+
+    fun closesFlyScreen(keyCode: Int, action: Int, flyScreen: Boolean): Boolean =
+        flyScreen && keyCode == QisiSteeringServiceClient.KEYCODE_BACK &&
+            action == QisiSteeringServiceClient.HARD_KEY_SHORT_CLICK
 }

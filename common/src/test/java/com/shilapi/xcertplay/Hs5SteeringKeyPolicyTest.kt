@@ -44,11 +44,11 @@ class Hs5SteeringKeyPolicyTest {
         AirPlayPersistence.saveCarPlayWheelMedia(context, false)
         AirPlayPersistence.saveCarPlayWheelSiri(context, true)
         assertArrayEquals(
-            intArrayOf(259, 110, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE),
+            intArrayOf(231, 259, 110, 4),
             Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = false, flyScreen = true),
         )
         assertArrayEquals(
-            intArrayOf(259, 110),
+            intArrayOf(231, 259, 110),
             Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = false, flyScreen = false),
         )
     }
@@ -57,5 +57,40 @@ class Hs5SteeringKeyPolicyTest {
         AirPlayPersistence.saveCarPlayWheelMedia(context, false)
         AirPlayPersistence.saveCarPlayWheelSiri(context, false)
         assertFalse(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context))
+        assertArrayEquals(intArrayOf(), Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = false))
+    }
+
+    @Test fun flyScreenBackDoesNotDependOnMediaOrSiri() {
+        AirPlayPersistence.saveCarPlayWheelMedia(context, false)
+        AirPlayPersistence.saveCarPlayWheelSiri(context, false)
+        assertTrue(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context, flyScreen = true))
+        assertArrayEquals(
+            intArrayOf(4),
+            Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = true, flyScreen = true),
+        )
+    }
+
+    @Test fun bluetoothAudioLeavesMediaWithCarButAllowsExplicitVoiceCustomization() {
+        AirPlayPersistence.saveCarBluetoothAudio(context, true)
+        AirPlayPersistence.saveCarPlayWheelMedia(context, true)
+        AirPlayPersistence.saveCarPlayWheelSiri(context, true)
+        assertTrue(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context))
+        assertArrayEquals(
+            intArrayOf(231, 259, 110, 4),
+            Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = true, flyScreen = true),
+        )
+        assertArrayEquals(intArrayOf(231, 259, 110), Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = true))
+        AirPlayPersistence.saveCarPlayWheelSiri(context, false)
+        assertFalse(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context))
+        assertArrayEquals(intArrayOf(4), Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = true, flyScreen = true))
+    }
+
+    @Test fun onlySystemServiceBackShortClickClosesVisibleFlyScreen() {
+        assertTrue(Hs5SteeringKeyPolicy.closesFlyScreen(4, 0, flyScreen = true))
+        assertFalse(Hs5SteeringKeyPolicy.closesFlyScreen(4, 1, flyScreen = true))
+        assertFalse(Hs5SteeringKeyPolicy.closesFlyScreen(4, 2, flyScreen = true))
+        assertFalse(Hs5SteeringKeyPolicy.closesFlyScreen(4, 0, flyScreen = false))
+        assertFalse(Hs5SteeringKeyPolicy.closesFlyScreen(9, 0, flyScreen = true))
+        assertFalse(Hs5SteeringKeyPolicy.closesFlyScreen(KeyEvent.KEYCODE_ESCAPE, 0, flyScreen = true))
     }
 }

@@ -228,6 +228,8 @@ class CarPlayController(
     @Volatile private var mux: Iap2UsbMuxHost? = null
     @Volatile private var csm: Iap2Session? = null
     @Volatile private var activeSession: AirPlaySession? = null
+    @Volatile private var lastEndedSession: AirPlaySession? = null
+    private val sessionUiLock = Any()
     @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
     private val clusterUiLock = Any()
     private var clusterUiStream: Pair<AirPlaySession, Int>? = null
@@ -284,6 +286,8 @@ class CarPlayController(
     @Volatile private var wirelessDiagnostics: WirelessStartupDiagnostics? = null
     @Volatile private var bluetoothSocket: BluetoothSocket? = null
     @Volatile private var bluetoothStream: BluetoothRfcommDuplexStream? = null
+    @Volatile private var wirelessBluetoothTarget: BluetoothDevice? = null
+    private var bluetoothAudioHandoff: BluetoothAudioHandoff? = null
     @Volatile private var wirelessTunnelChannel: Iap2Session? = null
     @Volatile private var wirelessRuntimeIdentification: Iap2IdentificationConfig? = null
     @Volatile private var wirelessAirPlayEndpoint: Iap2WirelessCarPlayEndpoint? = null
@@ -331,7 +335,11 @@ class CarPlayController(
                     debugLog("video in car session allowed=${VideoInCar.allowed} delivery=$delivery")
                 }
             }
-            activeSession = session
+            val listener = synchronized(sessionUiLock) {
+                lastEndedSession = null
+                activeSession = session
+                uiListener
+            }
             val btPrefs = appContext.getSharedPreferences("xcertplay_airplay", android.content.Context.MODE_PRIVATE)
             if (btPrefs.getBoolean("bt_suspend_during_carplay", false)) {
                 // close() marks [closed], and a closing session marks itself before onSessionEnded
@@ -341,19 +349,32 @@ class CarPlayController(
                 }
             }
             if (replacement) restoreDashboardContent(session)
+            if (replacement) synchronized(wirelessResourceLock) {
+                handoffBluetoothMusic(wirelessGeneration.get())
+            }
             debugLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
                     "peer=${session.host}",
             )
-            uiListener?.onSessionActive(session)
+            listener?.onSessionActive(session)
         }
 
         override fun onSessionEnded(session: AirPlaySession) {
-            val wasActive = activeSession === session
-            if (wasActive) activeSession = null
+            val (wasActive, listener) = synchronized(sessionUiLock) {
+                val wasActive = activeSession === session
+                if (wasActive) {
+                    lastEndedSession = session
+                    activeSession = null
+                }
+                wasActive to uiListener
+            }
             debugLog("AirPlay session ended peer=${session.host}; notifying UI before output cleanup")
-            uiListener?.onSessionEnded(session)
+            listener?.onSessionEnded(session)
             if (wasActive) {
+                synchronized(wirelessResourceLock) {
+                    bluetoothAudioHandoff?.close()
+                    bluetoothAudioHandoff = null
+                }
                 synchronized(albumReplayLock) { initialArtworkReplay = null }
                 BydNavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
                 BydBluetoothSuspend.resume(appContext, this@CarPlayController)
@@ -434,10 +455,19 @@ class CarPlayController(
         listener: AirPlaySessionListener,
         reportStatus: (CarPlayStatus) -> Unit,
     ) {
-        uiListener = listener
-        uiStatusReporter = reportStatus
+        val (attachedSession, endedSession) = synchronized(sessionUiLock) {
+            uiListener = listener
+            uiStatusReporter = reportStatus
+            activeSession to if (activeSession == null) lastEndedSession else null
+        }
         mainHandler.post {
-            if (uiListener === listener) lastReportedStatus?.let(reportStatus)
+            if (uiListener === listener && !closed) {
+                lastReportedStatus?.let(reportStatus)
+                if (attachedSession != null && activeSession === attachedSession) listener.onSessionActive(attachedSession)
+                else if (endedSession != null && activeSession == null && lastEndedSession === endedSession) {
+                    listener.onSessionEnded(endedSession)
+                }
+            }
         }
     }
 
@@ -615,12 +645,15 @@ class CarPlayController(
         }
     }
 
-    /** Opens Siri on the iPhone, as the car's voice button does in CarPlay. */
+    /** Queues Siri on the iPhone; diagnostics report whether the command was actually written. */
     fun requestSiri(): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
         return try {
-            touchExecutor.execute { session.invokeSiri() }
+            touchExecutor.execute {
+                val written = !closed && activeSession === session && session.invokeSiri()
+                DiagnosticLogging.record { connectionDiagnostic("Siri request commandWritten=$written") }
+            }
             true
         } catch (_: Exception) {
             false
@@ -674,6 +707,8 @@ class CarPlayController(
         synchronized(wirelessResourceLock) {
             if (closed) return
             closed = true
+            bluetoothAudioHandoff?.close()
+            bluetoothAudioHandoff = null
             bluetoothPreparation?.cancel(true)
             bluetoothPreparation = null
             // Order cancellation with address-preference commits and generation replacement.
@@ -1383,6 +1418,10 @@ class CarPlayController(
             }
             if (isStaleWirelessRun(generation)) return
             val device = prepared.device
+            synchronized(wirelessResourceLock) {
+                if (isStaleWirelessRun(generation)) return
+                wirelessBluetoothTarget = device
+            }
             val hostBluetoothMac = prepared.hostBluetoothMac
             debugLog(
                 "wireless selected Bluetooth target name=${device.name ?: "unknown"} " +
@@ -1920,6 +1959,7 @@ class CarPlayController(
                     debugLog("wireless handoff ready; closing Bluetooth bootstrap transport")
                     closeBluetoothBootstrapTransport()
                     onStatus(CarPlayStatus.WirelessActive, generation)
+                    handoffBluetoothMusic(generation)
                 }
             },
             "xcertplay-wireless-handoff",
@@ -1927,6 +1967,27 @@ class CarPlayController(
             isDaemon = true
             start()
         }
+    }
+
+    /** The phone has requested Bluetooth release and authenticated its replacement iAP2 tunnel. */
+    private fun handoffBluetoothMusic(generation: Int) {
+        if (closed || config.transport != CarPlayTransport.WIRELESS ||
+            generation != wirelessGeneration.get() || !wirelessHandoffRequested.get() ||
+            !wirelessTunnelReady.get() || !wirelessActiveReported.get() ||
+            wirelessFailureReported.get() || bluetoothAudioHandoff != null ||
+            airPlayConfig.disableAudioOutput || !Hs5HeadUnit.isHeadUnit(appContext)) return
+        val adapter = bluetoothAdapter ?: return
+        val target = wirelessBluetoothTarget ?: return
+        val session = activeSession ?: return
+        if (session.isClosed) return
+        bluetoothAudioHandoff = BluetoothAudioHandoff.create(
+            appContext, adapter, target, mainHandler,
+            isCurrent = {
+                !closed && generation == wirelessGeneration.get() &&
+                    wirelessTunnelReady.get() && activeSession === session && !session.isClosed
+            },
+            diagnostic = ::debugLog,
+        ).also { it.start() }
     }
 
     private fun keepBluetoothControlAlive(generation: Int): Boolean = synchronized(wirelessResourceLock) {
@@ -2436,7 +2497,15 @@ class CarPlayController(
             }
             val manager: WirelessHotspotManager = when (hotspotMode) {
                 WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
-                    preferredChannel = config.wifiP2pPreferredChannel)
+                    preferredChannel = config.wifiP2pPreferredChannel,
+                    onPeerLeft = {
+                        val disconnected = activeSession
+                        if (disconnected != null && !isStaleWirelessRun(generation)) {
+                            Thread({
+                                if (!isStaleWirelessRun(generation) && activeSession === disconnected) disconnected.close()
+                            }, "carplay-peer-disconnected").apply { isDaemon = true; start() }
+                        }
+                    })
                 WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     LocalOnlyHotspotManager(appContext, ::debugLog)
                 } else {
@@ -2721,6 +2790,9 @@ class CarPlayController(
             wirelessDiagnostics = null
             diagnostics?.close()
             wirelessConnectionProof.clear()
+            bluetoothAudioHandoff?.close()
+            bluetoothAudioHandoff = null
+            wirelessBluetoothTarget = null
             media.setIapTunnelHandler(null)
             val activeTunnel = wirelessTunnelChannel
             wirelessTunnelChannel = null

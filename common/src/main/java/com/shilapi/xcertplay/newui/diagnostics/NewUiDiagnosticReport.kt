@@ -11,6 +11,7 @@ import com.shilapi.xcertplay.HongqiPositionLights
 import com.shilapi.xcertplay.CarPlayNightModePolicy
 import com.shilapi.xcertplay.StartupDiagnosticSnapshot
 import com.shilapi.xcertplay.WheelKeyService
+import com.shilapi.xcertplay.Hs5SteeringKeys
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.update.UpdateDiagnostics
 import java.io.File
@@ -72,9 +73,11 @@ internal object NewUiDiagnosticReport {
         appendLine()
         appendLine("--- Cluster fly screen window ---")
         appendLine(Hs5ClusterActivityOutput.diagnosticReport())
+        appendLine(com.shilapi.xcertplay.hud.BydNavigationOutputs.hs5ClusterDiagnosticReport())
         appendLine()
         appendLine("--- Steering keys ---")
         appendLine(WheelKeyService.report(context))
+        appendLine(Hs5SteeringKeys.diagnosticReport(context))
         appendLine()
         appendLine("--- diplay.log ---")
         append(logTail(File(File(context.filesDir, "logs"), "diplay.log")))

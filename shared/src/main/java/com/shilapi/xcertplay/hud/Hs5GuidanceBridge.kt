@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import com.shilapi.xcertplay.orchestration.ConnectionDiagnosticTrace
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -49,6 +50,8 @@ internal object Hs5GuidanceBridge {
     private var hudActive = false
     private var instrumentNavActive = false
     private var instrumentMapActive = false
+    private var instrumentMapSession: QisiClusterMapSession? = null
+    private var clusterMapCloseRequest: (() -> Unit)? = null
     private var clusterMapShown = false
     private var lastInstrument: QisiInstrumentFrame? = null
 
@@ -87,6 +90,21 @@ internal object Hs5GuidanceBridge {
         applyInstrumentMapLocked()
     }
 
+    fun setClusterMapCloseRequest(request: (() -> Unit)?) = synchronized(lock) {
+        if (clusterMapCloseRequest === request) return@synchronized
+        instrumentMapSession?.close()
+        instrumentMapSession = null
+        instrumentMapActive = false
+        clusterMapCloseRequest = request
+        if (useQisi) applyInstrumentMapLocked()
+    }
+
+    fun clusterMapDiagnosticReport(): String = synchronized(lock) {
+        "Qisi cluster navigation: qisi=$useQisi bound=${systemBinder != null} " +
+            "instrument=${instrumentBinder != null} hud=${hudBinder != null} " +
+            "shown=$clusterMapShown active=$instrumentMapActive exitTarget=${clusterMapCloseRequest != null}"
+    }
+
     fun onFrame(frame: Iap2Frame) = synchronized(lock) {
         if (!available) return@synchronized
         when (route.accept(frame.messageId, frame.payload)) {
@@ -103,6 +121,9 @@ internal object Hs5GuidanceBridge {
 
     private fun tick() = synchronized(lock) {
         if (useQisi && remoteBinder == null && !binding) mainHandler.post { bindAdapterLocked() }
+        if (useQisi && clusterMapShown && !instrumentMapActive) {
+            mainHandler.post { synchronized(lock) { applyInstrumentMapLocked() } }
+        }
         if (lastSent != null && route.currentApple() == null) sendEndLocked()
         else if (++ticksSinceSend >= KEEPALIVE_TICKS) queueApplyLocked(force = true)
     }
@@ -254,43 +275,27 @@ internal object Hs5GuidanceBridge {
     private fun applyInstrumentMapLocked() {
         val system = systemBinder ?: return
         val instrument = instrumentBinder ?: return
-        if (!BydOutputSettings.hs5ClusterVisible(context ?: return)) return
+        val shouldShow = clusterMapShown && clusterMapCloseRequest != null &&
+            BydOutputSettings.hs5ClusterVisible(context ?: return)
         try {
-            if (clusterMapShown && !instrumentMapActive) {
-                QisiVehicleBinder.transactInts(
-                    system,
-                    QisiVehicleBinder.TOKEN_SYSTEM,
-                    QisiVehicleBinder.SYSTEM_INSTRUMENT_MAP,
-                    intArrayOf(1, 0),
-                )
-                QisiVehicleBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PREPARE)
-                QisiVehicleBinder.setInstrumentMapMode(instrument, INSTRUMENT_MAP_STAGE_PRESENT)
-                QisiVehicleBinder.transactInts(
-                    instrument,
-                    QisiVehicleBinder.TOKEN_INSTRUMENT,
-                    QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
-                    intArrayOf(1),
-                )
+            if (shouldShow && !instrumentMapActive) {
+                val request = clusterMapCloseRequest ?: return
+                val session = QisiClusterMapSession(system, instrument, mainHandler, request)
+                session.open()
+                instrumentMapSession = session
                 instrumentMapActive = true
                 DiagnosticLogging.logcat { Log.i(TAG, "cluster map projection started") }
-            } else if (!clusterMapShown && instrumentMapActive) {
-                QisiVehicleBinder.transactInts(
-                    instrument,
-                    QisiVehicleBinder.TOKEN_INSTRUMENT,
-                    QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
-                    intArrayOf(0),
-                )
-                QisiVehicleBinder.transactInts(
-                    system,
-                    QisiVehicleBinder.TOKEN_SYSTEM,
-                    QisiVehicleBinder.SYSTEM_INSTRUMENT_MAP,
-                    intArrayOf(0, 0),
-                )
+            } else if (!shouldShow && instrumentMapActive) {
+                instrumentMapSession?.close()
+                instrumentMapSession = null
                 instrumentMapActive = false
                 DiagnosticLogging.logcat { Log.i(TAG, "cluster map projection stopped") }
             }
         } catch (error: Exception) {
             DiagnosticLogging.logcat { Log.w(TAG, "instrument map stream failed", error) }
+            DiagnosticLogging.record {
+                ConnectionDiagnosticTrace.record("QISI_CLUSTER map request failed: ${error.javaClass.simpleName}: ${error.message}")
+            }
         }
     }
 
@@ -300,9 +305,6 @@ internal object Hs5GuidanceBridge {
     private fun legacyQisiInstrumentTbt(): Boolean =
         Build.VERSION.SDK_INT == 28 &&
             (Build.MODEL == "HONG QI" || Build.DEVICE == "t1c_acrn")
-
-    private const val INSTRUMENT_MAP_STAGE_PREPARE = 2
-    private const val INSTRUMENT_MAP_STAGE_PRESENT = 4
 
     private fun bindAdapterLocked() {
         val appContext = context ?: return
@@ -332,11 +334,6 @@ internal object Hs5GuidanceBridge {
         binding = true
         remoteBinder = service
         try {
-            hudBinder = QisiVehicleBinder.queryModule(
-                service,
-                QisiVehicleBinder.MODULE_HUD,
-                QisiVehicleBinder.TOKEN_HUD,
-            )
             instrumentBinder = QisiVehicleBinder.queryModule(
                 service,
                 QisiVehicleBinder.MODULE_INSTRUMENT,
@@ -347,6 +344,14 @@ internal object Hs5GuidanceBridge {
                 QisiVehicleBinder.MODULE_SYSTEM,
                 QisiVehicleBinder.TOKEN_SYSTEM,
             )
+            // Full-screen navigation needs modules 8/13, independently of the optional HUD module.
+            hudBinder = runCatching {
+                QisiVehicleBinder.queryModule(service, QisiVehicleBinder.MODULE_HUD,
+                    QisiVehicleBinder.TOKEN_HUD)
+            }.getOrNull()
+            DiagnosticLogging.record {
+                ConnectionDiagnosticTrace.record("QISI_CLUSTER adapter modules ready instrument=true system=true hud=${hudBinder != null}")
+            }
             if (!modulesReadyLogged) {
                 modulesReadyLogged = true
                 DiagnosticLogging.logcat { Log.i(TAG, "navigation modules ready hud=${hudBinder != null}") }
@@ -355,12 +360,17 @@ internal object Hs5GuidanceBridge {
             queueApplyLocked(force = true)
         } catch (error: Exception) {
             DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable", error) }
+            DiagnosticLogging.record {
+                ConnectionDiagnosticTrace.record("QISI_CLUSTER adapter modules failed: ${error.javaClass.simpleName}: ${error.message}")
+            }
             resetModulesLocked()
             scheduleBindRetryLocked()
         }
     }
 
     private fun resetModulesLocked() {
+        instrumentMapSession?.close()
+        instrumentMapSession = null
         hudBinder = null
         instrumentBinder = null
         systemBinder = null

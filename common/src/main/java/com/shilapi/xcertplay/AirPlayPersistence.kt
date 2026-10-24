@@ -77,6 +77,8 @@ object AirPlayPersistence {
     private const val KEY_CAR_BLUETOOTH_AUDIO = "car_bluetooth_audio"
     private const val KEY_CARPLAY_WHEEL_MEDIA = "carplay_wheel_media"
     private const val KEY_CARPLAY_WHEEL_SIRI = "carplay_wheel_siri"
+    private const val KEY_VOICE_ASSISTANT_KEY_SINGLE = "voice_assistant_key_single"
+    private const val KEY_VOICE_ASSISTANT_KEY_DOUBLE = "voice_assistant_key_double"
     private const val KEY_CALL_ECHO_CANCELLATION = "call_echo_cancellation"
     private const val KEY_CALL_VOICE_FILTER = "call_voice_filter"
     private const val KEY_SMOOTH_VIDEO = "smooth_video"
@@ -712,7 +714,10 @@ object AirPlayPersistence {
             .edit().putBoolean(KEY_CARPLAY_WHEEL_MEDIA, enabled).apply()
     }
 
-    /** Hongqi/QiSi factory voice key for Siri while CarPlay is on screen. */
+    /**
+     * When true, DiPlay registers the Hongqi voice hard key and applies [loadVoiceAssistantKeySingle]
+     * and [loadVoiceAssistantKeyDouble]. When false, the car keeps its original voice-key behavior.
+     */
     fun loadCarPlayWheelSiri(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_CARPLAY_WHEEL_SIRI, true)
@@ -720,6 +725,32 @@ object AirPlayPersistence {
     fun saveCarPlayWheelSiri(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_CARPLAY_WHEEL_SIRI, enabled).apply()
+    }
+
+    fun loadVoiceAssistantKeySingle(context: Context): VoiceAssistantKeyTarget =
+        readVoiceAssistantKeyTarget(context, KEY_VOICE_ASSISTANT_KEY_SINGLE, VoiceAssistantKeyTarget.HONGQI)
+
+    fun loadVoiceAssistantKeyDouble(context: Context): VoiceAssistantKeyTarget =
+        readVoiceAssistantKeyTarget(context, KEY_VOICE_ASSISTANT_KEY_DOUBLE, VoiceAssistantKeyTarget.SIRI)
+
+    fun saveVoiceAssistantKeySingle(context: Context, target: VoiceAssistantKeyTarget) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_VOICE_ASSISTANT_KEY_SINGLE, target.name).apply()
+    }
+
+    fun saveVoiceAssistantKeyDouble(context: Context, target: VoiceAssistantKeyTarget) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_VOICE_ASSISTANT_KEY_DOUBLE, target.name).apply()
+    }
+
+    private fun readVoiceAssistantKeyTarget(
+        context: Context,
+        key: String,
+        default: VoiceAssistantKeyTarget,
+    ): VoiceAssistantKeyTarget {
+        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key, null)
+            ?: return default
+        return runCatching { VoiceAssistantKeyTarget.valueOf(stored) }.getOrDefault(default)
     }
 
     fun loadSmoothVideo(context: Context): Boolean {

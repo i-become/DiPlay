@@ -17,7 +17,7 @@ class CarPlayViewAreas private constructor(
     val areas: List<AirPlayViewArea>,
     private val slots: List<Slot>,
     initial: Int,
-) {
+) : java.io.Serializable {
     /** What an area is for; SIDE_PANEL is CarPlay beside DiPlay's panel and is only chosen on request. */
     enum class Kind { FULL_SCREEN, SPLIT_SCREEN, SIDE_PANEL }
 
@@ -25,7 +25,10 @@ class CarPlayViewAreas private constructor(
     data class Screen(val width: Int, val height: Int, val portrait: Boolean)
 
     /** One area's purpose; [sixths] is CarPlay's share of its screen beside the side panel, in sixths. */
-    private data class Slot(val kind: Kind, val portrait: Boolean, val sixths: Int = 6)
+    private data class Slot(val kind: Kind, val portrait: Boolean, val sixths: Int = 6) : java.io.Serializable
+
+    /** A new session must start in the area declared in /info, not the last live side-panel area. */
+    internal fun startupCopy(initial: Int): CarPlayViewAreas = CarPlayViewAreas(areas, slots, initial)
 
     /** The area CarPlay uses now; shared by the session's host and its settings. */
     @Volatile var current: Int = initial

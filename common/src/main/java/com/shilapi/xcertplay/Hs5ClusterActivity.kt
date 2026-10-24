@@ -117,7 +117,11 @@ class Hs5ClusterActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode in CLOSE_KEYS) {
-            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) closeByUser("key ${event.keyCode}")
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) {
+                val reason = "key ${event.keyCode}"
+                if (event.keyCode != KeyEvent.KEYCODE_BACK ||
+                    !CarPlayHostSettingsBridge.closeFromAndroidBack(reason)) closeByUser(reason)
+            }
             return true
         }
         return super.dispatchKeyEvent(event)

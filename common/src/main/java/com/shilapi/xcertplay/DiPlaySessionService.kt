@@ -83,11 +83,13 @@ class DiPlaySessionService : Service() {
         if (warmup) {
             handler.removeCallbacks(warmupTimeout)
             handler.postDelayed(warmupTimeout, WARMUP_MILLIS)
+            Hs5BootSession.schedule(this)
         }
         return START_NOT_STICKY
     }
     override fun onDestroy() {
         handler.removeCallbacks(warmupTimeout)
+        if (CarPlayBackgroundSession.isOwner(Hs5BootSession)) CarPlayBackgroundSession.stop()
         super.onDestroy()
     }
     override fun onTaskRemoved(rootIntent: Intent?) {

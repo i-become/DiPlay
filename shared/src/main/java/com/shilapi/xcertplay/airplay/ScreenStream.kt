@@ -63,6 +63,7 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         try {
             val accepted = bound.accept()
             socket = accepted
+            com.shilapi.xcertplay.network.TcpLiveness.configure(accepted, onDiagnostic)
             run(accepted)
         } catch (error: Exception) {
             if (!closed.get()) listener.onClosed(error)

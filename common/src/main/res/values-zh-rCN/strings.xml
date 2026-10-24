@@ -760,6 +760,17 @@
     <string name="settings_carplay_wheel_media_description">CarPlay 连接期间，方向盘上一曲/下一曲键在 iPhone 上切歌。关闭时保持车辆原有按键行为。</string>
     <string name="settings_carplay_wheel_siri">CarPlay 中方向盘唤醒 Siri</string>
     <string name="settings_carplay_wheel_siri_description">CarPlay 在前台时，方向盘语音键唤醒 iPhone 上的 Siri。关闭时保持车辆原有语音助手键行为。</string>
+    <string name="settings_voice_assistant_key_title">语音助手按键配置</string>
+    <string name="settings_voice_assistant_key_short_sub">CarPlay 连接时方向盘语音键的单击与双击</string>
+    <string name="settings_voice_assistant_key_description">配置方向盘语音键单击和双击分别唤起红旗助手或 Siri。</string>
+    <string name="settings_voice_assistant_key_custom_toggle">自定义语音键</string>
+    <string name="settings_voice_assistant_key_custom_toggle_sub">关闭时保持车辆原有语音助手键行为。</string>
+    <string name="settings_voice_assistant_key_single_label">单击</string>
+    <string name="settings_voice_assistant_key_double_label">双击</string>
+    <string name="settings_voice_assistant_key_action_hongqi">唤起红旗助手</string>
+    <string name="settings_voice_assistant_key_action_siri">唤起 Siri</string>
+    <string name="settings_voice_assistant_key_summary">单击 · %1$s / 双击 · %2$s</string>
+    <string name="settings_voice_assistant_key_summary_car_default">车机默认</string>
     <string name="call_echo_cancellation">通话回声消除（实验性）</string>
     <string name="call_echo_cancellation_description">尝试减少 CarPlay 通话中发送给对方的扬声器回声。效果取决于车载主机。下次连接 CarPlay 时生效。</string>
     <string name="call_voice_filter">更清晰的通话人声（实验性）</string>

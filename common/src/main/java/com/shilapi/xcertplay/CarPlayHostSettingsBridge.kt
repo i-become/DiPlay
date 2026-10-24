@@ -15,11 +15,19 @@ internal object CarPlayHostSettingsBridge {
     }
 
     fun register(host: CarPlayHostActivity) {
-        hostRef = WeakReference(host)
+        val reference = WeakReference(host)
+        hostRef = reference
+        com.shilapi.xcertplay.hud.BydNavigationOutputs.setHs5ClusterExitListener {
+            val target = reference.get()
+            if (target != null) closeFlyScreenFromVehicle(target)
+        }
     }
 
     fun unregister(host: CarPlayHostActivity) {
-        if (hostRef?.get() === host) hostRef = null
+        if (hostRef?.get() === host) {
+            hostRef = null
+            com.shilapi.xcertplay.hud.BydNavigationOutputs.setHs5ClusterExitListener(null)
+        }
     }
 
     fun notifyCarPlayNightModeChanged(context: Context) {
@@ -59,6 +67,25 @@ internal object CarPlayHostSettingsBridge {
 
     /** A wheel key closes the fly screen as the three-finger gesture does; the gesture reopens it. */
     fun closeFlyScreen(reason: String): Boolean = hostRef?.get()?.closeFlyScreen(reason) == true
+
+    internal fun closeFlyScreenFromVehicle(expected: CarPlayHostActivity): Boolean =
+        hostRef?.get() === expected && expected.closeFlyScreen("Qisi full-screen navigation exit")
+
+    /** Identity is captured before posting a key, so a late event cannot close a replacement UI. */
+    fun wheelBackTarget(): CarPlayHostActivity? = hostRef?.get()?.takeIf {
+        it.projectionShown() || it.flyScreenShown()
+    }
+
+    fun wheelBackTargetShown(): Boolean = wheelBackTarget() != null
+
+    fun closeFromWheel(expected: CarPlayHostActivity, reason: String): Boolean {
+        if (hostRef?.get() !== expected) return false
+        return if (expected.projectionShown()) expected.exitProjection(reason)
+        else expected.closeFlyScreen(reason)
+    }
+
+    fun closeFromAndroidBack(reason: String): Boolean =
+        wheelBackTarget()?.let { closeFromWheel(it, reason) } == true
 
     fun notifySessionLogRecordingChanged() {
         hostRef?.get()?.syncSessionLogRecordingFromSettings()

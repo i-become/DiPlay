@@ -700,6 +700,17 @@
     <string name="settings_carplay_wheel_media_description">While CarPlay is active, the wheel previous and next keys change tracks on the iPhone. Off keeps the car\'s original action for those keys.</string>
     <string name="settings_carplay_wheel_siri">CarPlay wheel Siri</string>
     <string name="settings_carplay_wheel_siri_description">While CarPlay is on screen, the wheel voice key wakes Siri on the iPhone. Off keeps the car\'s original voice assistant key.</string>
+    <string name="settings_voice_assistant_key_title">Voice assistant key</string>
+    <string name="settings_voice_assistant_key_short_sub">Single and double press while CarPlay is active</string>
+    <string name="settings_voice_assistant_key_description">Elige qué asistente se abre al pulsar una o dos veces el botón de voz del volante.</string>
+    <string name="settings_voice_assistant_key_custom_toggle">Custom voice key</string>
+    <string name="settings_voice_assistant_key_custom_toggle_sub">Off keeps the car\'s original voice assistant key.</string>
+    <string name="settings_voice_assistant_key_single_label">Single press</string>
+    <string name="settings_voice_assistant_key_double_label">Double press</string>
+    <string name="settings_voice_assistant_key_action_hongqi">Hongqi assistant</string>
+    <string name="settings_voice_assistant_key_action_siri">Siri</string>
+    <string name="settings_voice_assistant_key_summary">Single · %1$s / Double · %2$s</string>
+    <string name="settings_voice_assistant_key_summary_car_default">Car default</string>
     <string name="call_echo_cancellation">Cancelación de eco en llamadas (experimental)</string>
     <string name="call_echo_cancellation_description">Intenta reducir el eco de los altavoces que recibe la otra persona en llamadas de CarPlay. El resultado depende del equipo del coche. Se aplica en la próxima conexión de CarPlay.</string>
     <string name="call_voice_filter">Voces más claras en llamadas (experimental)</string>

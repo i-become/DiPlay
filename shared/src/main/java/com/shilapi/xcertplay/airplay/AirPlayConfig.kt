@@ -6,7 +6,7 @@ data class AirPlayInsets(
     val bottom: Int = 0,
     val left: Int = 0,
     val right: Int = 0,
-)
+) : java.io.Serializable
 
 /** One display advertised to the phone in /info. */
 data class AirPlayDisplayConfig(
@@ -38,7 +38,7 @@ data class AirPlayDisplayConfig(
     val mainDisplayCornerMasks: Boolean? = null,
     /** When true, do not declare safeArea in viewAreas dictionary to avoid conflict with cornerMasks. */
     val mainDisplayDisableSafeArea: Boolean = (mainDisplayCornerMasks == true),
-)
+) : java.io.Serializable
 
 /**
  * A rectangle of the display's stream that CarPlay can draw in, and optionally the edge for its dock
@@ -51,14 +51,14 @@ data class AirPlayViewArea(
     val originX: Int = 0,
     val originY: Int = 0,
     val dockEdge: Int? = null,
-)
+) : java.io.Serializable
 
 /** One OEM homescreen icon. */
 data class AirPlayIcon(
     val widthPixels: Int,
     val heightPixels: Int,
     val data: ByteArray,
-)
+) : java.io.Serializable
 
 /** Immutable accessory configuration consumed by the AirPlay session server. */
 data class AirPlayConfig(
@@ -96,7 +96,7 @@ data class AirPlayConfig(
      * default stream (#148, #341). When set, 8 and 16 kHz are not offered for default and alert audio.
      */
     val speechWithout8And16Khz: Boolean = false,
-)
+) : java.io.Serializable
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */
 internal val AirPlayConfig.bufferedAudioOutputEnabled: Boolean
