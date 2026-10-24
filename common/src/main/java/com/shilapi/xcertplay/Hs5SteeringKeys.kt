@@ -218,8 +218,7 @@ internal object Hs5SteeringKeys {
             "focusRequested=$viewFocusHeld focusType=$viewFocusType focusSuppressed=$viewFocusSuppressed host=${hostRef.get() != null} " +
             "flyScreen=${CarPlayHostSettingsBridge.flyScreenShown()} session=${sessionReady(controller)}\n" +
             "Voice routing: enabled=${AirPlayPersistence.loadCarPlayWheelSiri(context)} " +
-            "single=${AirPlayPersistence.loadVoiceAssistantKeySingle(context)} " +
-            "double=${AirPlayPersistence.loadVoiceAssistantKeyDouble(context)} doubleWindowMs=${VoiceAssistantKeyGesture.DOUBLE_TAP_WINDOW_MILLIS}\n" +
+            "target=SIRI immediate=true\n" +
             (fawKeys?.status() ?: "FAW steering: detached") + "\n" + Hs5SteeringDiagnostics.report()
     }
 

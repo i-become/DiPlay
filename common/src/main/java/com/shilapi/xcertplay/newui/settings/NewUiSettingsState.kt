@@ -4,7 +4,6 @@ import android.content.Context
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.AppLocale
 import com.shilapi.xcertplay.Hs5SteeringKeys
-import com.shilapi.xcertplay.VoiceAssistantKeyTarget
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.update.UpdateAvailability
@@ -25,8 +24,6 @@ data class NewUiSettingsState(
     val showHs5SteeringKeys: Boolean,
     val carPlayWheelMedia: Boolean,
     val carPlayWheelSiri: Boolean,
-    val voiceAssistantKeySingle: VoiceAssistantKeyTarget,
-    val voiceAssistantKeyDouble: VoiceAssistantKeyTarget,
 ) {
     /** Local stream routing applies only when CarPlay audio goes through the vehicle Bluetooth path. */
     val showLocalAudioRouting: Boolean get() = carBluetoothAudio
@@ -34,17 +31,6 @@ data class NewUiSettingsState(
     fun mediaChannelLabel(context: Context): String = channelLabel(context, mediaAudioChannel)
 
     fun navigationChannelLabel(context: Context): String = channelLabel(context, navigationAudioChannel)
-
-    fun voiceAssistantKeySummary(context: Context): String {
-        if (!carPlayWheelSiri) {
-            return context.getString(R.string.settings_voice_assistant_key_summary_car_default)
-        }
-        return context.getString(
-            R.string.settings_voice_assistant_key_summary,
-            voiceAssistantKeyActionLabel(context, voiceAssistantKeySingle),
-            voiceAssistantKeyActionLabel(context, voiceAssistantKeyDouble),
-        )
-    }
 
     companion object {
         val placeholder = NewUiSettingsState(
@@ -63,8 +49,6 @@ data class NewUiSettingsState(
             showHs5SteeringKeys = false,
             carPlayWheelMedia = true,
             carPlayWheelSiri = true,
-            voiceAssistantKeySingle = VoiceAssistantKeyTarget.HONGQI,
-            voiceAssistantKeyDouble = VoiceAssistantKeyTarget.SIRI,
         )
 
         private fun channelLabel(context: Context, channel: Int): String =
@@ -72,14 +56,6 @@ data class NewUiSettingsState(
                 context.getString(R.string.auto_label)
             } else {
                 channel.toString()
-            }
-
-        internal fun voiceAssistantKeyActionLabel(context: Context, target: VoiceAssistantKeyTarget): String =
-            when (target) {
-                VoiceAssistantKeyTarget.HONGQI ->
-                    context.getString(R.string.settings_voice_assistant_key_action_hongqi)
-                VoiceAssistantKeyTarget.SIRI ->
-                    context.getString(R.string.settings_voice_assistant_key_action_siri)
             }
     }
 }
@@ -112,8 +88,6 @@ internal object NewUiSettingsStateReader {
             showHs5SteeringKeys = Hs5HeadUnit.isHeadUnit(context),
             carPlayWheelMedia = AirPlayPersistence.loadCarPlayWheelMedia(context),
             carPlayWheelSiri = AirPlayPersistence.loadCarPlayWheelSiri(context),
-            voiceAssistantKeySingle = AirPlayPersistence.loadVoiceAssistantKeySingle(context),
-            voiceAssistantKeyDouble = AirPlayPersistence.loadVoiceAssistantKeyDouble(context),
         )
     }
 }
@@ -150,18 +124,6 @@ internal object NewUiSettingsActions {
 
     fun saveCarPlayWheelSiri(context: Context, enabled: Boolean) {
         AirPlayPersistence.saveCarPlayWheelSiri(context, enabled)
-        Hs5SteeringKeys.applySettings(context)
-    }
-
-    fun saveVoiceAssistantKeySingle(context: Context, target: VoiceAssistantKeyTarget) {
-        AirPlayPersistence.saveVoiceAssistantKeySingle(context, target)
-        AirPlayPersistence.saveCarPlayWheelSiri(context, true)
-        Hs5SteeringKeys.applySettings(context)
-    }
-
-    fun saveVoiceAssistantKeyDouble(context: Context, target: VoiceAssistantKeyTarget) {
-        AirPlayPersistence.saveVoiceAssistantKeyDouble(context, target)
-        AirPlayPersistence.saveCarPlayWheelSiri(context, true)
         Hs5SteeringKeys.applySettings(context)
     }
 }

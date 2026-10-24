@@ -758,7 +758,7 @@
     <string name="settings_car_bluetooth_audio_description">DiPlay 不向 iPhone 提供 CarPlay 音频，因此音乐、导航和通话应通过 iPhone 与车辆的蓝牙连接传输。请保持 iPhone 与车辆配对，并将车辆音源设为蓝牙。如果声音改从 iPhone 播放，请关闭此选项。会重新连接 CarPlay。</string>
     <string name="settings_carplay_wheel_media">CarPlay 中方向盘切歌</string>
     <string name="settings_carplay_wheel_media_description">CarPlay 连接期间，方向盘上一曲/下一曲键在 iPhone 上切歌。关闭时保持车辆原有按键行为。</string>
-    <string name="settings_carplay_wheel_siri">CarPlay 中方向盘唤醒 Siri</string>
+    <string name="settings_carplay_wheel_siri">方向盘语音助手按键唤醒Siri</string>
     <string name="settings_carplay_wheel_siri_description">CarPlay 在前台时，方向盘语音键唤醒 iPhone 上的 Siri。关闭时保持车辆原有语音助手键行为。</string>
     <string name="settings_voice_assistant_key_title">语音助手按键配置</string>
     <string name="settings_voice_assistant_key_short_sub">CarPlay 连接时方向盘语音键的单击与双击</string>
@@ -1021,6 +1021,18 @@
     <string name="new_ui_display_cluster_map_sub">在仪表屏显示 iPhone 地图飞屏。</string>
     <string name="new_ui_display_cluster_gesture">三指横滑飞屏</string>
     <string name="new_ui_display_cluster_gesture_sub">三指横向滑动快速切换飞屏。</string>
+    <string name="new_ui_display_nav_marker">导航车标位置</string>
+    <string name="new_ui_display_nav_marker_sub">仪表导航地图上的车辆图标</string>
+    <string name="new_ui_display_nav_marker_summary">%1$d%% · %2$d%%</string>
+    <string name="new_ui_display_nav_marker_horizontal">水平</string>
+    <string name="new_ui_display_nav_marker_vertical">垂直</string>
+    <string name="new_ui_display_nav_marker_percent">%1$d%%</string>
+    <string name="new_ui_display_nav_marker_edit">编辑位置</string>
+    <string name="new_ui_display_nav_marker_editing">编辑</string>
+    <string name="new_ui_display_nav_marker_reset">重置默认</string>
+    <string name="new_ui_display_nav_marker_reconnect">保存后重新连接 CarPlay 才会生效。</string>
+    <string name="new_ui_display_nav_marker_legend_center">中心</string>
+    <string name="new_ui_display_nav_marker_legend_marker">车标</string>
     <string name="new_ui_display_theme_applied">CarPlay 主题已更新。若画面未变化，请进入 CarPlay 后重试或重新连接。</string>
     <string name="new_ui_display_carplay_theme">CarPlay 主题模式</string>
     <string name="new_ui_display_carplay_theme_sub">日间、夜间或跟随系统。</string>

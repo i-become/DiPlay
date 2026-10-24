@@ -715,8 +715,8 @@ object AirPlayPersistence {
     }
 
     /**
-     * When true, DiPlay registers the Hongqi voice hard key and applies [loadVoiceAssistantKeySingle]
-     * and [loadVoiceAssistantKeyDouble]. When false, the car keeps its original voice-key behavior.
+     * When true, the steering-wheel voice key wakes Siri. When false, the car keeps its original
+     * voice-key behavior. The former single/double-click preferences do not affect this switch.
      */
     fun loadCarPlayWheelSiri(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

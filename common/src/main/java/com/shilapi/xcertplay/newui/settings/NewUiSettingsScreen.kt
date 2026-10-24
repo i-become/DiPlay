@@ -27,7 +27,7 @@ fun NewUiSettingsScreen(
     onLanguage: () -> Unit,
     onCheckUpdate: () -> Unit,
     onCarPlayWheelMediaChanged: (Boolean) -> Unit,
-    onVoiceAssistantKeyConfig: () -> Unit,
+    onCarPlayWheelSiriChanged: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
@@ -54,11 +54,11 @@ fun NewUiSettingsScreen(
                         enabled = wheelKeysEnabled,
                         onCheckedChange = onCarPlayWheelMediaChanged,
                     )
-                    NewUiCompactNavRow(
-                        title = stringResource(R.string.settings_voice_assistant_key_title),
-                        subtitle = stringResource(R.string.settings_voice_assistant_key_short_sub),
-                        trailing = state.voiceAssistantKeySummary(context),
-                        onClick = { if (wheelKeysEnabled) onVoiceAssistantKeyConfig() },
+                    NewUiCompactToggleRow(
+                        title = stringResource(R.string.settings_carplay_wheel_siri),
+                        subtitle = stringResource(R.string.settings_carplay_wheel_siri_description),
+                        checked = state.carPlayWheelSiri,
+                        onCheckedChange = onCarPlayWheelSiriChanged,
                     )
                 }
                 if (state.showLocalAudioRouting) {

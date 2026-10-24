@@ -9,5 +9,4 @@ enum class NewUiSettingsSubpage {
     UPDATE,
     MEDIA_AUDIO_CHANNEL,
     NAVIGATION_AUDIO_CHANNEL,
-    VOICE_ASSISTANT_KEY,
 }

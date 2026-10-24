@@ -29,7 +29,9 @@ import com.shilapi.xcertplay.newui.NewUiTypography
 @Composable
 fun NewUiDisplayScreen(
     state: NewUiDisplayState,
+    navMarkerSummary: String,
     onPickFps: () -> Unit,
+    onPickNavMarker: () -> Unit,
     onSmoothVideoChanged: (Boolean) -> Unit,
     onDirectVideoOutputChanged: (Boolean) -> Unit,
     onLowLatencyDecoderChanged: (Boolean) -> Unit,
@@ -102,6 +104,12 @@ fun NewUiDisplayScreen(
                     checked = state.clusterMapEnabled && state.clusterHorizontalGestureEnabled,
                     enabled = state.clusterMapEnabled,
                     onCheckedChange = onClusterGestureChanged,
+                )
+                NewUiCompactValueRow(
+                    title = stringResource(R.string.new_ui_display_nav_marker),
+                    subtitle = stringResource(R.string.new_ui_display_nav_marker_sub),
+                    value = navMarkerSummary,
+                    onClick = onPickNavMarker,
                 )
                 CarPlayThemeSegmentedRow(
                     selectedIndex = state.nightModeIndex,

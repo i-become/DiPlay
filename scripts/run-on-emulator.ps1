@@ -18,6 +18,11 @@ $Root = Split-Path $PSScriptRoot -Parent
 
 
 
+function Wake-Emulator([string]$adbPath, [string]$deviceSerial) {
+    & $adbPath -s $deviceSerial shell input keyevent KEYCODE_WAKEUP 2>$null | Out-Null
+    & $adbPath -s $deviceSerial shell input keyevent 82 2>$null | Out-Null
+}
+
 $serial = & $adb devices | Select-String "emulator-\d+\s+device" | ForEach-Object { ($_ -split "\s+")[0] } | Select-Object -First 1
 
 if (-not $serial) {
@@ -48,7 +53,7 @@ if (-not $serial) {
 
 }
 
-
+Wake-Emulator $adb $serial
 
 if (-not $env:DIPLAY_AUTH_ASSETS_DIR) {
 
@@ -74,6 +79,7 @@ try {
 
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    Wake-Emulator $adb $serial
     & $adb -s $serial shell am start -n "com.shihab.diplay.hudtest/com.shilapi.xcertplay.newui.NewUiActivity"
 
 } finally {

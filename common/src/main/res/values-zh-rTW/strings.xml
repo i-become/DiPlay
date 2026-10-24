@@ -756,7 +756,7 @@
     <string name="settings_car_bluetooth_audio_description">DiPlay 不向 iPhone 提供 CarPlay 音訊，因此音樂、導航和通話應透過 iPhone 與車輛的藍牙連線傳輸。請保持 iPhone 與車輛配對，並將車輛音源設為藍牙。如果聲音改從 iPhone 播放，請關閉此選項。變更後會重新連線至 CarPlay。</string>
     <string name="settings_carplay_wheel_media">CarPlay 中方向盤切歌</string>
     <string name="settings_carplay_wheel_media_description">CarPlay 連線期間，方向盤上一曲/下一曲鍵在 iPhone 上切歌。關閉時保持車輛原有按鍵行為。</string>
-    <string name="settings_carplay_wheel_siri">CarPlay 中方向盤喚醒 Siri</string>
+    <string name="settings_carplay_wheel_siri">方向盤語音助手按鍵喚醒 Siri</string>
     <string name="settings_carplay_wheel_siri_description">CarPlay 在前景時，方向盤語音鍵喚醒 iPhone 上的 Siri。關閉時保持車輛原有語音助手鍵行為。</string>
     <string name="settings_voice_assistant_key_title">語音助手按鍵配置</string>
     <string name="settings_voice_assistant_key_short_sub">CarPlay 連線時方向盤語音鍵的單擊與雙擊</string>

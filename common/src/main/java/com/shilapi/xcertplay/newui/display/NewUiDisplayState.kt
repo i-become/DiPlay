@@ -135,6 +135,19 @@ internal object NewUiDisplayActions {
         }
         CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
     }
+
+    fun saveClusterNavMarker(context: Context, xPercent: Int, yPercent: Int) {
+        AirPlayPersistence.saveClusterMarkerXPercent(context, xPercent)
+        AirPlayPersistence.saveClusterMarkerYPercent(context, yPercent)
+        CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
+    }
+
+    fun resetClusterNavMarker(context: Context) {
+        saveClusterNavMarker(context, DEFAULT_NAV_MARKER_X, DEFAULT_NAV_MARKER_Y)
+    }
+
+    private const val DEFAULT_NAV_MARKER_X = 50
+    private const val DEFAULT_NAV_MARKER_Y = 45
 }
 
 fun CarPlayNightMode.newUiLabelRes(): Int = when (this) {

@@ -59,13 +59,19 @@ fun NewUiScrollPanelColumn(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val scroll = rememberScrollState()
     Column(
-        modifier = modifier
-            .newUiGlassPanel(cornerRadius = NewUiLayout.PageCardRadius)
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 4.dp),
-        content = content,
-    )
+        modifier = modifier.newUiGlassPanel(cornerRadius = NewUiLayout.PageCardRadius),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = true)
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .padding(vertical = 4.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable

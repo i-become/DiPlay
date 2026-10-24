@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.shilapi.xcertplay.AirPlayPersistence
@@ -78,6 +79,7 @@ import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticQrScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsSubpage
 import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
+import com.shilapi.xcertplay.newui.display.NewUiDisplayNavMarkerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayState
 import com.shilapi.xcertplay.newui.display.NewUiDisplayStateReader
@@ -95,7 +97,6 @@ import com.shilapi.xcertplay.newui.settings.NewUiSettingsSubpage
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsUpdateScreen
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsVehicleIconScreen
 import com.shilapi.xcertplay.newui.settings.NewUiSettingsVehicleNameScreen
-import com.shilapi.xcertplay.newui.settings.NewUiSettingsVoiceAssistantKeyScreen
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateController
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateStage
 import com.shilapi.xcertplay.newui.settings.NewUiUpdateUiState
@@ -122,6 +123,8 @@ class NewUiActivity : ComponentActivity() {
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
     private var displaySubpage by mutableStateOf(NewUiDisplaySubpage.MAIN)
+    private var clusterNavMarkerX by mutableStateOf(50)
+    private var clusterNavMarkerY by mutableStateOf(45)
     private var diagnosticsSubpage by mutableStateOf(NewUiDiagnosticsSubpage.MAIN)
     private var vehicleIconRevision by mutableStateOf(0)
     private var diagnosticReportTitle by mutableStateOf("")
@@ -322,9 +325,38 @@ class NewUiActivity : ComponentActivity() {
                                     refreshAll()
                                 },
                             )
+                            NewUiDisplaySubpage.NAV_MARKER -> NewUiDisplayNavMarkerScreen(
+                                xPercent = clusterNavMarkerX,
+                                yPercent = clusterNavMarkerY,
+                                onBack = { popDisplaySubpage() },
+                                onSave = { x, y ->
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.new_ui_display_nav_marker),
+                                        message = getString(R.string.new_ui_display_nav_marker_reconnect),
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.saveClusterNavMarker(activity, x, y)
+                                    }
+                                },
+                                onResetDefault = {
+                                    applyWithReconnectConfirm(
+                                        title = getString(R.string.new_ui_display_nav_marker_reset),
+                                        message = getString(R.string.new_ui_display_nav_marker_reconnect),
+                                        onApplied = ::refreshAll,
+                                    ) {
+                                        NewUiDisplayActions.resetClusterNavMarker(activity)
+                                    }
+                                },
+                            )
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
+                                navMarkerSummary = getString(
+                                    R.string.new_ui_display_nav_marker_summary,
+                                    clusterNavMarkerX,
+                                    clusterNavMarkerY,
+                                ),
                                 onPickFps = { openDisplayFpsPage() },
+                                onPickNavMarker = { openDisplayNavMarkerPage() },
                                 onSmoothVideoChanged = { enabled ->
                                     applyWithReconnectConfirm(
                                         title = getString(R.string.smooth_video),
@@ -492,24 +524,6 @@ class NewUiActivity : ComponentActivity() {
                                 },
                                 onPreview = { previewAudioChannel(it, navigation = true) },
                             )
-                            NewUiSettingsSubpage.VOICE_ASSISTANT_KEY -> NewUiSettingsVoiceAssistantKeyScreen(
-                                customVoiceKeyEnabled = settingsState.carPlayWheelSiri,
-                                singleTarget = settingsState.voiceAssistantKeySingle,
-                                doubleTarget = settingsState.voiceAssistantKeyDouble,
-                                onCustomVoiceKeyEnabledChanged = { enabled ->
-                                    NewUiSettingsActions.saveCarPlayWheelSiri(activity, enabled)
-                                    refreshAll()
-                                },
-                                onSingleTargetChanged = { target ->
-                                    NewUiSettingsActions.saveVoiceAssistantKeySingle(activity, target)
-                                    refreshAll()
-                                },
-                                onDoubleTargetChanged = { target ->
-                                    NewUiSettingsActions.saveVoiceAssistantKeyDouble(activity, target)
-                                    refreshAll()
-                                },
-                                onBack = { popSettingsSubpage() },
-                            )
                             NewUiSettingsSubpage.MAIN -> NewUiSettingsScreen(
                                 state = settingsState,
                                 onAutoStartChanged = { enabled ->
@@ -556,8 +570,9 @@ class NewUiActivity : ComponentActivity() {
                                     NewUiSettingsActions.saveCarPlayWheelMedia(activity, enabled)
                                     refreshAll()
                                 },
-                                onVoiceAssistantKeyConfig = {
-                                    pushSettingsSubpage(NewUiSettingsSubpage.VOICE_ASSISTANT_KEY)
+                                onCarPlayWheelSiriChanged = { enabled ->
+                                    NewUiSettingsActions.saveCarPlayWheelSiri(activity, enabled)
+                                    refreshAll()
                                 },
                             )
                         }
@@ -709,6 +724,8 @@ class NewUiActivity : ComponentActivity() {
         carPlayWasActive = carPlayNowActive
         topBarStatus = NewUiTopBarStatusReader.read(this)
         displayState = NewUiDisplayStateReader.read(this)
+        clusterNavMarkerX = AirPlayPersistence.loadClusterMarkerXPercent(this)
+        clusterNavMarkerY = AirPlayPersistence.loadClusterMarkerYPercent(this)
         settingsState = NewUiSettingsStateReader.read(this)
         diagnosticStoragePath = NewUiDiagnosticsRepository.storageHint(this)
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)
@@ -820,6 +837,11 @@ class NewUiActivity : ComponentActivity() {
 
     private fun openDisplayFpsPage() {
         displaySubpage = NewUiDisplaySubpage.FPS
+        syncSubpageBackCallback()
+    }
+
+    private fun openDisplayNavMarkerPage() {
+        displaySubpage = NewUiDisplaySubpage.NAV_MARKER
         syncSubpageBackCallback()
     }
 

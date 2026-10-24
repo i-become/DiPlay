@@ -79,6 +79,29 @@
           "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-ba4b6344-b7a1-46aa-b465-14e1bab404ec"
         }
       ]
+    },
+    "nav-vehicle-marker": {
+      "title": "导航车标位置 · New UI 子页（查看 / 编辑）",
+      "viewport": { "width": 1920, "height": 720 },
+      "designDirection": "A-apple-minimal",
+      "htmlSources": {
+        "view": ".superdesign/tmp/nav-vehicle-marker-view.html",
+        "edit": ".superdesign/tmp/nav-vehicle-marker-edit.html"
+      },
+      "pages": [
+        {
+          "id": "view",
+          "draftId": "25c609b6-db2a-4bc1-9a28-a77d0044872a",
+          "previewUrl": "https://p.superdesign.dev/draft/25c609b6-db2a-4bc1-9a28-a77d0044872a",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-25c609b6-db2a-4bc1-9a28-a77d0044872a"
+        },
+        {
+          "id": "edit",
+          "draftId": "b787f3f3-10d2-4a5f-885f-9c3b6863770d",
+          "previewUrl": "https://p.superdesign.dev/draft/b787f3f3-10d2-4a5f-885f-9c3b6863770d",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-b787f3f3-10d2-4a5f-885f-9c3b6863770d"
+        }
+      ]
     }
   }
 }

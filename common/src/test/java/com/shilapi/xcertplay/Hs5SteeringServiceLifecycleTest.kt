@@ -322,7 +322,8 @@ class Hs5SteeringServiceLifecycleTest {
         assertEquals(0, closes)
         voicePress()
         finishSingle()
-        assertEquals(1, voiceCommands.size)
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller).requestSiri()
     }
 
     @Test fun shortBackClosesOnlyFlyScreenAndUnregistersWithBluetoothAudio() {
@@ -542,20 +543,18 @@ class Hs5SteeringServiceLifecycleTest {
         finishSingle()
     }
 
-    @Test fun hongqiSingleSiriDoubleRoutesRepeatedPressesWithoutStickyAssistantState() {
+    @Test fun siriSwitchIgnoresLegacyHongqiSingleMappingAndWakesImmediately() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         assertTrue(registrations.last().containsAllCodes(231, 259))
-        repeat(2) {
-            voicePress()
-            finishSingle()
-            doublePress()
-        }
-        assertEquals(2, voiceCommands.size)
-        verify(controller, times(2)).requestSiri()
+        voicePress()
+        verify(controller).requestSiri()
+        assertTrue(voiceCommands.isEmpty())
+        finishSingle()
+        verify(controller).requestSiri()
     }
 
-    @Test fun siriSingleHongqiDoubleAlsoWorksForCarLinkVoiceCode() {
+    @Test fun siriSwitchIgnoresLegacyHongqiDoubleMappingForCarLinkVoiceCode() {
         configureVoice(VoiceAssistantKeyTarget.SIRI)
         start()
         repeat(2) {
@@ -563,18 +562,18 @@ class Hs5SteeringServiceLifecycleTest {
             finishSingle()
             doublePress(259)
         }
-        assertEquals(2, voiceCommands.size)
-        verify(controller, times(2)).requestSiri()
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller, times(6)).requestSiri()
     }
 
-    @Test fun aliasedCodesForSamePhysicalPressDoNotBecomeDoubleClick() {
+    @Test fun aliasedCodesForSamePhysicalPressRequestSiriOnlyOnce() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         voicePress(231)
         voicePress(259)
         finishSingle()
-        assertEquals(1, voiceCommands.size)
-        verify(controller, never()).requestSiri()
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller).requestSiri()
     }
 
     @Test fun customVoiceWorksWithBluetoothAudioButLeavesMediaAndPhoneAlone() {
@@ -587,7 +586,7 @@ class Hs5SteeringServiceLifecycleTest {
         verify(controller).requestSiri()
     }
 
-    @Test fun disablingCustomVoiceCancelsPendingWakeAndReturnsBothCodesToOem() {
+    @Test fun disablingSiriSwitchReturnsBothCodesToOemAndRejectsStaleCallback() {
         configureVoice(VoiceAssistantKeyTarget.SIRI)
         start()
         val old = listener!!
@@ -599,16 +598,18 @@ class Hs5SteeringServiceLifecycleTest {
         finishSingle()
         assertArrayEquals(intArrayOf(4), registrations.last())
         assertTrue(unregistrations.last().containsAllCodes(231, 259))
-        verify(controller, never()).requestSiri()
+        verify(controller).requestSiri()
         assertTrue(voiceCommands.isEmpty())
     }
 
-    @Test fun disconnectCancelsPendingVoiceWake() {
+    @Test fun disconnectRemovesVoiceListenerAndCannotLeaveDelayedWake() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         voicePress()
+        verify(controller).requestSiri()
         Hs5SteeringKeys.detach(controller)
         finishSingle()
+        verify(controller).requestSiri()
         assertTrue(voiceCommands.isEmpty())
         assertNull(systemCallback)
     }
@@ -620,22 +621,24 @@ class Hs5SteeringServiceLifecycleTest {
         sendKey(listener!!, 231, 1)
         sendKey(listener!!, 231, 2)
         finishSingle()
-        assertEquals(1, voiceCommands.size)
-        verify(controller, never()).requestSiri()
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller).requestSiri()
     }
 
-    @Test fun hongqiWakeReleasesFocusAndDoesNotTakeItBackOnSettingsRefresh() {
+    @Test fun siriPressKeepsCarPlayFocusOnSettingsRefresh() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         assertEquals(1, focusRequests)
         voicePress()
         finishSingle()
-        assertEquals(1, focusReleases)
+        assertEquals(0, focusReleases)
         Hs5SteeringKeys.applySettings(context)
         drain()
         assertEquals(1, focusRequests)
         doublePress()
-        assertEquals(2, focusRequests)
+        assertEquals(1, focusRequests)
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller, times(3)).requestSiri()
     }
 
     @Test fun queuedHongqiThenSiriRestoresFocusBeforeSendingSiri() {
@@ -687,7 +690,7 @@ class Hs5SteeringServiceLifecycleTest {
         assertEquals(2, focusRequests)
     }
 
-    @Test fun changingVoiceMappingCancelsPendingActionAndUsesNewMapping() {
+    @Test fun changingLegacyVoiceMappingDoesNotChangeSiriSwitchBehavior() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         voicePress()
@@ -697,10 +700,10 @@ class Hs5SteeringServiceLifecycleTest {
         assertTrue(voiceCommands.isEmpty())
         voicePress()
         finishSingle()
-        verify(controller).requestSiri()
+        verify(controller, times(2)).requestSiri()
     }
 
-    @Test fun rejectedHongqiWakeDoesNotPreventSubsequentSiriOrHongqiRequests() {
+    @Test fun siriSwitchNeverSubmitsHongqiWakeCommands() {
         configureVoice(VoiceAssistantKeyTarget.HONGQI)
         start()
         rejectVoiceCommand = true
@@ -708,11 +711,12 @@ class Hs5SteeringServiceLifecycleTest {
         finishSingle()
         assertTrue(voiceCommands.isEmpty())
         doublePress()
-        verify(controller).requestSiri()
+        verify(controller, times(3)).requestSiri()
         rejectVoiceCommand = false
         voicePress()
         finishSingle()
-        assertEquals(1, voiceCommands.size)
+        assertTrue(voiceCommands.isEmpty())
+        verify(controller, times(4)).requestSiri()
     }
 
     @Test fun diagnosticEventsAreOptInAndAreClearedOnDisable() {

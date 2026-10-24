@@ -698,7 +698,7 @@
     <string name="settings_car_bluetooth_audio_description">DiPlay no ofrece audio de CarPlay al iPhone, así que la música, la navegación y las llamadas deberían ir por la conexión Bluetooth del iPhone con el coche. Mantén el iPhone emparejado con el coche y elige Bluetooth como fuente de audio del coche. Si el sonido sale por el iPhone, desactiva esta opción. Reconecta CarPlay.</string>
     <string name="settings_carplay_wheel_media">CarPlay wheel track skip</string>
     <string name="settings_carplay_wheel_media_description">While CarPlay is active, the wheel previous and next keys change tracks on the iPhone. Off keeps the car\'s original action for those keys.</string>
-    <string name="settings_carplay_wheel_siri">CarPlay wheel Siri</string>
+    <string name="settings_carplay_wheel_siri">Activar Siri con el botón de voz del volante</string>
     <string name="settings_carplay_wheel_siri_description">While CarPlay is on screen, the wheel voice key wakes Siri on the iPhone. Off keeps the car\'s original voice assistant key.</string>
     <string name="settings_voice_assistant_key_title">Voice assistant key</string>
     <string name="settings_voice_assistant_key_short_sub">Single and double press while CarPlay is active</string>

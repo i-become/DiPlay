@@ -795,7 +795,7 @@
     <string name="settings_car_bluetooth_audio_description">DiPlay offers the iPhone no CarPlay audio, so music, navigation and calls should go over the iPhone\'s Bluetooth connection with the car. Keep the iPhone paired with the car and choose Bluetooth as the car\'s audio source. If the sound plays on the iPhone instead, turn this off. Reconnects CarPlay.</string>
     <string name="settings_carplay_wheel_media">CarPlay wheel track skip</string>
     <string name="settings_carplay_wheel_media_description">While CarPlay is active, the wheel previous and next keys change tracks on the iPhone. Off keeps the car\'s original action for those keys.</string>
-    <string name="settings_carplay_wheel_siri">CarPlay wheel Siri</string>
+    <string name="settings_carplay_wheel_siri">Steering-wheel voice key wakes Siri</string>
     <string name="settings_carplay_wheel_siri_description">While CarPlay is on screen, the wheel voice key wakes Siri on the iPhone. Off keeps the car\'s original voice assistant key.</string>
     <string name="settings_voice_assistant_key_title">Voice assistant key</string>
     <string name="settings_voice_assistant_key_short_sub">Single and double press while CarPlay is active</string>
@@ -1062,6 +1062,18 @@
     <string name="new_ui_display_cluster_map_sub">Show the iPhone cluster map on the instrument display.</string>
     <string name="new_ui_display_cluster_gesture">Three-finger swipe cluster</string>
     <string name="new_ui_display_cluster_gesture_sub">Switch the cluster map with a three-finger horizontal swipe.</string>
+    <string name="new_ui_display_nav_marker">Navigation marker position</string>
+    <string name="new_ui_display_nav_marker_sub">Car icon on the cluster navigation map</string>
+    <string name="new_ui_display_nav_marker_summary">%1$d%% · %2$d%%</string>
+    <string name="new_ui_display_nav_marker_horizontal">Horizontal</string>
+    <string name="new_ui_display_nav_marker_vertical">Vertical</string>
+    <string name="new_ui_display_nav_marker_percent">%1$d%%</string>
+    <string name="new_ui_display_nav_marker_edit">Edit position</string>
+    <string name="new_ui_display_nav_marker_editing">Editing</string>
+    <string name="new_ui_display_nav_marker_reset">Reset to default</string>
+    <string name="new_ui_display_nav_marker_reconnect">Applies after you reconnect CarPlay.</string>
+    <string name="new_ui_display_nav_marker_legend_center">Centre</string>
+    <string name="new_ui_display_nav_marker_legend_marker">Marker</string>
     <string name="new_ui_display_theme_applied">CarPlay theme updated. Open CarPlay or reconnect if the screen does not change.</string>
     <string name="new_ui_display_carplay_theme">CarPlay appearance</string>
     <string name="new_ui_display_carplay_theme_sub">Day, night, or follow the system.</string>
