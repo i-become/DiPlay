@@ -883,8 +883,10 @@
     <string name="update_verifying">Verifying…</string>
     <string name="update_install">Install %1$s</string>
     <string name="update_failed">Update failed</string>
-    <string name="update_install_preparing">Preparing the update for the system installer…</string>
-    <string name="update_install_requested">The update was submitted to the system. Waiting for the installation result…</string>
+    <string name="update_install_preparing">Verifying the update and preparing OEM SOTA installation…</string>
+    <string name="update_install_requested">Submitted to OEM SOTA. Waiting for the installed version to be confirmed…</string>
+    <string name="update_sota_failure">OEM SOTA could not install this update (%1$s). No standard installer was opened.</string>
+    <string name="update_sota_timeout">OEM SOTA has not confirmed installation within 2 minutes. Check the installed version before trying again.</string>
     <string name="update_install_permission">Allow DiPlay to install apps in the system settings, then tap Install again. If no permission screen appears, export a diagnostic report.</string>
     <string name="update_install_missing">The downloaded APK is unavailable. Check for updates and download it again.</string>
     <string name="update_available_home">Update available</string>

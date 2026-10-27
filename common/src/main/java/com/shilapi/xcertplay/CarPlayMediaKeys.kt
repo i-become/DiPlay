@@ -70,6 +70,29 @@ internal object CarPlayMediaKeys {
     private var artwork: Bitmap? = null
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
     private var placeholder: Bitmap? = null
+    private val dashboardListeners = linkedSetOf<() -> Unit>() // Main thread only.
+    private val dashboardChanged = Runnable { dashboardListeners.toList().forEach { it() } }
+
+    internal fun subscribeDashboard(changed: () -> Unit): () -> Unit {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        dashboardListeners.add(changed)
+        return {
+            check(Looper.myLooper() == Looper.getMainLooper())
+            dashboardListeners.remove(changed)
+            if (dashboardListeners.isEmpty()) mainHandler.removeCallbacks(dashboardChanged)
+        }
+    }
+
+    private fun notifyDashboard() {
+        mainHandler.removeCallbacks(dashboardChanged)
+        mainHandler.post(dashboardChanged)
+    }
+
+    /** Read the existing metadata/artwork cache without taking over the controller's callbacks. */
+    @Synchronized
+    internal fun dashboardMusic(): ClusterDashboardMusic =
+        if (controller == null) ClusterDashboardMusic()
+        else ClusterDashboardMusic(nowPlaying, artwork?.takeUnless { it.isRecycled })
 
     @Synchronized
     fun attach(context: Context, next: CarPlayController) {
@@ -148,6 +171,7 @@ internal object CarPlayMediaKeys {
                 if (nowPlaying.elapsedMillis != update.elapsedMillis) elapsedUpdatedAt = SystemClock.elapsedRealtime()
                 val metadataChanged = metadataChanged(nowPlaying, update) || artwork !== previousArtwork
                 nowPlaying = update
+                notifyDashboard()
                 updateInitialAlbumRecovery(expected)
                 // The iPhone repeats NowPlayingUpdate about twice a second for the position alone.
                 // Republishing the metadata each time sent a copy of the artwork through system_server
@@ -180,6 +204,7 @@ internal object CarPlayMediaKeys {
         while (artworkCache.size > MAX_CACHED_ARTWORK) artworkCache.remove(artworkCache.keys.first())
         if (nowPlaying.artworkTransferId == id) {
             artwork = decoded
+            notifyDashboard()
             controller?.let { com.shilapi.xcertplay.media.AmbientMusicController.albumColorChanged(it, result?.color) }
             controller?.let(::updateInitialAlbumRecovery)
             session?.setMetadata(androidMetadata(nowPlaying, shownArtworkLocked()))
@@ -362,6 +387,7 @@ internal object CarPlayMediaKeys {
         nowPlaying = CarPlayNowPlaying()
         artwork = null
         artworkCache.clear()
+        notifyDashboard()
         focusRequest?.let { request -> appContext?.getSystemService(AudioManager::class.java)?.let(request::abandon) }
         focusRequest = null
         focusHeld = false

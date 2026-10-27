@@ -8,6 +8,7 @@ import com.shilapi.xcertplay.ClusterMapPresentation
 import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.Hs5ClusterActivityOutput
 import com.shilapi.xcertplay.HongqiPositionLights
+import com.shilapi.xcertplay.HongqiClusterVehicleData
 import com.shilapi.xcertplay.CarPlayNightModePolicy
 import com.shilapi.xcertplay.StartupDiagnosticSnapshot
 import com.shilapi.xcertplay.WheelKeyService
@@ -67,6 +68,8 @@ internal object NewUiDiagnosticReport {
             "resolvedWithoutHostNight=${CarPlayNightModePolicy.effectiveNight(context)}")
         appendLine("Automatic priority: position lights (0=day, 1=night), ambient sensor, Android theme. Fixed/scheduled modes override lights.")
         appendLine(HongqiPositionLights.report())
+        appendLine("--- HS5 instrument vehicle data ---")
+        appendLine(HongqiClusterVehicleData.report())
         appendLine()
         appendLine("--- Cluster displays ---")
         appendLine(runCatching { ClusterMapPresentation.diagnosticReport(context) }.getOrElse { "unavailable: ${it.javaClass.simpleName}" })

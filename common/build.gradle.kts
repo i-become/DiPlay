@@ -31,6 +31,7 @@ android {
 
 dependencies {
     api(project(":shared"))
+    implementation(files("libs/hs5-vehicle-sdk.jar"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

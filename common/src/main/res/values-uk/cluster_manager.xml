@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">Керування панеллю приладів</string>
+    <string name="settings_cluster_manager_entry_description">Перегляд і вибір стилю панелі. Зміна стилю перепідключає CarPlay.</string>
+    <string name="settings_cluster_manager_description">Виберіть стиль. Прев’ю — статичні ілюстрації; фактичний вміст з’явиться після підключення.</string>
+    <string name="settings_cluster_style_basic">Міський</string>
+    <string name="settings_cluster_style_sport">Спортивний</string>
+    <string name="settings_cluster_style_sport_description">Червоні концентричні шкали, вигляд автомобіля, музика та карта CarPlay праворуч.</string>
+    <string name="settings_cluster_style_basic_description">Два циферблати з даними автомобіля, картою CarPlay у центрі та музикою.</string>
+    <string name="settings_cluster_style_original">Оригінальний</string>
+    <string name="settings_cluster_style_original_description">Початкова карта CarPlay без власних циферблатів DiPlay.</string>
+    <string name="settings_cluster_style_applied">Застосовано</string>
+    <string name="settings_cluster_style_apply">Застосувати до панелі</string>
+    <string name="settings_cluster_style_reconnect">Зміна стилю перепідключає CarPlay й ненадовго перериває зображення та звук. Застосувати й перепідключити?</string>
+    <string name="settings_cluster_style_preview">Прев’ю стилю «%1$s»</string>
+</resources>
+

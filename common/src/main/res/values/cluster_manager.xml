@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">Cluster management</string>
+    <string name="settings_cluster_manager_entry_description">Preview and apply a style for the instrument cluster. Changing styles reconnects CarPlay.</string>
+    <string name="settings_cluster_manager_description">Choose a cluster style. Previews are static illustrations; actual content appears after connection.</string>
+    <string name="settings_cluster_style_basic">Urban</string>
+    <string name="settings_cluster_style_sport">Sport</string>
+    <string name="settings_cluster_style_sport_description">Red concentric instruments with a vehicle scene, music and a right-side CarPlay map.</string>
+    <string name="settings_cluster_style_basic_description">Twin dials with vehicle information, a central CarPlay map and music.</string>
+    <string name="settings_cluster_style_original">Original</string>
+    <string name="settings_cluster_style_original_description">The original CarPlay map projection, without DiPlay’s custom dials.</string>
+    <string name="settings_cluster_style_applied">Applied</string>
+    <string name="settings_cluster_style_apply">Apply to cluster</string>
+    <string name="settings_cluster_style_reconnect">Changing the cluster style reconnects CarPlay and briefly interrupts the picture and audio. Apply and reconnect?</string>
+    <string name="settings_cluster_style_preview">%1$s style preview</string>
+</resources>
+

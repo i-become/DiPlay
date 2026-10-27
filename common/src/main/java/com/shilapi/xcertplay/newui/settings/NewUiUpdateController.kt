@@ -2,12 +2,7 @@ package com.shilapi.xcertplay.newui.settings
 
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
-import android.content.Intent
-import android.content.pm.PackageInstaller
-import android.net.Uri
-import android.os.Build
 import android.os.SystemClock
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import com.shilapi.xcertplay.host.R
@@ -33,6 +28,7 @@ internal class NewUiUpdateController(
     private var generation = 0
     private var release: UpdateRelease? = null
     private var updateFile: File? = null
+    private var verifiedDigest: String? = null
     private var installResultRevision = 0L
 
     fun checkForUpdates() {
@@ -94,6 +90,8 @@ internal class NewUiUpdateController(
             return
         }
         diagnostic("download-started")
+        updateFile = null
+        verifiedDigest = null
         uiState = uiState.copy(
             stage = NewUiUpdateStage.DOWNLOADING,
             message = null,
@@ -135,9 +133,9 @@ internal class NewUiUpdateController(
                 }
                 release = latest
                 diagnostic("verification-passed")
-                apkFile
+                apkFile to actual
             }.onFailure { directory.deleteRecursively() }
-            val saved = outcome.getOrNull()?.let { UpdateApkExport.copy(activity.applicationContext, it) }
+            val saved = outcome.getOrNull()?.first?.let { UpdateApkExport.copy(activity.applicationContext, it) }
             if (outcome.isSuccess) diagnostic("apk-export completed=${saved != null} publicUri=${saved?.uri != null}")
             activity.runOnUiThread {
                 if (gen != generation || activity.isFinishing || activity.isDestroyed) {
@@ -145,9 +143,10 @@ internal class NewUiUpdateController(
                     return@runOnUiThread
                 }
                 outcome.fold(
-                    { file ->
+                    { (file, digest) ->
                         diagnostic("download-ready bytes=${file.length()}")
                         updateFile = file
+                        verifiedDigest = digest
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.READY,
                             releaseTag = release?.tagName,
@@ -174,20 +173,11 @@ internal class NewUiUpdateController(
             "apkPresent=${updateFile?.isFile == true}")
         if (uiState.installPreparing) return
         val file = updateFile
-        if (file == null || !file.isFile || file.length() <= 0L) {
+        val digest = verifiedDigest
+        if (file == null || !file.isFile || file.length() <= 0L || digest == null) {
             diagnostic("install-failed reason=apk-missing")
             uiState = uiState.copy(stage = NewUiUpdateStage.FAILED, message = activity.getString(R.string.update_install_missing))
             onStateChanged()
-            return
-        }
-        val allowed = Build.VERSION.SDK_INT < 26 || activity.packageManager.canRequestPackageInstalls()
-        diagnostic("install-permission canRequest=$allowed")
-        if (!allowed) {
-            uiState = uiState.copy(message = activity.getString(R.string.update_install_permission))
-            onStateChanged()
-            runCatching {
-                activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
-            }.onFailure { diagnostic("install-permission-open-failed failureClass=${it.javaClass.simpleName}") }
             return
         }
         uiState = uiState.copy(installPreparing = true, message = activity.getString(R.string.update_install_preparing))
@@ -196,30 +186,21 @@ internal class NewUiUpdateController(
         val gen = generation
         val started = SystemClock.elapsedRealtime()
         Thread({
-            val prepared = runCatching { UpdateInstaller.prepare(activity.applicationContext, file) }
+            val prepared = runCatching { UpdateInstaller.install(activity.applicationContext, file, digest) }
             diagnostic("install-prepared success=${prepared.isSuccess} elapsedMs=${SystemClock.elapsedRealtime() - started}")
             activity.runOnUiThread {
                 if (gen == generation && !activity.isFinishing && !activity.isDestroyed) {
                     prepared.fold(
-                        { id ->
-                            runCatching { UpdateInstaller.commit(activity, id) }
-                                .onFailure { diagnostic("install-commit-failed failureClass=${it.javaClass.simpleName}") }
-                            refreshInstallResult()
-                        },
+                        { refreshInstallResult() },
                         { failure ->
                             diagnostic("install-prepare-failed failureClass=${failure.javaClass.simpleName} detail=${failure.message}")
                             uiState = uiState.copy(stage = NewUiUpdateStage.FAILED, installPreparing = false,
-                                message = activity.getString(R.string.update_install_failure))
+                                message = activity.getString(R.string.update_sota_failure, "SOTA_REQUEST_FAILED"))
                             onStateChanged()
                         },
                     )
                 } else {
-                    prepared.getOrNull()?.let { id ->
-                        UpdateInstaller.abandon(activity, id)
-                        UpdateInstaller.record(activity, id, UpdateInstaller.LAUNCH_FAILED, "UI closed before commit")
-                    }
-                    diagnostic("install-abandoned generationChanged=${gen != generation} " +
-                        "finishing=${activity.isFinishing} destroyed=${activity.isDestroyed}")
+                    // SOTA owns a submitted request; destroying this UI must not revoke its files.
                     uiState = uiState.copy(installPreparing = false)
                 }
             }
@@ -227,27 +208,23 @@ internal class NewUiUpdateController(
     }
 
     fun refreshInstallResult() {
-        UpdateInstaller.reconcile(activity)
+        UpdateInstaller.reconcileAsync(activity.applicationContext)
         val result = UpdateInstaller.result(activity) ?: return
         if (result.revision == installResultRevision) return
         installResultRevision = result.revision
         val message = when (result.status) {
-            UpdateInstaller.STAGED -> R.string.update_install_preparing
-            UpdateInstaller.COMMITTED, UpdateInstaller.INSTALLING -> R.string.update_install_requested
-            PackageInstaller.STATUS_PENDING_USER_ACTION -> R.string.update_install_confirm
-            PackageInstaller.STATUS_SUCCESS -> R.string.update_install_success
-            PackageInstaller.STATUS_FAILURE_ABORTED -> R.string.update_install_cancelled
-            PackageInstaller.STATUS_FAILURE_BLOCKED -> R.string.update_install_blocked
-            PackageInstaller.STATUS_FAILURE_CONFLICT -> R.string.update_install_conflict
-            PackageInstaller.STATUS_FAILURE_INVALID, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> R.string.update_install_incompatible
-            PackageInstaller.STATUS_FAILURE_STORAGE -> R.string.update_install_storage
-            else -> R.string.update_install_failure
+            UpdateInstaller.Status.PREPARING -> R.string.update_install_preparing
+            UpdateInstaller.Status.WAITING -> R.string.update_install_requested
+            UpdateInstaller.Status.SUCCEEDED -> R.string.update_install_success
+            UpdateInstaller.Status.TIMED_OUT -> R.string.update_sota_timeout
+            UpdateInstaller.Status.FAILED -> R.string.update_sota_failure
         }
         uiState = uiState.copy(
-            stage = if (result.status == PackageInstaller.STATUS_SUCCESS) NewUiUpdateStage.IDLE
+            stage = if (result.status == UpdateInstaller.Status.SUCCEEDED) NewUiUpdateStage.IDLE
                 else if (updateFile?.isFile == true) NewUiUpdateStage.READY else uiState.stage,
             installPreparing = result.busy,
-            message = activity.getString(message),
+            message = if (result.status == UpdateInstaller.Status.FAILED) activity.getString(message, result.reason)
+                else activity.getString(message),
         )
         onStateChanged()
     }

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay HS5 · 导航车标位置 · 查看</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>
+    body{margin:0;font-family:-apple-system,"SF Pro Display","PingFang SC",sans-serif}
+    .map-bg{
+      background:#0a1628;
+      background-image:linear-gradient(rgba(38,60,90,.28) 1px,transparent 1px),linear-gradient(90deg,rgba(38,60,90,.28) 1px,transparent 1px);
+      background-size:40px 40px;
+    }
+    .road{stroke:#2a4568;stroke-width:16;stroke-linecap:round;fill:none}
+    .road-main{stroke:#3d5f8a;stroke-width:26}
+    .cross{stroke:rgba(8,123,255,.4);stroke-width:2;stroke-dasharray:7 5}
+  </style>
+</head>
+<body>
+<div id="screen-root" class="w-[1920px] h-[720px] flex flex-col bg-[#071426] text-[#f2f7ff] overflow-hidden">
+  <header class="shrink-0 h-[96px] flex items-center justify-between px-10 border-b border-[#263c5a]/90">
+    <div class="flex items-center gap-12 h-full">
+      <div class="flex items-center gap-3"><div class="w-1 h-9 bg-[#c8102e] rounded-full"></div><span class="text-[26px] font-semibold">CarPlay <span class="text-[#8faed5] font-normal">HS5</span></span></div>
+      <nav class="flex items-center gap-2 h-full py-2">
+        <a id="nav-connect" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">连接</a>
+        <a id="nav-display" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] bg-[#087bff] text-[22px] font-semibold">显示</a>
+        <a id="nav-settings" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">设置</a>
+        <a id="nav-diagnostics" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">诊断</a>
+        <a id="nav-about" href="#" class="px-9 h-[72px] flex items-center rounded-[18px] text-[#8faed5] text-[22px] font-semibold">关于</a>
+      </nav>
+    </div>
+    <span id="status-clock" class="text-[20px] text-[#8faed5]">14:20</span>
+  </header>
+  <main class="flex-1 min-h-0 px-10 py-7 flex gap-10">
+    <section id="preview-column" class="w-[58%] min-w-0 h-full rounded-[32px] border border-[#263c5a]/80 overflow-hidden map-bg relative flex items-center justify-center">
+      <div id="preview-aspect" class="relative w-full max-h-full aspect-[16/9] shadow-[inset_0_0_0_1px_rgba(38,60,90,.6)]">
+        <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid slice">
+          <path class="road road-main" d="M100 400 C 260 360, 400 190, 600 150 S 880 110, 920 70"/>
+          <path class="road" d="M30 270 H 930"/>
+          <path class="road" d="M480 30 V 510"/>
+          <line class="cross" x1="480" y1="190" x2="480" y2="350"/>
+          <line class="cross" x1="400" y1="270" x2="560" y2="270"/>
+        </svg>
+        <div id="car-marker" class="absolute w-[48px] h-[48px] -translate-x-1/2 -translate-y-1/2" style="left:58%;top:42%">
+          <div class="w-full h-full rounded-full bg-[#ffb347] border-2 border-white/90 shadow-lg flex items-center justify-center">
+            <iconify-icon icon="mdi:navigation" class="text-[26px] text-[#071426] rotate-45"></iconify-icon>
+          </div>
+        </div>
+      </div>
+      <div class="absolute top-4 left-4 flex gap-3 text-[13px] text-[#8faed5]/95 pointer-events-none">
+        <span class="inline-flex items-center gap-1.5 bg-[#071426]/75 px-2.5 py-1 rounded-lg"><span class="w-2 h-2 rounded-full bg-[#087bff]"></span>中心</span>
+        <span class="inline-flex items-center gap-1.5 bg-[#071426]/75 px-2.5 py-1 rounded-lg"><span class="w-2.5 h-2.5 rounded-sm bg-[#ffb347]"></span>车标</span>
+      </div>
+    </section>
+    <section id="settings-column" class="w-[42%] min-w-0 h-full flex flex-col">
+      <h1 id="page-title" class="text-[32px] font-bold tracking-tight mb-6">导航车标位置</h1>
+      <div class="rounded-[28px] border border-[#263c5a]/80 bg-[#0d1c30]/95 overflow-hidden flex-1 flex flex-col">
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40">
+          <span class="text-[18px] font-semibold">水平</span>
+          <span id="stat-x" class="text-[17px] text-[#8faed5] tabular-nums">58%</span>
+        </div>
+        <div class="flex items-center justify-between px-6 h-[68px] border-b border-[#263c5a]/40">
+          <span class="text-[18px] font-semibold">垂直</span>
+          <span id="stat-y" class="text-[17px] text-[#8faed5] tabular-nums">42%</span>
+        </div>
+        <div class="p-6 mt-auto flex flex-col gap-3">
+          <button type="button" id="btn-edit" class="w-full h-[100px] rounded-[24px] bg-gradient-to-b from-[#1a8cff] to-[#087bff] text-[20px] font-semibold shadow-[0_0_32px_rgba(8,123,255,.35)]">编辑位置</button>
+          <button type="button" id="btn-reset" class="w-full h-[52px] rounded-[12px] text-[16px] text-[#8faed5] font-semibold">重置默认</button>
+        </div>
+      </div>
+      <button type="button" id="btn-back" class="mt-4 h-[68px] w-full rounded-[12px] border border-[#263c5a]/80 bg-white/5 inline-flex items-center justify-center gap-2 text-[#087bff] text-[18px] font-semibold shrink-0">
+        <iconify-icon icon="lucide:arrow-left"></iconify-icon>返回显示
+      </button>
+    </section>
+  </main>
+</div>
+</body>
+</html>

@@ -2,12 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Read-only vehicle state on Hongqi HS5 Qisi firmware. -->
+    <uses-permission android:name="ltd.qisi.adapterservice.permission.READ_SETTINGS" />
     <!-- Optional, user-authorized startup of the car's own hotspot. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Optional, user-authorized installation of a released update APK. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
+        <package android:name="ltd.qisi.sotasupportapp" />
         <package android:name="ltd.qisi.adapterservice" />
         <package android:name="ltd.qisi.systemservice" />
         <package android:name="faw.system.viewservice" />
@@ -54,13 +55,12 @@
     </queries>
     <application>
         <receiver
-            android:name="com.shilapi.xcertplay.update.UpdateInstallStatusReceiver"
-            android:exported="false" />
-        <activity
-            android:name="com.shilapi.xcertplay.update.UpdateInstallActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:name="com.shilapi.xcertplay.update.UpdatePackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <provider
             android:name="com.shilapi.xcertplay.DiPlayBootInitProvider"
             android:authorities="${applicationId}.boot-init"

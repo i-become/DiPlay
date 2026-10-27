@@ -1,16 +1,11 @@
 package com.shilapi.xcertplay.newui.settings
 
 import android.content.Context
-import android.content.Intent
-import android.content.IntentSender
-import android.content.pm.PackageInfo
-import android.content.pm.PackageInstaller
 import android.os.Looper
-import android.provider.Settings
 import androidx.activity.ComponentActivity
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.update.UpdateDiagnostics
-import com.shilapi.xcertplay.update.UpdateInstallStatusReceiver
+import com.shilapi.xcertplay.update.UpdateChecksums
 import com.shilapi.xcertplay.update.UpdateInstaller
 import org.junit.After
 import org.junit.Assert.*
@@ -23,95 +18,77 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
-import org.robolectric.annotation.Implementation
-import org.robolectric.annotation.Implements
-import org.robolectric.shadows.ShadowPackageInstaller
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE, shadows = [NewUiUpdateControllerTest.WaitingPackageSession::class])
+@Config(sdk = [28], manifest = Config.NONE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class NewUiUpdateControllerTest {
-    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
-    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private val app get() = RuntimeEnvironment.getApplication()
     private val activityController by lazy { Robolectric.buildActivity(ComponentActivity::class.java).setup() }
     private val activity get() = activityController.get()
 
     @Before fun clearHistory() {
-        for (name in listOf("diplay_update_diagnostics", "diplay_update_install")) {
-            app.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
-        }
-        shadowOf(app.packageManager).setCanRequestPackageInstalls(true)
+        DiagnosticLogging.setEnabled(false)
+        app.getSharedPreferences(UpdateInstaller.PREFERENCES, Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     @After fun cleanup() { activityController.pause().stop().destroy() }
 
-    @Test fun missingDownloadedApkGivesFeedbackAndLeavesAnExportableReason() {
+    @Test fun missingDownloadedApkGivesFeedbackWithoutOpeningAnInstaller() {
         val controller = NewUiUpdateController(activity) {}
         controller.installUpdate()
         assertEquals(NewUiUpdateStage.FAILED, controller.uiState.stage)
         assertEquals(activity.getString(R.string.update_install_missing), controller.uiState.message)
-        assertTrue(UpdateDiagnostics.report(app).contains("reason=apk-missing"))
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
-    @Test fun repeatedClicksStageOnlyOneSessionWithoutAFileProvider() {
-        val controller = readyController()
+    @Test fun aFileWithoutItsVerifiedDownloadDigestMustBeDownloadedAgain() {
+        val controller = readyController(withDigest = false)
         controller.installUpdate()
-        assertTrue(controller.uiState.installPreparing)
-        controller.installUpdate()
-        waitUntil { UpdateInstaller.result(app)?.status == UpdateInstaller.COMMITTED }
-        assertEquals(1, app.packageManager.packageInstaller.mySessions.size)
-        assertEquals(1, UpdateDiagnostics.report(app).lines().count { it.contains("install-session-staged ") })
-        assertTrue(controller.uiState.installPreparing)
-        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(activity.getString(R.string.update_install_missing), controller.uiState.message)
+        assertNull(UpdateInstaller.result(app))
     }
 
-    @Test fun missingPermissionOpensTheActualGrantPageBeforeCreatingASession() {
+    @Test fun unavailableSotaDoesNotAskForUnknownSourcesOrFallBackToStandardInstall() {
         val controller = readyController()
         shadowOf(app.packageManager).setCanRequestPackageInstalls(false)
         controller.installUpdate()
-        val intent = shadowOf(activity).nextStartedActivity
-        assertEquals(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
-        assertEquals("package:${app.packageName}", intent.data.toString())
-        assertFalse(controller.uiState.installPreparing)
-        assertEquals(activity.getString(R.string.update_install_permission), controller.uiState.message)
-        assertTrue(app.packageManager.packageInstaller.mySessions.isEmpty())
-    }
-
-    @Test fun signatureConflictIsShownAsFailureAndAllowsRetryOfTheDownloadedApk() {
-        val controller = readyController()
-        controller.installUpdate()
-        waitUntil { UpdateInstaller.result(app)?.status == UpdateInstaller.COMMITTED }
-        val id = UpdateInstaller.result(app)!!.sessionId
-        UpdateInstallStatusReceiver().onReceive(app, Intent()
-            .putExtra(PackageInstaller.EXTRA_SESSION_ID, id)
-            .putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE_CONFLICT)
-            .putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, "INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match"))
-        controller.refreshInstallResult()
-        assertFalse(controller.uiState.installPreparing)
-        assertEquals(NewUiUpdateStage.READY, controller.uiState.stage)
-        assertEquals(activity.getString(R.string.update_install_conflict), controller.uiState.message)
-        assertTrue(UpdateDiagnostics.report(app).contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE"))
-    }
-
-    @Test fun unreadableOrWrongPackageApkNeverReachesTheSystemInstaller() {
-        val controller = readyController(packageName = "another.app")
+        assertTrue(controller.uiState.installPreparing)
         controller.installUpdate()
         waitUntil { !controller.uiState.installPreparing }
-        assertEquals(NewUiUpdateStage.FAILED, controller.uiState.stage)
+        assertEquals(NewUiUpdateStage.READY, controller.uiState.stage)
+        assertEquals(activity.getString(R.string.update_sota_failure, "SOTA_UNSUPPORTED_DEVICE"), controller.uiState.message)
         assertTrue(app.packageManager.packageInstaller.mySessions.isEmpty())
-        assertTrue(UpdateDiagnostics.report(app).contains("APK package does not match"))
+        assertNull(shadowOf(activity).nextStartedActivity)
     }
 
-    private fun readyController(packageName: String = app.packageName): NewUiUpdateController {
+    @Test fun resultIsVisibleAfterTheSettingsScreenIsRecreated() {
+        app.getSharedPreferences(UpdateInstaller.PREFERENCES, Context.MODE_PRIVATE).edit()
+            .putString("request", "saved-request").putString("status", "TIMED_OUT")
+            .putLong("revision", 1).putString("reason", "SOTA_RESULT_TIMEOUT").commit()
+        val controller = NewUiUpdateController(activity) {}
+        controller.refreshInstallResult()
+        assertFalse(controller.uiState.installPreparing)
+        assertEquals(activity.getString(R.string.update_sota_timeout), controller.uiState.message)
+    }
+
+    @Test fun onlyVersionConfirmedSuccessShowsInstalled() {
+        app.getSharedPreferences(UpdateInstaller.PREFERENCES, Context.MODE_PRIVATE).edit()
+            .putString("request", "saved-request").putString("status", "SUCCEEDED")
+            .putLong("revision", 1).putString("reason", "VERSION_CONFIRMED").commit()
+        val controller = NewUiUpdateController(activity) {}
+        controller.refreshInstallResult()
+        assertEquals(NewUiUpdateStage.IDLE, controller.uiState.stage)
+        assertEquals(activity.getString(R.string.update_install_success), controller.uiState.message)
+    }
+
+    private fun readyController(withDigest: Boolean = true): NewUiUpdateController {
         val file = File(app.cacheDir, "install-test.apk").apply { writeText("verified-test-content") }
-        shadowOf(app.packageManager).setPackageArchiveInfo(file.absolutePath,
-            PackageInfo().apply { this.packageName = packageName; versionCode = 1201 })
         return NewUiUpdateController(activity) {}.apply {
             ReflectionHelpers.setField(this, "updateFile", file)
+            if (withDigest) ReflectionHelpers.setField(this, "verifiedDigest", UpdateChecksums.sha256Hex(file))
             ReflectionHelpers.setField(this, "uiState", NewUiUpdateUiState(stage = NewUiUpdateStage.READY))
         }
     }
@@ -124,12 +101,5 @@ class NewUiUpdateControllerTest {
         }
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue("update worker did not finish", condition())
-    }
-
-    /** Robolectric otherwise emits a success broadcast with no PackageInstaller extras. */
-    @Implements(PackageInstaller.Session::class)
-    class WaitingPackageSession : ShadowPackageInstaller.ShadowSession() {
-        @Implementation
-        protected override fun commit(statusReceiver: IntentSender) = Unit
     }
 }

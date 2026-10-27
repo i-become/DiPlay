@@ -51,6 +51,8 @@ internal class ClusterMapPresentation(
     private var turnCardView: ClusterTurnCardView? = null
     private var videoView: View? = null
     private var streamActive = false
+    private var dashboard: ClusterDashboardView? = null
+    private val dashboardForeground = Hs5ClusterForeground()
     var outputSurface: Surface? = null
         private set
     var mapVisible = true
@@ -63,6 +65,27 @@ internal class ClusterMapPresentation(
         val plan = if (adaptive) DiLink51ClusterLayout.plan(size.x, size.y, theme) else null
         // The adaptive DiLink 5.1 layout follows the cluster's own contrast; elsewhere the cluster follows DiPlay's theme.
         val dark = if (plan != null) DiLink51ClusterLayout.dark(context, theme) else context.resolveAppNightNow()
+        if (plan == null && ClusterDashboardView.enabled(context)) {
+            dashboard = ClusterDashboardView(context) { surface ->
+                outputSurface = surface
+                onSurface(surface)
+            }.apply {
+                setNightMode(dark)
+                setStreamActive(streamActive)
+                setDashboardVisible(mapVisible)
+            }
+            if (dashboardForeground.attach(context, display, checkNotNull(dashboard)) { event ->
+                if (event.action == android.view.KeyEvent.ACTION_UP && !event.isCanceled) {
+                    CarPlayHostSettingsBridge.closeFlyScreen("cluster overlay back")
+                }
+                true
+            }) {
+                setContentView(View(context).apply { setBackgroundColor(Color.BLACK) })
+            } else setContentView(checkNotNull(dashboard))
+            dashboardForeground.setVisible(mapVisible)
+            DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("HS5 dashboard window=${dashboardForeground.mode}") }
+            return
+        }
         val backdrop = if (dark) Color.rgb(15, 22, 30) else Color.rgb(207, 218, 229)
         val placeholder = if (dark) Color.BLACK else Color.rgb(233, 238, 246)
         val root = FrameLayout(context).apply {
@@ -163,6 +186,7 @@ internal class ClusterMapPresentation(
      * video; legacy SurfaceView stays visible under the placeholder to preserve its surface.
      */
     fun setStreamActive(active: Boolean) {
+        dashboard?.setStreamActive(active)
         if (streamActive == active) return
         // Update before cancelling: a cancelled fade must not hide the newly restored label.
         streamActive = active
@@ -182,6 +206,8 @@ internal class ClusterMapPresentation(
     /** Window alpha hides the pixels without destroying the TextureView/decoder surface. */
     fun setMapVisible(visible: Boolean) {
         mapVisible = visible
+        dashboard?.setDashboardVisible(visible)
+        dashboardForeground.setVisible(visible)
         window?.let { window ->
             val alpha = if (visible) 1f else 0f
             if (window.attributes.alpha != alpha) window.attributes = window.attributes.apply { this.alpha = alpha }
@@ -193,6 +219,7 @@ internal class ClusterMapPresentation(
     }
 
     fun setTurnCardNightMode(night: Boolean) {
+        dashboard?.setNightMode(night)
         turnCardView?.setNightMode(night)
     }
 
@@ -202,6 +229,11 @@ internal class ClusterMapPresentation(
 
     fun setTurnCardGuidance(guidance: ClusterTurnGuidance?) {
         turnCardView?.setGuidance(guidance)
+    }
+
+    override fun onStop() {
+        dashboardForeground.close()
+        super.onStop()
     }
 
     companion object {
@@ -257,6 +289,7 @@ internal class ClusterMapPresentation(
 
         fun diagnosticReport(context: Context): String = buildString {
             appendLine("clusterEnabled=${AirPlayPersistence.loadClusterMapEnabled(context)}")
+            appendLine("clusterNavigationCropPercent=${ClusterMapCropSettings.load(context)} navigating=${com.shilapi.xcertplay.glance.CarPlayGlance.snapshot().navigating}")
             appendLine(
                 "debugSimulatedCluster=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)}",
             )

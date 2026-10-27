@@ -6,22 +6,20 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import android.view.Display
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Surface
-import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.SurfaceHolder
+import android.widget.FrameLayout
 import android.view.View
 import android.view.WindowManager
-import android.widget.FrameLayout
-import android.widget.ProgressBar
-import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import java.lang.ref.WeakReference
@@ -37,8 +35,9 @@ import java.util.UUID
  * key reaches this window instead of DiPlay's centre screen and closes the fly screen.
  */
 class Hs5ClusterActivity : Activity() {
-    private var waiting: View? = null
-    private var turnCard: ClusterTurnCardView? = null
+    private var dashboard: ClusterDashboardView? = null
+    private val foreground = Hs5ClusterForeground()
+    internal val windowOutput: String get() = foreground.mode
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,41 +47,36 @@ class Hs5ClusterActivity : Activity() {
             return
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.setFormat(PixelFormat.TRANSLUCENT)
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        val dark = resolveAppNightNow()
-        val placeholder = if (dark) Color.BLACK else Color.rgb(233, 238, 246)
-        val root = FrameLayout(this).apply { setBackgroundColor(placeholder) }
-        val surfaceView = SurfaceView(this)
-        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(holder: SurfaceHolder) {
-                Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, holder.surface)
+        val content: View = if (AirPlayPersistence.loadClusterStyle(this).customDashboard) {
+            ClusterDashboardView(this) {
+                Hs5ClusterActivityOutput.surfaceChanged(this, it)
+            }.also { dashboard = it }
+        } else {
+            FrameLayout(this).apply {
+                setBackgroundColor(Color.BLACK)
+                addView(SurfaceView(this@Hs5ClusterActivity).apply {
+                    holder.addCallback(object : SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: SurfaceHolder) {
+                            Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, holder.surface)
+                        }
+                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                            Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, null)
+                        }
+                    })
+                }, FrameLayout.LayoutParams(-1, -1))
             }
-
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "hs5 cluster window surface ${width}x$height") }
-            }
-
-            override fun surfaceDestroyed(holder: SurfaceHolder) {
-                Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, null)
-            }
-        })
-        root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
-        val density = resources.displayMetrics.density
-        waiting = FrameLayout(this).apply {
-            setBackgroundColor(placeholder)
-            addView(ProgressBar(context).apply {
-                isIndeterminate = true
-                indeterminateTintList = ColorStateList.valueOf(if (dark) Color.WHITE else Color.DKGRAY)
-                contentDescription = context.getString(R.string.cluster_waiting_for_map)
-            }, FrameLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt(), Gravity.CENTER))
         }
-        root.addView(waiting, FrameLayout.LayoutParams(-1, -1))
-        turnCard = ClusterTurnCardView(this).apply { visibility = View.GONE }
-        root.addView(turnCard, FrameLayout.LayoutParams(-1, -1))
-        root.addView(ClusterSpeedometerView(this), FrameLayout.LayoutParams(-1, -1))
-        setContentView(root)
+        @Suppress("DEPRECATION")
+        val targetDisplay = windowManager.defaultDisplay
+        if (dashboard != null && targetDisplay != null && foreground.attach(this, targetDisplay, content, ::dispatchKeyEvent)) {
+            setContentView(View(this).apply { setBackgroundColor(Color.TRANSPARENT) })
+        } else setContentView(content)
         applyOutputState()
     }
 
@@ -105,14 +99,21 @@ class Hs5ClusterActivity : Activity() {
     }
 
     override fun onStop() {
+        foreground.close()
         // Another window covering the cluster means the head unit took the fly screen back.
         if (!isFinishing) Hs5ClusterActivityOutput.closedOutside(this, "covered on cluster")
         super.onStop()
     }
 
     override fun onDestroy() {
+        foreground.close()
         Hs5ClusterActivityOutput.closedOutside(this, "destroyed")
         super.onDestroy()
+    }
+
+    override fun finish() {
+        foreground.close()
+        super.finish()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -139,13 +140,8 @@ class Hs5ClusterActivity : Activity() {
     }
 
     internal fun applyOutputState() {
-        val active = Hs5ClusterActivityOutput.streamActive
-        waiting?.visibility = if (active) View.GONE else View.VISIBLE
-        val card = Hs5ClusterActivityOutput.turnCard
-        turnCard?.setLayout(card.xPercent, card.yPercent, card.sizePercent)
-        turnCard?.setOpacity(card.opacityPercent)
-        turnCard?.setNightMode(card.night)
-        turnCard?.setGuidance(if (active) card.guidance else null)
+        dashboard?.setStreamActive(Hs5ClusterActivityOutput.streamActive)
+        dashboard?.setNightMode(Hs5ClusterActivityOutput.turnCard.night)
     }
 
     internal companion object {
@@ -292,7 +288,7 @@ internal object Hs5ClusterActivityOutput {
 
     fun diagnosticReport(): String = synchronized(events) {
         buildString {
-            appendLine("open=${isOpen()} focused=$resumed streamActive=$streamActive surface=${outputSurface != null}")
+            appendLine("open=${isOpen()} focused=$resumed streamActive=$streamActive surface=${outputSurface != null} window=${activity.get()?.windowOutput}")
             if (events.isEmpty()) append("no cluster window events recorded") else append(events.joinToString("\n"))
         }
     }
@@ -309,6 +305,7 @@ internal object Hs5ClusterActivityOutput {
     }
 
     private fun record(message: String) {
+        if (!DiagnosticLogging.enabled) return
         DiagnosticLogging.logcat { Log.i(TAG, message) }
         val line = "${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())} $message"
         synchronized(events) {

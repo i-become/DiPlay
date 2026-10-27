@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">إدارة لوحة العدادات</string>
+    <string name="settings_cluster_manager_entry_description">معاينة نمط لوحة العدادات وتطبيقه. يؤدي تغيير النمط إلى إعادة اتصال CarPlay.</string>
+    <string name="settings_cluster_manager_description">اختر نمط لوحة العدادات. المعاينات صور توضيحية ثابتة؛ يظهر المحتوى الفعلي بعد الاتصال.</string>
+    <string name="settings_cluster_style_basic">حضري</string>
+    <string name="settings_cluster_style_sport">رياضي</string>
+    <string name="settings_cluster_style_sport_description">عدادات حمراء متحدة المركز مع مشهد السيارة والموسيقى وخريطة CarPlay على اليمين.</string>
+    <string name="settings_cluster_style_basic_description">عدادان مع معلومات السيارة وخريطة CarPlay في الوسط والموسيقى.</string>
+    <string name="settings_cluster_style_original">أصلي</string>
+    <string name="settings_cluster_style_original_description">عرض خريطة CarPlay الأصلية دون عدادات DiPlay المخصصة.</string>
+    <string name="settings_cluster_style_applied">مطبّق</string>
+    <string name="settings_cluster_style_apply">تطبيق على لوحة العدادات</string>
+    <string name="settings_cluster_style_reconnect">يؤدي تغيير النمط إلى إعادة اتصال CarPlay وانقطاع الصورة والصوت مؤقتًا. هل تريد التطبيق وإعادة الاتصال؟</string>
+    <string name="settings_cluster_style_preview">معاينة نمط %1$s</string>
+</resources>
+

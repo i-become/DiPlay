@@ -125,6 +125,16 @@ class NewUiConnectionActions(
         startCarPlayHost(connectionHub = true)
     }
 
+    /** Called only after the apply-and-reconnect dialog. Also handles a retained session
+     * whose host Activity is gone; both map geometry and native surfaces must be rebuilt. */
+    fun reconnectAfterClusterStyleChange() {
+        if (!CarPlayBackgroundSession.hasSession()) return
+        val wireless = AirPlayPersistence.loadWirelessEnabled(activity)
+        disconnect {
+            if (!activity.isFinishing && !activity.isDestroyed) connect(wireless)
+        }
+    }
+
     fun disconnect(onComplete: () -> Unit) {
         ConnectionProgressUiState.markDisconnected()
         CarPlayBackgroundSession.stop {

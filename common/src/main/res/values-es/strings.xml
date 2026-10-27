@@ -747,8 +747,10 @@
     <string name="update_verifying">Verificando…</string>
     <string name="update_install">Instalar %1$s</string>
     <string name="update_failed">Error de actualización</string>
-    <string name="update_install_preparing">Preparando la actualización para el instalador del sistema…</string>
-    <string name="update_install_requested">Actualización enviada al sistema. Esperando el resultado de la instalación…</string>
+    <string name="update_install_preparing">Verificando la actualización y preparando la instalación SOTA del fabricante…</string>
+    <string name="update_install_requested">Enviado a SOTA del fabricante. Esperando confirmar la versión instalada…</string>
+    <string name="update_sota_failure">SOTA del fabricante no pudo instalar esta actualización (%1$s). No se abrió el instalador estándar.</string>
+    <string name="update_sota_timeout">SOTA no ha confirmado la instalación en 2 minutos. Comprueba la versión instalada antes de reintentar.</string>
     <string name="update_install_permission">Permite que DiPlay instale aplicaciones en los ajustes del sistema y vuelve a pulsar Instalar. Si no aparece la pantalla de permiso, exporta un informe de diagnóstico.</string>
     <string name="update_install_missing">El APK descargado no está disponible. Busca actualizaciones y vuelve a descargarlo.</string>
     <string name="update_available_home">Actualización disponible</string>

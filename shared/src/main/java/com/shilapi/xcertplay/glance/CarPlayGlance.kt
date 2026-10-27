@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.glance
 import com.shilapi.xcertplay.hud.BydHudRouteState
 import com.shilapi.xcertplay.hud.ClusterSongState
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
  * What CarPlay is doing, at a glance, for widgets and other screens outside CarPlay: the next
@@ -22,6 +23,7 @@ object CarPlayGlance {
         val remainingMeters: Long? = null,
         val song: String? = null,
         val playing: Boolean = false,
+        val navigating: Boolean = false,
     )
 
     private val route = BydHudRouteState()
@@ -31,11 +33,23 @@ object CarPlayGlance {
 
     /** Called with each new snapshot, on the thread that changed it. */
     @Volatile var listener: ((Snapshot) -> Unit)? = null
+    private val observers = CopyOnWriteArraySet<(Snapshot) -> Unit>()
+
+    /** Independent screens can observe without replacing the navigation widget listener. */
+    fun subscribe(observer: (Snapshot) -> Unit): () -> Unit {
+        observers.add(observer)
+        return { observers.remove(observer) }
+    }
+
+    private fun notifyChanged(snapshot: Snapshot) {
+        listener?.invoke(snapshot)
+        observers.forEach { it(snapshot) }
+    }
 
     /** Refresh time-dependent guidance even when no new metadata frame has arrived. */
     fun snapshot(): Snapshot {
         val (changed, current) = synchronized(this) { publishLocked() to last }
-        changed?.let { listener?.invoke(it) }
+        changed?.let(::notifyChanged)
         return current
     }
 
@@ -49,7 +63,7 @@ object CarPlayGlance {
             }
             publishLocked()
         }
-        changed?.let { listener?.invoke(it) }
+        changed?.let(::notifyChanged)
     }
 
     fun setConnected(next: Boolean) {
@@ -62,7 +76,7 @@ object CarPlayGlance {
             }
             publishLocked()
         }
-        changed?.let { listener?.invoke(it) }
+        changed?.let(::notifyChanged)
     }
 
     private fun publishLocked(): Snapshot? {
@@ -71,6 +85,7 @@ object CarPlayGlance {
         val next = Snapshot(
             connected = connected,
             maneuverType = maneuver?.type,
+            navigating = connected && route.isNavigating(),
             drivingSide = maneuver?.drivingSide ?: 0,
             distanceMeters = maneuver?.distanceMeters ?: 0,
             road = maneuver?.road.orEmpty(),

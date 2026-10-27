@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">Калибровка вида навигации</string>
+    <string name="settings_cluster_navigation_crop_help">Только для настраиваемой панели при навигации. Положительное значение сдвигает карту влево, отрицательное — вправо, с равномерным увеличением и обрезкой краёв. После навигации возвращается полный вид. Сохранение при отпускании, без переподключения.</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%% (0 = полный вид)</string>
+    <string name="settings_cluster_navigation_crop_reset">Восстановить полный вид</string>
+</resources>
+

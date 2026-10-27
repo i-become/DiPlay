@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.view.Display
 import android.view.KeyEvent
@@ -36,10 +37,15 @@ class Hs5ClusterActivityOutputTest {
     }
 
     @Test fun backKeyClosesTheWindowAndTurnsFlyScreenOff() {
+        AirPlayPersistence.saveClusterStyle(org.robolectric.RuntimeEnvironment.getApplication(), ClusterStyle.BASIC)
         val (_, launch) = openWindow()
         assertTrue(Hs5ClusterActivityOutput.isOpen())
         assertTrue(Hs5ClusterActivityOutput.ownsFocus())
         val window = Robolectric.buildActivity(Hs5ClusterActivity::class.java, launch).setup().get()
+
+        val content = window.findViewById<android.view.ViewGroup>(android.R.id.content)
+        assertTrue(content.getChildAt(0) is ClusterDashboardView)
+        assertEquals(PixelFormat.TRANSLUCENT, window.window.attributes.format)
 
         window.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK))
         assertTrue(closed.isEmpty())

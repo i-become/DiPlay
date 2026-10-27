@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920,height=720,initial-scale=1">
+  <title>HS5 仪表修正预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101426; }
+    .cluster { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    .base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+    .correction { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .dial-unit { fill: #f4f5fa; font: 500 28px Arial, sans-serif; text-anchor: middle; }
+  </style>
+</head>
+<body>
+  <div class="cluster">
+    <img class="base" src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/39839b53-6199-4aec-abff-348506995bd9/reference-assets/df61b7e62d2e5a8c8bdc4266e4669faaa91f892b78a736ecc59f769dfe1bd00f/hs5-draft-v8-preview.png" alt="Hongqi HS5 instrument cluster preview">
+    <svg class="correction" viewBox="0 0 1920 720" preserveAspectRatio="none" aria-label="Corrected cluster layout">
+      <defs>
+        <linearGradient id="left-face" x1="0" y1="580" x2="0" y2="648" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#353e64"/>
+          <stop offset="0.48" stop-color="#252d50"/>
+          <stop offset="1" stop-color="#171b35"/>
+        </linearGradient>
+        <linearGradient id="right-face" x1="0" y1="580" x2="0" y2="648" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#353e64"/>
+          <stop offset="0.48" stop-color="#252d50"/>
+          <stop offset="1" stop-color="#171b35"/>
+        </linearGradient>
+        <linearGradient id="footer" x1="0" y1="648" x2="0" y2="720" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#1b2040"/>
+          <stop offset="1" stop-color="#171c36"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M202 590 C250 579 304 575 355 577 C406 575 460 579 508 590 L508 648 L202 648 Z" fill="url(#left-face)"/>
+      <path d="M1412 590 C1460 579 1514 575 1565 577 C1616 575 1670 579 1718 590 L1718 648 L1412 648 Z" fill="url(#right-face)"/>
+
+      <rect x="0" y="648" width="1920" height="72" fill="url(#footer)"/>
+      <path d="M0 648 H1920" stroke="#65708f" stroke-opacity=".38" stroke-width="1"/>
+
+      <text class="dial-unit" x="355" y="624">x1000 r/min</text>
+      <text class="dial-unit" x="1565" y="624">km/h</text>
+    </svg>
+  </div>
+</body>
+</html>

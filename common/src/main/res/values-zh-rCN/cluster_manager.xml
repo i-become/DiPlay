@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">仪表管理</string>
+    <string name="settings_cluster_manager_entry_description">预览并应用仪表样式；切换样式会重新连接 CarPlay。</string>
+    <string name="settings_cluster_manager_description">选择仪表样式。预览为静态示意图，实际内容以连接后的显示为准。</string>
+    <string name="settings_cluster_style_basic">都市</string>
+    <string name="settings_cluster_style_sport">运动</string>
+    <string name="settings_cluster_style_sport_description">红色双环仪表，融合车辆场景、音乐与右侧 CarPlay 地图。</string>
+    <string name="settings_cluster_style_basic_description">双仪表融合车辆信息、中间 CarPlay 地图及音乐。</string>
+    <string name="settings_cluster_style_original">原始</string>
+    <string name="settings_cluster_style_original_description">CarPlay 原生地图飞屏，不显示 DiPlay 自定义仪表。</string>
+    <string name="settings_cluster_style_applied">已应用</string>
+    <string name="settings_cluster_style_apply">应用到仪表盘</string>
+    <string name="settings_cluster_style_reconnect">切换仪表样式需要重新连接 CarPlay，画面与声音会短暂中断。是否应用并重新连接？</string>
+    <string name="settings_cluster_style_preview">%1$s仪表样式预览</string>
+</resources>
+

@@ -1062,6 +1062,15 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ADAPT_PIP_RESOLUTION, enabled).apply()
     }
 
+    fun loadClusterStyle(context: Context): ClusterStyle = ClusterStyle.fromPreference(
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("cluster_style", null))
+
+    /** Caller must confirm reconnect before saving while a session is running. */
+    fun saveClusterStyle(context: Context, style: ClusterStyle) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("cluster_style", style.preferenceValue).apply()
+    }
+
     fun loadClusterContent(context: Context): CarPlayClusterDisplay.Content =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CLUSTER_CONTENT, null)
             ?.let { name -> CarPlayClusterDisplay.Content.entries.firstOrNull { it.name == name } }
@@ -1071,6 +1080,9 @@ object AirPlayPersistence {
     fun effectiveClusterContent(context: Context): CarPlayClusterDisplay.Content =
         if (loadDebugSimulatedClusterPresentation(context)) {
             CarPlayClusterDisplay.Content.INSTRUMENTS
+        } else if (ClusterDashboardView.supported(context)) {
+            // Native HS5 cards consume metadata; the secondary video remains the live map.
+            CarPlayClusterDisplay.Content.MAP
         } else {
             loadClusterContent(context)
         }

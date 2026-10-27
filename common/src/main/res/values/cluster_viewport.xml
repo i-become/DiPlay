@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">Navigation view calibration</string>
+    <string name="settings_cluster_navigation_crop_help">Custom cluster styles only, during navigation. Positive values move the map left; negative values move it right. Cropping zooms evenly. Browsing restores the full view. Saved on release and applied without reconnecting.</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%% (0 = full view)</string>
+    <string name="settings_cluster_navigation_crop_reset">Restore full view</string>
+</resources>
+

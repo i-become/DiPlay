@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">Calibrar vista de navegación</string>
+    <string name="settings_cluster_navigation_crop_help">Solo para los cuadros personalizados durante la navegación. Los valores positivos desplazan el mapa a la izquierda; los negativos, a la derecha. El recorte amplía proporcionalmente. Al salir se restaura la vista completa. Se guarda al soltar, sin reconectar.</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%% (0 = vista completa)</string>
+    <string name="settings_cluster_navigation_crop_reset">Restaurar vista completa</string>
+</resources>
+

@@ -747,8 +747,10 @@
     <string name="update_verifying">Проверка…</string>
     <string name="update_install">Установить %1$s</string>
     <string name="update_failed">Не удалось обновить</string>
-    <string name="update_install_preparing">Подготовка обновления для системного установщика…</string>
-    <string name="update_install_requested">Обновление передано системе. Ожидание результата установки…</string>
+    <string name="update_install_preparing">Проверка обновления и подготовка установки через штатный SOTA…</string>
+    <string name="update_install_requested">Передано штатному SOTA. Ожидание подтверждения установленной версии…</string>
+    <string name="update_sota_failure">Штатный SOTA не смог установить обновление (%1$s). Стандартный установщик не запускался.</string>
+    <string name="update_sota_timeout">SOTA не подтвердил установку за 2 минуты. Проверьте установленную версию перед повторной попыткой.</string>
     <string name="update_install_permission">Разрешите DiPlay устанавливать приложения в настройках системы, затем снова нажмите «Установить». Если экран разрешения не появился, экспортируйте отчёт диагностики.</string>
     <string name="update_install_missing">Загруженный APK недоступен. Проверьте обновления и загрузите его повторно.</string>
     <string name="update_available_home">Доступно обновление</string>

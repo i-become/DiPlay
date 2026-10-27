@@ -32,6 +32,7 @@ fun NewUiDisplayScreen(
     navMarkerSummary: String,
     onPickFps: () -> Unit,
     onPickNavMarker: () -> Unit,
+    onOpenClusterManager: () -> Unit,
     onSmoothVideoChanged: (Boolean) -> Unit,
     onDirectVideoOutputChanged: (Boolean) -> Unit,
     onLowLatencyDecoderChanged: (Boolean) -> Unit,
@@ -79,6 +80,14 @@ fun NewUiDisplayScreen(
                 )
             },
             right = {
+                if (state.clusterManagerAvailable) {
+                    NewUiCompactValueRow(
+                        title = stringResource(R.string.settings_cluster_manager),
+                        subtitle = stringResource(R.string.settings_cluster_manager_entry_description),
+                        value = stringResource(state.clusterStyle.titleRes),
+                        onClick = onOpenClusterManager,
+                    )
+                }
                 NewUiCompactToggleRow(
                     title = stringResource(R.string.new_ui_shell_display_hud_title),
                     subtitle = stringResource(R.string.new_ui_shell_display_hud_sub),

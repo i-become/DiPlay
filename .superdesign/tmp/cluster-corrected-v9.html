@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920,height=720,initial-scale=1">
+  <title>HS5 仪表修正预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101426; }
+    .cluster { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    .base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+    .correction { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .dial-unit { fill: #f4f5fa; font: 500 28px Arial, sans-serif; text-anchor: middle; }
+  </style>
+</head>
+<body>
+  <div class="cluster">
+    <img class="base" src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/39839b53-6199-4aec-abff-348506995bd9/reference-assets/df61b7e62d2e5a8c8bdc4266e4669faaa91f892b78a736ecc59f769dfe1bd00f/hs5-draft-v8-preview.png" alt="Hongqi HS5 instrument cluster preview">
+    <svg class="correction" viewBox="0 0 1920 720" preserveAspectRatio="none" aria-label="Corrected cluster layout">
+      <defs>
+        <clipPath id="left-lower-dial"><path d="M198 580 Q355 555 512 580 L512 648 H198 Z"/></clipPath>
+        <clipPath id="right-lower-dial"><path d="M1408 580 Q1565 555 1722 580 L1722 648 H1408 Z"/></clipPath>
+        <radialGradient id="dial-face" gradientUnits="userSpaceOnUse" cx="355" cy="602" r="185" gradientTransform="translate(0 350) scale(1 .42)">
+          <stop offset="0" stop-color="#293554"/>
+          <stop offset=".76" stop-color="#202a49"/>
+          <stop offset="1" stop-color="#19213d"/>
+        </radialGradient>
+        <radialGradient id="dial-face-right" gradientUnits="userSpaceOnUse" cx="1565" cy="602" r="185" gradientTransform="translate(0 350) scale(1 .42)">
+          <stop offset="0" stop-color="#293554"/>
+          <stop offset=".76" stop-color="#202a49"/>
+          <stop offset="1" stop-color="#19213d"/>
+        </radialGradient>
+        <linearGradient id="footer" x1="0" y1="648" x2="0" y2="720" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#1b2040"/>
+          <stop offset="1" stop-color="#171c36"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M198 580 Q355 555 512 580 Q520 614 512 648 H198 Q190 614 198 580 Z" fill="url(#dial-face)"/>
+      <path d="M1408 580 Q1565 555 1722 580 Q1730 614 1722 648 H1408 Q1400 614 1408 580 Z" fill="url(#dial-face-right)"/>
+
+      <rect x="0" y="648" width="1920" height="72" fill="url(#footer)"/>
+      <path d="M0 648 H1920" stroke="#65708f" stroke-opacity=".38" stroke-width="1"/>
+
+      <text class="dial-unit" x="355" y="624">×1000r/min</text>
+      <text class="dial-unit" x="1565" y="624">km/h</text>
+    </svg>
+  </div>
+</body>
+</html>

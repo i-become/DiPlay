@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">導航視野校準</string>
+    <string name="settings_cluster_navigation_crop_help">僅自訂儀表導航時生效。正值將畫面向左移，負值向右移，並等比放大裁切邊緣。結束導航恢復完整視野。放開即儲存並生效，無需重新連線。</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%%（0 為完整視野）</string>
+    <string name="settings_cluster_navigation_crop_reset">恢復完整視野</string>
+</resources>
+

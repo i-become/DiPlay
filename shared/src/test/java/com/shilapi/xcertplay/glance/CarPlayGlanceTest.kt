@@ -11,6 +11,22 @@ import org.junit.Before
 import org.junit.Test
 
 class CarPlayGlanceTest {
+    @Test fun screensSubscribeIndependentlyOfWidgetAndUnsubscribeCleanly() {
+        val widget = mutableListOf<CarPlayGlance.Snapshot>()
+        val dashboard = mutableListOf<CarPlayGlance.Snapshot>()
+        CarPlayGlance.listener = { widget += it }
+        val release = CarPlayGlance.subscribe { dashboard += it }
+        try {
+            CarPlayGlance.setConnected(true)
+            assertEquals(1, widget.size)
+            assertEquals(widget, dashboard)
+            release()
+            CarPlayGlance.setConnected(false)
+            assertEquals(2, widget.size)
+            assertEquals(1, dashboard.size)
+        } finally { release() }
+    }
+
     private fun frame(id: Int, block: Iap2BodyBuilder.() -> Unit) = Iap2Messages.buildRaw(id, block)
 
     @Before
@@ -113,6 +129,31 @@ class CarPlayGlanceTest {
             test { now += it }
         } finally {
             clock.set(route, original)
+        }
+    }
+
+    @Test
+    fun navigationPresenceDoesNotDependOnNextTurnDetails() {
+        withRouteClock { advance ->
+            CarPlayGlance.setConnected(true)
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1); u16List(0x0d, emptyList()) })
+            assertTrue(CarPlayGlance.snapshot().navigating)
+            assertNull(CarPlayGlance.snapshot().maneuverType)
+            CarPlayGlance.onFrame(frame(0x5201) { u16List(0x0d, emptyList()) })
+            advance(4_000_000_000L)
+            assertTrue(CarPlayGlance.snapshot().navigating)
+            assertNull(CarPlayGlance.snapshot().maneuverType)
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 0) })
+            assertEquals(false, CarPlayGlance.snapshot().navigating)
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1) })
+            assertTrue(CarPlayGlance.snapshot().navigating)
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+            assertEquals(false, CarPlayGlance.snapshot().navigating)
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1) })
+            advance(30_000_000_000L)
+            assertEquals(false, CarPlayGlance.snapshot().navigating)
+            CarPlayGlance.setConnected(false)
+            assertEquals(CarPlayGlance.Snapshot(), CarPlayGlance.snapshot())
         }
     }
 

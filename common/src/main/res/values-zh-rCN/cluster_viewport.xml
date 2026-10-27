@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">导航视野校准</string>
+    <string name="settings_cluster_navigation_crop_help">仅自定义仪表导航时生效。正值将画面向左移，负值向右移，并等比放大裁切边缘。退出导航恢复完整视野。松手即保存并生效，无需重连。</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%%（0 为完整视野）</string>
+    <string name="settings_cluster_navigation_crop_reset">恢复完整视野</string>
+</resources>
+

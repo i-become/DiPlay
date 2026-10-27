@@ -1,150 +1,179 @@
 package com.shilapi.xcertplay.update
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageInfo
-import android.content.pm.PackageInstaller
-import android.os.Looper
-import java.time.Duration
-import com.shilapi.xcertplay.newui.settings.NewUiUpdateController
-import com.shilapi.xcertplay.host.R
+import android.os.SystemClock
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.LooperMode
-import org.robolectric.util.ReflectionHelpers
-import androidx.activity.ComponentActivity
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class UpdateInstallerTest {
-    @org.junit.Before fun enableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(true) }
-    @org.junit.After fun disableRecording() { com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false) }
     private val app get() = RuntimeEnvironment.getApplication()
-    private val receiver = UpdateInstallStatusReceiver()
+    private val prefs get() = app.getSharedPreferences(UpdateInstaller.PREFERENCES, Context.MODE_PRIVATE)
+    private val transport = FakeSota()
+    private val scheduled = mutableListOf<String>()
 
     @Before fun reset() {
-        for (name in listOf("diplay_update_install", "diplay_update_diagnostics")) {
+        DiagnosticLogging.setEnabled(false)
+        for (name in listOf(UpdateInstaller.PREFERENCES, "diplay_update_diagnostics", "diplay_update_install")) {
             app.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
         }
     }
 
-    @Test fun pendingUserActionOpensSystemConfirmationAndKeepsItsResultLink() {
-        val id = prepare()
-        receiver.onReceive(app, result(id, PackageInstaller.STATUS_PENDING_USER_ACTION)
-            .putExtra(Intent.EXTRA_INTENT, Intent("android.content.pm.action.CONFIRM_INSTALL")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)))
-        val launch = shadowOf(app).nextStartedActivity
-        assertEquals(UpdateInstallActivity::class.java.name, launch.component?.className)
-        val bridge = Robolectric.buildActivity(UpdateInstallActivity::class.java, launch).setup()
-        val confirmation = shadowOf(bridge.get()).nextStartedActivityForResult
-        assertEquals("android.content.pm.action.CONFIRM_INSTALL", confirmation.intent.action)
-        assertEquals(0, confirmation.intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
-        assertTrue(confirmation.intent.getBooleanExtra(Intent.EXTRA_RETURN_RESULT, false))
-
-        // Android 9 also returns this after APPROVAL. Do not abandon the approved session.
-        shadowOf(bridge.get()).receiveResult(confirmation.intent, Activity.RESULT_CANCELED, null)
-        assertEquals(UpdateInstaller.INSTALLING, UpdateInstaller.result(app)?.status)
-        assertNotNull(app.packageManager.packageInstaller.getSessionInfo(id))
-        receiver.onReceive(app, result(id, PackageInstaller.STATUS_SUCCESS))
-        assertEquals(PackageInstaller.STATUS_SUCCESS, UpdateInstaller.result(app)?.status)
-        assertTrue(bridge.get().isFinishing)
-        bridge.pause().stop().destroy()
-    }
-
-    @Test fun cancellationComesFromTheSystemStatusAndIsDisplayedAfterUiRecreation() {
-        val id = prepare()
-        receiver.onReceive(app, result(id, PackageInstaller.STATUS_FAILURE_ABORTED)
-            .putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, "User rejected permissions"))
-        val screen = Robolectric.buildActivity(ComponentActivity::class.java).setup()
-        val controller = NewUiUpdateController(screen.get()) {}
-        controller.refreshInstallResult()
-        assertFalse(controller.uiState.installPreparing)
-        assertEquals(screen.get().getString(R.string.update_install_cancelled), controller.uiState.message)
-        assertTrue(UpdateDiagnostics.report(app).contains("User rejected permissions"))
+    @Test fun dispatchIsPendingNotSuccessAndDoesNotOpenAStandardInstaller() {
+        val result = submit()
+        assertEquals(UpdateInstaller.Status.WAITING, result.status)
+        assertTrue(result.busy)
+        assertEquals(listOf("inspect", "verify", "stage", "send"), transport.calls)
+        assertEquals(listOf(result.requestId), scheduled)
+        assertTrue(app.packageManager.packageInstaller.mySessions.isEmpty())
         assertNull(shadowOf(app).nextStartedActivity)
-        screen.pause().stop().destroy()
     }
 
-    @Test fun missingConfirmationIntentIsAVisibleFailureAndAbandonsTheStagedSession() {
-        val id = prepare()
-        receiver.onReceive(app, result(id, PackageInstaller.STATUS_PENDING_USER_ACTION))
-        assertEquals(UpdateInstaller.LAUNCH_FAILED, UpdateInstaller.result(app)?.status)
-        assertNull(app.packageManager.packageInstaller.getSessionInfo(id))
-        assertTrue(UpdateDiagnostics.report(app).contains("missing system confirmation intent"))
+    @Test fun duplicateSubmissionDoesNotCopyOrBroadcastAgain() {
+        val first = submit()
+        assertEquals(first, submit())
+        assertEquals(1, transport.calls.count { it == "send" })
+        assertEquals(1, scheduled.size)
     }
 
-    @Test fun oldSessionResultsDoNotOverrideANewerAttempt() {
-        val old = prepare()
-        val current = prepare()
-        receiver.onReceive(app, result(old, PackageInstaller.STATUS_FAILURE_CONFLICT))
-        assertEquals(current, UpdateInstaller.result(app)?.sessionId)
-        assertEquals(UpdateInstaller.STAGED, UpdateInstaller.result(app)?.status)
+    @Test fun untrustedServiceFailsClosedWithoutStagingOrFallback() {
+        transport.failAt = "inspect"
+        val result = submit()
+        assertEquals(UpdateInstaller.Status.FAILED, result.status)
+        assertEquals("TEST_inspect", result.reason)
+        assertEquals(listOf("inspect"), transport.calls)
+        assertTrue(scheduled.isEmpty())
+        assertTrue(app.packageManager.packageInstaller.mySessions.isEmpty())
     }
 
-    @Test fun processReplacementCanRecoverSuccessWithoutItsFinalBroadcast() {
-        val id = prepare()
+    @Test fun invalidUpdateIsNeverExposedToSota() {
+        transport.failAt = "verify"
+        assertEquals(UpdateInstaller.Status.FAILED, submit().status)
+        assertEquals(listOf("inspect", "verify"), transport.calls)
+        assertFalse(prefs.contains("rootMode"))
+    }
+
+    @Test fun stagingFailureCleansOnlyThisRequestAndDoesNotBroadcast() {
+        transport.failAt = "stage"
+        val result = submit()
+        assertFalse(result.busy)
+        assertEquals(listOf("inspect", "verify", "stage", "cleanup"), transport.calls)
+        assertEquals(result.requestId, transport.cleaned.single().requestId)
+    }
+
+    @Test fun broadcastFailureIsVisibleAndCleansTheReadOnlyCopy() {
+        transport.failAt = "send"
+        val result = submit()
+        assertEquals(UpdateInstaller.Status.FAILED, result.status)
+        assertEquals("TEST_send", result.reason)
+        assertEquals(1, transport.cleaned.size)
+    }
+
+    @Test fun schedulerFailurePreventsSendingAnUntrackedRequest() {
+        val result = UpdateInstaller.submit(app, File(app.cacheDir, "input.apk"), "digest", transport) {
+            throw IllegalStateException("scheduler unavailable")
+        }
+        assertEquals(UpdateInstaller.Status.FAILED, result.status)
+        assertFalse(transport.calls.contains("send"))
+    }
+
+    @Test fun selfReplacementConfirmsVersionAndCleansStaging() {
+        val request = submit()
+        installed(1201, 400)
+        UpdateInstaller.reconcile(app, transport = transport)
+        val result = UpdateInstaller.result(app)!!
+        assertEquals(UpdateInstaller.Status.SUCCEEDED, result.status)
+        assertEquals(request.requestId, result.requestId)
+        assertTrue(result.revision > request.revision)
+        assertEquals(request.requestId, transport.cleaned.single().requestId)
+    }
+
+    @Test fun timestampAloneOrAnUnchangedTimestampCannotConfirmSuccess() {
+        submit()
+        installed(1200, 400)
+        UpdateInstaller.reconcile(app, transport = transport)
+        assertTrue(UpdateInstaller.result(app)!!.busy)
+        installed(1201, 0)
+        UpdateInstaller.reconcile(app, transport = transport)
+        assertTrue(UpdateInstaller.result(app)!!.busy)
+    }
+
+    @Test fun timeoutSurvivesProcessUiLossAndUnlocksRetry() {
+        val request = submit()
+        UpdateInstaller.reconcile(app, requestId = request.requestId, expired = true, transport = transport)
+        assertEquals(UpdateInstaller.Status.TIMED_OUT, UpdateInstaller.result(app)?.status)
+        assertEquals(request.requestId, transport.cleaned.single().requestId)
+        assertNotEquals(request.requestId, submit().requestId)
+    }
+
+    @Test fun lateSelfReplacementCanCorrectATimeout() {
+        val request = submit()
+        UpdateInstaller.reconcile(app, expired = true, transport = transport)
+        installed(1201, 400)
+        UpdateInstaller.reconcile(app, requestId = request.requestId, transport = transport)
+        assertEquals(UpdateInstaller.Status.SUCCEEDED, UpdateInstaller.result(app)?.status)
+    }
+
+    @Test fun oldTimeoutCannotChangeOrCleanANewerAttempt() {
+        val old = submit()
+        UpdateInstaller.reconcile(app, expired = true, transport = transport)
+        val fresh = submit()
+        transport.cleaned.clear()
+        UpdateInstaller.reconcile(app, requestId = old.requestId, expired = true, transport = transport)
+        assertEquals(fresh, UpdateInstaller.result(app))
+        assertTrue(transport.cleaned.isEmpty())
+    }
+
+    @Test fun elapsedDeadlineAndRebootCannotLeaveRequestBusyForever() {
+        submit()
+        prefs.edit().putLong("startedElapsed", SystemClock.elapsedRealtime() - UpdateInstaller.TIMEOUT_MS).commit()
+        UpdateInstaller.reconcile(app, transport = transport)
+        assertEquals(UpdateInstaller.Status.TIMED_OUT, UpdateInstaller.result(app)?.status)
+        submit()
+        prefs.edit().putLong("startedElapsed", SystemClock.elapsedRealtime() + 10_000).commit()
+        UpdateInstaller.reconcile(app, transport = transport)
+        assertFalse(UpdateInstaller.result(app)!!.busy)
+    }
+
+    @Test fun diagnosticOptOutDoesNotPersistAnInstallLog() {
+        submit()
+        assertFalse(app.getSharedPreferences("diplay_update_diagnostics", Context.MODE_PRIVATE).contains("events"))
+        assertFalse(UpdateAvailability.report(app, System.currentTimeMillis()).contains("sota status="))
+    }
+
+    private fun submit() = UpdateInstaller.submit(app, File(app.cacheDir, "input.apk"), "digest", transport, scheduled::add)
+
+    private fun installed(version: Int, updated: Long) {
         val info = app.packageManager.getPackageInfo(app.packageName, 0).apply {
-            versionCode = 1201
-            lastUpdateTime = System.currentTimeMillis() + 1_000
+            versionCode = version
+            lastUpdateTime = updated
         }
         shadowOf(app.packageManager).installPackage(info)
-        UpdateInstaller.reconcile(app)
-        assertEquals(PackageInstaller.STATUS_SUCCESS, UpdateInstaller.result(app)?.status)
-        assertTrue(UpdateDiagnostics.report(app).contains("verified installed version=1201"))
-        assertEquals(id, UpdateInstaller.result(app)?.sessionId)
     }
 
-    @Test fun disappearedSessionCannotLeaveTheInstallButtonBusyForever() {
-        val id = prepare()
-        UpdateInstaller.abandon(app, id)
-        UpdateInstaller.reconcile(app)
-        assertFalse(UpdateInstaller.result(app)!!.busy)
-        assertEquals(UpdateInstaller.LAUNCH_FAILED, UpdateInstaller.result(app)?.status)
+    private class FakeSota : SotaTransport {
+        val calls = mutableListOf<String>()
+        val cleaned = mutableListOf<SotaStaging>()
+        var failAt: String? = null
+        private fun step(name: String) { calls += name; if (name == failAt) throw SotaFailure("TEST_$name") }
+        override fun checkEndpoint() = step("inspect")
+        override fun verifyArchive(source: File, digest: String): SotaUpdate { step("verify"); return SotaUpdate(1201, 0) }
+        override fun storageMode() = 448
+        override fun stage(staging: SotaStaging, source: File, digest: String) = step("stage")
+        override fun send(staging: SotaStaging) {
+            assertEquals(staging.requestId, RuntimeEnvironment.getApplication().getSharedPreferences(
+                UpdateInstaller.PREFERENCES, Context.MODE_PRIVATE).getString("request", null))
+            step("send")
+        }
+        override fun cleanup(staging: SotaStaging) { calls += "cleanup"; cleaned += staging }
     }
-
-    @Test
-    @LooperMode(LooperMode.Mode.PAUSED)
-    fun anInstallerThatExitsWithoutAStatusCannotLeaveTheButtonBusyForever() {
-        val id = prepare()
-        UpdateInstaller.record(app, id, UpdateInstaller.INSTALLING, "confirmation returned")
-        // Robolectric's setSessionActiveState only dispatches callbacks; it does
-        // not update the SessionInfo returned by getSessionInfo().
-        ReflectionHelpers.setField(app.packageManager.packageInstaller.getSessionInfo(id), "active", false)
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(121))
-        UpdateInstaller.reconcile(app)
-        assertEquals(UpdateInstaller.LAUNCH_FAILED, UpdateInstaller.result(app)?.status)
-        assertNull(app.packageManager.packageInstaller.getSessionInfo(id))
-        assertTrue(UpdateDiagnostics.report(app).contains("no installation result"))
-    }
-
-    @Test
-    @LooperMode(LooperMode.Mode.PAUSED)
-    fun anActiveSystemInstallIsNotAbandonedWhenTheResultIsDelayed() {
-        val id = prepare()
-        UpdateInstaller.record(app, id, UpdateInstaller.INSTALLING, "confirmation returned")
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(121))
-        UpdateInstaller.reconcile(app)
-        assertEquals(UpdateInstaller.INSTALLING, UpdateInstaller.result(app)?.status)
-        assertNotNull(app.packageManager.packageInstaller.getSessionInfo(id))
-    }
-
-    private fun prepare(): Int {
-        val file = File(app.cacheDir, "update-test.apk").apply { writeText("verified bytes") }
-        shadowOf(app.packageManager).setPackageArchiveInfo(file.absolutePath,
-            PackageInfo().apply { packageName = app.packageName; versionCode = 1201 })
-        return UpdateInstaller.prepare(app, file)
-    }
-
-    private fun result(id: Int, status: Int) = Intent()
-        .putExtra(PackageInstaller.EXTRA_SESSION_ID, id)
-        .putExtra(PackageInstaller.EXTRA_STATUS, status)
 }

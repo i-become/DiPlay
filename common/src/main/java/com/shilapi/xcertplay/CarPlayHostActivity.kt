@@ -1582,6 +1582,14 @@ class CarPlayHostActivity : ComponentActivity() {
                     ).also { MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels }
                 }
                 val requestedScale = AirPlayPersistence.loadClusterMapScalePercent(this)
+                if (ClusterDashboardView.enabled(this)) {
+                    return AirPlayPersistence.loadClusterStyle(this).streamConfig(size.x, size.y, requestedScale,
+                        markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
+                        markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this)).also {
+                        MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
+                        DiagnosticLogging.record { appendLog("HS5 OEM map viewport: ${it.widthPixels}x${it.heightPixels} on ${size.x}x${size.y} safeArea=${it.safeArea}") }
+                    }
+                }
                 val smallWindow = smallWindowActive()
                 requestedSmallWindowForStream = smallWindow
                 fun streamAt(scale: Int) = CarPlayClusterDisplay.config(

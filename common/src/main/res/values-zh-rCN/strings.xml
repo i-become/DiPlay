@@ -842,8 +842,10 @@
     <string name="update_verifying">正在校验…</string>
     <string name="update_install">安装 %1$s</string>
     <string name="update_failed">更新失败</string>
-    <string name="update_install_preparing">正在为系统安装器准备更新…</string>
-    <string name="update_install_requested">已向系统提交更新，正在等待安装结果…</string>
+    <string name="update_install_preparing">正在校验更新包并准备原厂 SOTA 安装…</string>
+    <string name="update_install_requested">已提交原厂 SOTA，正在等待安装版本确认…</string>
+    <string name="update_sota_failure">原厂 SOTA 无法安装本次更新（%1$s），未启动标准安装器。</string>
+    <string name="update_sota_timeout">原厂 SOTA 在 2 分钟内未确认安装完成，请先检查已安装版本，再决定是否重试。</string>
     <string name="update_install_permission">请在系统设置中允许 DiPlay 安装应用，再次点击安装。如果没有出现授权页面，请导出诊断报告。</string>
     <string name="update_install_missing">下载的安装包已不可用，请检查更新并重新下载。</string>
     <string name="update_available_home">有可用更新</string>

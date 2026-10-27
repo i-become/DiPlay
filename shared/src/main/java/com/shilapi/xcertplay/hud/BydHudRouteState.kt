@@ -81,6 +81,11 @@ internal class BydHudRouteState(
         )
     }
 
+    /** Route presence is independent of next-maneuver details, e.g. during rerouting. */
+    fun isNavigating(): Boolean = routeActive && lastRouteUpdateNs?.let {
+        nanoTime() - it < staleRouteNs
+    } == true
+
     fun clear(): Boolean {
         val wasActive = routeActive
         routeActive = false
@@ -148,12 +153,12 @@ internal class BydHudRouteState(
         // The iPhone briefly sends an empty current list every few seconds and while rerouting. Keep the last
         // maneuver (and the cached 0x5202 details, which are never resent) and hide it only if the list stays
         // empty; the bridges' 1 s tick clears the outputs once current() turns null.
+        if (state != null) routeActive = true
         if (listPresent && firstManeuver == null) {
             if (emptyListSinceNs == null) emptyListSinceNs = nanoTime()
             return BydHudRouteChange.NONE
         }
         if (firstManeuver != null) emptyListSinceNs = null
-        if (state != null) routeActive = true
         if (firstManeuver != null) {
             activeIndex = firstManeuver!!
             routeActive = true

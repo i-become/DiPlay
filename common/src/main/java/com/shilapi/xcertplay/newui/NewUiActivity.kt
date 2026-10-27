@@ -79,6 +79,7 @@ import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticQrScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsSubpage
 import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
+import com.shilapi.xcertplay.newui.display.NewUiClusterManagerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayNavMarkerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayState
@@ -125,6 +126,7 @@ class NewUiActivity : ComponentActivity() {
     private var displaySubpage by mutableStateOf(NewUiDisplaySubpage.MAIN)
     private var clusterNavMarkerX by mutableStateOf(50)
     private var clusterNavMarkerY by mutableStateOf(45)
+    private var clusterNavigationCrop by mutableStateOf(0)
     private var diagnosticsSubpage by mutableStateOf(NewUiDiagnosticsSubpage.MAIN)
     private var vehicleIconRevision by mutableStateOf(0)
     private var diagnosticReportTitle by mutableStateOf("")
@@ -328,6 +330,11 @@ class NewUiActivity : ComponentActivity() {
                             NewUiDisplaySubpage.NAV_MARKER -> NewUiDisplayNavMarkerScreen(
                                 xPercent = clusterNavMarkerX,
                                 yPercent = clusterNavMarkerY,
+                                navigationCrop = clusterNavigationCrop,
+                                onNavigationCrop = { value ->
+                                    com.shilapi.xcertplay.ClusterMapCropSettings.save(activity, value)
+                                    clusterNavigationCrop = value
+                                },
                                 onBack = { popDisplaySubpage() },
                                 onSave = { x, y ->
                                     applyWithReconnectConfirm(
@@ -348,6 +355,24 @@ class NewUiActivity : ComponentActivity() {
                                     }
                                 },
                             )
+                            NewUiDisplaySubpage.CLUSTER_MANAGER -> NewUiClusterManagerScreen(
+                                selectedStyle = displayState.clusterStyle,
+                                onBack = { popDisplaySubpage() },
+                                onApply = { style ->
+                                    if (style != displayState.clusterStyle) {
+                                        applyWithReconnectConfirm(
+                                            title = getString(R.string.settings_cluster_manager),
+                                            message = getString(R.string.settings_cluster_style_reconnect),
+                                            onApplied = {
+                                                refreshAll()
+                                                connectionActions.reconnectAfterClusterStyleChange()
+                                            },
+                                        ) {
+                                            NewUiDisplayActions.saveClusterStyle(activity, style)
+                                        }
+                                    }
+                                },
+                            )
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
                                 navMarkerSummary = getString(
@@ -357,6 +382,10 @@ class NewUiActivity : ComponentActivity() {
                                 ),
                                 onPickFps = { openDisplayFpsPage() },
                                 onPickNavMarker = { openDisplayNavMarkerPage() },
+                                onOpenClusterManager = {
+                                    displaySubpage = NewUiDisplaySubpage.CLUSTER_MANAGER
+                                    syncSubpageBackCallback()
+                                },
                                 onSmoothVideoChanged = { enabled ->
                                     applyWithReconnectConfirm(
                                         title = getString(R.string.smooth_video),
@@ -726,6 +755,7 @@ class NewUiActivity : ComponentActivity() {
         displayState = NewUiDisplayStateReader.read(this)
         clusterNavMarkerX = AirPlayPersistence.loadClusterMarkerXPercent(this)
         clusterNavMarkerY = AirPlayPersistence.loadClusterMarkerYPercent(this)
+        clusterNavigationCrop = com.shilapi.xcertplay.ClusterMapCropSettings.load(this)
         settingsState = NewUiSettingsStateReader.read(this)
         diagnosticStoragePath = NewUiDiagnosticsRepository.storageHint(this)
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)

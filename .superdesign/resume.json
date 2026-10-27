@@ -1,10 +1,47 @@
 {
+  "schemaVersion": 1,
   "projectId": "39839b53-6199-4aec-abff-348506995bd9",
   "projectUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9",
   "targets": {
+    "hs5-cluster-dashboard": {
+      "targetKind": "new-ui",
+      "projectId": "39839b53-6199-4aec-abff-348506995bd9",
+      "activeDraftId": "f23cfce5-ab23-43e6-afee-512d7bc412fa",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/cluster-dashboard-brief.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "11879723213C16881BB2B21E4EAF6639AE68720C433BB7CCFBE3BCB2BE54FE5E",
+        ".superdesign/cluster-dashboard-brief.md": "6BFDCF3470F1898C43252159D833A8EE667C232B76F6EF01125A52E2FD88748B"
+      },
+      "referenceIds": [
+        "43b8f708-0063-43de-a3cd-04bb362f6eab",
+        "1ec31396-4836-433e-845f-f49e6e4f7d7e"
+      ],
+      "components": [],
+      "drafts": {
+        "f23cfce5-ab23-43e6-afee-512d7bc412fa": {
+          "title": "HS5 原车仪表还原 · 清除底部遮挡块",
+          "visualDirection": "Urban live map spans dial centres, aligns with dial tops and tire panel, behind opaque dial layers. Removed broad side fades. Shared source density multiplier widens browsing/guidance geography; actual Amap zoom requires in-car confirmation. Native preview map/data are fixtures.",
+          "currentVersion": 14,
+          "previewUrl": "https://p.superdesign.dev/draft/f23cfce5-ab23-43e6-afee-512d7bc412fa",
+          "htmlSource": ".superdesign/tmp/cluster-viewport.html"
+        }
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
+      "updatedAt": "2026-10-27T13:27:36.964Z"
+    },
     "connection-redesign": {
       "title": "HS5 Connection page redesign explorations",
-      "viewport": { "width": 1920, "height": 720 },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
       "variants": [
         {
           "id": "A-apple-minimal",
@@ -45,7 +82,10 @@
     },
     "shell-pages-A-apple-minimal": {
       "title": "HS5 top-tab shell · Apple Minimal main pages",
-      "viewport": { "width": 1920, "height": 720 },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
       "designDirection": "A-apple-minimal",
       "htmlSources": {
         "display": ".superdesign/tmp/page-display.html",
@@ -80,9 +120,57 @@
         }
       ]
     },
+    "oem-cluster-replica-reference": {
+      "title": "OEM 数字仪表 · 对照照片复现",
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
+      "designDirection": "oem-three-zone-rpm-adas-speed",
+      "htmlSources": {
+        "main": ".superdesign/tmp/oem-cluster-replica-reference.html"
+      },
+      "pages": [
+        {
+          "id": "main",
+          "draftId": "de7e7113-caf3-4728-bae4-37196c44dd41",
+          "previewUrl": "https://p.superdesign.dev/draft/de7e7113-caf3-4728-bae4-37196c44dd41",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-de7e7113-caf3-4728-bae4-37196c44dd41"
+        }
+      ],
+      "updatedAt": "2026-10-25T04:50:00Z"
+    },
+    "carplay-ultra-cluster-fusion": {
+      "title": "CarPlay Ultra 融合仪表 · 1920×720",
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
+      "designDirection": "vw-style-floating-dials-over-perspective-nav",
+      "htmlSources": {
+        "main": ".superdesign/tmp/carplay-ultra-cluster-fusion.html"
+      },
+      "pages": [
+        {
+          "id": "main-v2",
+          "draftId": "b6bf5d3a-bbd4-4032-b85a-e5d27cb01cb9",
+          "previewUrl": "https://p.superdesign.dev/draft/b6bf5d3a-bbd4-4032-b85a-e5d27cb01cb9",
+          "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-b6bf5d3a-bbd4-4032-b85a-e5d27cb01cb9"
+        },
+        {
+          "id": "main-v1",
+          "draftId": "d87d8d0d-5e41-4fab-a003-aa6f4dec09a4",
+          "previewUrl": "https://p.superdesign.dev/draft/d87d8d0d-5e41-4fab-a003-aa6f4dec09a4"
+        }
+      ],
+      "updatedAt": "2026-10-24T16:20:00Z"
+    },
     "nav-vehicle-marker": {
       "title": "导航车标位置 · New UI 子页（查看 / 编辑）",
-      "viewport": { "width": 1920, "height": 720 },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
       "designDirection": "A-apple-minimal",
       "htmlSources": {
         "view": ".superdesign/tmp/nav-vehicle-marker-view.html",
@@ -102,6 +190,82 @@
           "nodeUrl": "https://superdesign.dev/teams/b5eb5f77-fc70-4c78-8e5f-ad9b9f86575c/projects/39839b53-6199-4aec-abff-348506995bd9?node=draft-variant-b787f3f3-10d2-4a5f-885f-9c3b6863770d"
         }
       ]
+    },
+    "display-cluster-manager": {
+      "targetKind": "new-ui",
+      "projectId": "39839b53-6199-4aec-abff-348506995bd9",
+      "activeDraftId": "ac1b0716-c638-4f39-bd6d-0de113c2d5e4",
+      "sourceTarget": "shell-pages-A-apple-minimal",
+      "sourceDraftId": "42cc31cb-1166-48d7-8b80-0029abd33b19",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/theme.md",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiShell.kt",
+        "common/src/main/java/com/shilapi/xcertplay/newui/display/NewUiDisplayScreen.kt",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiComponents.kt",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiLayout.kt"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "11879723213C16881BB2B21E4EAF6639AE68720C433BB7CCFBE3BCB2BE54FE5E",
+        ".superdesign/init/theme.md": "8DB84A6B05570E7D86F4A71F767974098EC7B5EE554D3216C104CBE7935C037F",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiShell.kt": "90C85EA23E1D5A0F9A83BB0A44EA96C8741BFABFB622CE75AD0674504372801C",
+        "common/src/main/java/com/shilapi/xcertplay/newui/display/NewUiDisplayScreen.kt": "476D0B6FEAD68F724904A7912DBDB2A8EBCB15FCD0CF93D62E958137DCC1B170",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiComponents.kt": "9FB4EEB942DB894167E9D173F09855F200D84891C0C3CA8872771CDA90DC3B8F",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiLayout.kt": "981468A7E8D77B5F3F95E5F754E46F949ECE72C0D480FAFFDBA6A0F3EF189DBA"
+      },
+      "components": [],
+      "drafts": {
+        "ac1b0716-c638-4f39-bd6d-0de113c2d5e4": {
+          "title": "CarPlay HS5 · 仪表管理",
+          "visualDirection": "Existing Display top-tab shell; vertically scrollable static style cards for 原始 and 基础 with apply/selected states",
+          "parentDraftId": "42cc31cb-1166-48d7-8b80-0029abd33b19",
+          "currentVersion": 2,
+          "previewUrl": "https://p.superdesign.dev/draft/ac1b0716-c638-4f39-bd6d-0de113c2d5e4"
+        }
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
+      "updatedAt": "2026-10-26T07:22:00.306Z"
+    },
+    "hs5-cluster-sport": {
+      "targetKind": "new-ui",
+      "projectId": "39839b53-6199-4aec-abff-348506995bd9",
+      "activeDraftId": "e02d6834-75fa-42e4-aa54-538d7af93b20",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/cluster-sport-brief.md",
+        "common/src/main/java/com/shilapi/xcertplay/SportClusterRenderer.kt",
+        "common/src/main/java/com/shilapi/xcertplay/ClusterInstrumentRenderer.kt"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "11879723213C16881BB2B21E4EAF6639AE68720C433BB7CCFBE3BCB2BE54FE5E",
+        ".superdesign/cluster-sport-brief.md": "CA08A69E64EF82EC5BE7A97191E7AAECE3B30A132138AD3CF535DAC21B42D691",
+        "common/src/main/java/com/shilapi/xcertplay/SportClusterRenderer.kt": "DF8DD21C910B4950919C6C8116028A0C693F6437166CE76A396A74712BC1B86A",
+        "common/src/main/java/com/shilapi/xcertplay/ClusterInstrumentRenderer.kt": "55C3FF3DDE3902B1B0A82DF674D9CF1497519F714C91047B26D39A31192BB1E6"
+      },
+      "referenceIds": [
+        "6e4a1c93-cd31-429f-afb7-959864ce0b0a"
+      ],
+      "components": [],
+      "drafts": {
+        "e02d6834-75fa-42e4-aa54-538d7af93b20": {
+          "title": "HS5 运动仪表 · Android 原生实现",
+          "visualDirection": "Sport original red artwork retained; consistent 96% content transform shifted 24 reference pixels down, clears OEM header and bottom instruments. Wider top/bottom map fades and narrow dial seam. Shared source density multiplier for browsing and guidance. Native preview map/song are fixtures.",
+          "currentVersion": 2,
+          "previewUrl": "https://p.superdesign.dev/draft/e02d6834-75fa-42e4-aa54-538d7af93b20",
+          "htmlSource": ".superdesign/tmp/cluster-sport-native.html"
+        }
+      },
+      "viewport": {
+        "width": 2048,
+        "height": 768
+      },
+      "updatedAt": "2026-10-27T13:27:36.965Z"
     }
   }
 }
+

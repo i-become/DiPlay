@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">Gestión del cuadro</string>
+    <string name="settings_cluster_manager_entry_description">Previsualiza y aplica un estilo al cuadro. Cambiar el estilo vuelve a conectar CarPlay.</string>
+    <string name="settings_cluster_manager_description">Elige un estilo. Las vistas previas son ilustraciones estáticas; el contenido real aparece tras la conexión.</string>
+    <string name="settings_cluster_style_basic">Urbano</string>
+    <string name="settings_cluster_style_sport">Deportivo</string>
+    <string name="settings_cluster_style_sport_description">Esferas rojas concéntricas con vista del vehículo, música y mapa CarPlay a la derecha.</string>
+    <string name="settings_cluster_style_basic_description">Dos esferas con información del vehículo, mapa CarPlay central y música.</string>
+    <string name="settings_cluster_style_original">Original</string>
+    <string name="settings_cluster_style_original_description">Proyección del mapa original de CarPlay sin las esferas personalizadas de DiPlay.</string>
+    <string name="settings_cluster_style_applied">Aplicado</string>
+    <string name="settings_cluster_style_apply">Aplicar al cuadro</string>
+    <string name="settings_cluster_style_reconnect">Cambiar el estilo vuelve a conectar CarPlay e interrumpe brevemente la imagen y el audio. ¿Aplicar y reconectar?</string>
+    <string name="settings_cluster_style_preview">Vista previa del estilo %1$s</string>
+</resources>
+

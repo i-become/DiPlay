@@ -747,8 +747,10 @@
     <string name="update_verifying">جارٍ التحقق…</string>
     <string name="update_install">تثبيت %1$s</string>
     <string name="update_failed">فشل التحديث</string>
-    <string name="update_install_preparing">جارٍ تجهيز التحديث لمثبّت النظام…</string>
-    <string name="update_install_requested">تم إرسال التحديث إلى النظام. في انتظار نتيجة التثبيت…</string>
+    <string name="update_install_preparing">جارٍ التحقق من التحديث وتجهيز تثبيت SOTA الأصلي…</string>
+    <string name="update_install_requested">تم الإرسال إلى SOTA الأصلي. في انتظار تأكيد الإصدار المثبّت…</string>
+    <string name="update_sota_failure">تعذّر تثبيت التحديث عبر SOTA الأصلي (%1$s). لم يُفتح المثبّت العادي.</string>
+    <string name="update_sota_timeout">لم يؤكد SOTA الأصلي التثبيت خلال دقيقتين. تحقق من الإصدار المثبّت قبل المحاولة مجددًا.</string>
     <string name="update_install_permission">اسمح لتطبيق DiPlay بتثبيت التطبيقات في إعدادات النظام، ثم اضغط على تثبيت مجددًا. إذا لم تظهر شاشة الإذن، فصدّر تقرير التشخيص.</string>
     <string name="update_install_missing">ملف APK الذي تم تنزيله غير متاح. تحقّق من التحديثات ونزّله مجددًا.</string>
     <string name="update_available_home">يتوفر تحديث</string>

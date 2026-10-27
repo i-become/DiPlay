@@ -5,6 +5,8 @@ import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
 import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.CarPlayNightMode
+import com.shilapi.xcertplay.ClusterStyle
+import com.shilapi.xcertplay.ClusterDashboardView
 import com.shilapi.xcertplay.hud.BydOutputSettings
 import com.shilapi.xcertplay.host.R
 
@@ -21,6 +23,8 @@ data class NewUiDisplayState(
     val clusterFlyScreenWindowEnabled: Boolean,
     val clusterHorizontalGestureEnabled: Boolean,
     val carPlayNightMode: CarPlayNightMode,
+    val clusterStyle: ClusterStyle = ClusterStyle.ORIGINAL,
+    val clusterManagerAvailable: Boolean = false,
 ) {
     val fpsLabel: String
         get() = "${AirPlayDisplaySettings.sanitizeFps(fps)} FPS"
@@ -55,6 +59,8 @@ internal object NewUiDisplayStateReader {
         val videoCodecLabel = if (AirPlayPersistence.loadHevcEnabled(context)) "HEVC" else "H.264"
         return NewUiDisplayState(
             fps = AirPlayPersistence.loadFps(context),
+            clusterStyle = AirPlayPersistence.loadClusterStyle(context),
+            clusterManagerAvailable = ClusterDashboardView.supported(context),
             smoothVideoEnabled = AirPlayPersistence.loadSmoothVideo(context),
             directVideoOutputEnabled = AirPlayPersistence.loadDirectVideoOutput(context),
             lowLatencyDecoderEnabled = AirPlayPersistence.loadLowLatencyDecoder(context),
@@ -80,6 +86,11 @@ internal object NewUiDisplayStateReader {
 }
 
 internal object NewUiDisplayActions {
+    fun saveClusterStyle(context: Context, style: ClusterStyle) {
+        if (AirPlayPersistence.loadClusterStyle(context) == style) return
+        AirPlayPersistence.saveClusterStyle(context, style)
+    }
+
     fun saveFps(context: Context, fps: Int) {
         AirPlayPersistence.saveFps(context, fps)
     }

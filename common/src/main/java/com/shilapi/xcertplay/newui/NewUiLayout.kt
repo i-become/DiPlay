@@ -50,5 +50,11 @@ object NewUiLayout {
     val AboutQrSize = 260.dp
     val AboutQrInnerPadding = 4.dp
     val RowGap = 14.dp
+    val ClusterCardPadding = 24.dp
+    val ClusterCardGap = 24.dp
+    val ClusterCardWideThreshold = 760.dp
+    val ClusterPreviewMaxWidth = 660.dp
+    val ClusterSelectionBorder = 2.dp
+    val ClusterCardBorder = 1.dp
     const val TopBarHongqiBadgeAspectRatio = 1700f / 500f
 }

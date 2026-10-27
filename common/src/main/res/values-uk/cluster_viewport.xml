@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_crop">Калібрування вигляду навігації</string>
+    <string name="settings_cluster_navigation_crop_help">Лише для власної панелі під час навігації. Додатне значення зсуває карту ліворуч, від’ємне — праворуч, зі збереженням пропорцій і обрізанням країв. Після навігації повертається повний вигляд. Збереження після відпускання, без перепідключення.</string>
+    <string name="settings_cluster_navigation_crop_value">%1$d%% (0 = повний вигляд)</string>
+    <string name="settings_cluster_navigation_crop_reset">Відновити повний вигляд</string>
+</resources>
+

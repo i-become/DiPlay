@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_manager">儀表管理</string>
+    <string name="settings_cluster_manager_entry_description">預覽並套用儀表樣式；切換樣式會重新連線 CarPlay。</string>
+    <string name="settings_cluster_manager_description">選擇儀表樣式。預覽為靜態示意圖，實際內容以連線後的顯示為準。</string>
+    <string name="settings_cluster_style_basic">都市</string>
+    <string name="settings_cluster_style_sport">運動</string>
+    <string name="settings_cluster_style_sport_description">紅色雙環儀表，融合車輛場景、音樂與右側 CarPlay 地圖。</string>
+    <string name="settings_cluster_style_basic_description">雙儀表融合車輛資訊、中間 CarPlay 地圖及音樂。</string>
+    <string name="settings_cluster_style_original">原始</string>
+    <string name="settings_cluster_style_original_description">CarPlay 原生地圖投影，不顯示 DiPlay 自訂儀表。</string>
+    <string name="settings_cluster_style_applied">已套用</string>
+    <string name="settings_cluster_style_apply">套用至儀表板</string>
+    <string name="settings_cluster_style_reconnect">切換儀表樣式需要重新連線 CarPlay，畫面與聲音會短暫中斷。是否套用並重新連線？</string>
+    <string name="settings_cluster_style_preview">%1$s儀表樣式預覽</string>
+</resources>
+
