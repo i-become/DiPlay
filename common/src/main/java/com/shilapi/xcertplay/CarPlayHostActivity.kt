@@ -5409,6 +5409,8 @@ class CarPlayHostActivity : ComponentActivity() {
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
             viewAreas = pendingViewAreas,
+            physicalSizeReferenceMm = widthPhysicalMm,
+            physicalSizeBasis = physicalSizeBasis,
         )
         Hs5BootProfileCache.saveAsync(this, airPlayConfig, display, size.width, size.height)
         sessionDisplay = display
@@ -6768,6 +6770,9 @@ internal data class CarPlaySessionDisplay(
     val windowHeight: Int,
     /** The view areas this session declared, or null for the whole screen as one area. */
     val viewAreas: CarPlayViewAreas? = null,
+    /** Settings used when this connection negotiated its display; retained across host recreation. */
+    val physicalSizeReferenceMm: Int? = null,
+    val physicalSizeBasis: AirPlayPhysicalSizeBasis = AirPlayPhysicalSizeBasis.WIDTH,
 ) : java.io.Serializable
 
 /** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */

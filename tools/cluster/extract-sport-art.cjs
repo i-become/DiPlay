@@ -60,18 +60,45 @@ async function main() {
   const t=(x-320)/75,a=sample(original,319,y),b=sample(original,396,y);
   put(x,y,[0,1,2].map(c=>Math.round(a[c]*(1-t)+b[c]*t)).concat(255));
  }
- // A 3:2 right-side video aperture, with the original outer red frame preserved.
- // Match the surrounding black/red frame at each edge, then feather to live video.
- for(let y=140;y<632;y++)for(let x=1310;x<2048;x++){
-  if(Math.hypot(x-1024,y-358)<328)continue;
-  const curve=Math.pow(Math.max(0,(x-1900)/148),2);
-  const top=y-(140+37*curve),bottom=(627-83*curve)-y;
-  if(top<0||bottom<0)continue;
-  const alpha=Math.max(1-smooth(top/64),1-smooth(bottom/56),1-smooth((2047-x)/28));
-  put(x,y,[2,3,5,Math.round(255*alpha)]);
+ // Follow the inner red frame rather than cutting a rectangular video window.
+ // The live 4:3 Surface overscans the opening behind the tachometer. A short left
+ // feather hides the Surface edge and lets the lower map corner dissolve into the
+ // instrument's red arc instead of ending in a rectangular right angle.
+ const edge=(segments)=>{
+  const samples=[];
+  for(const [a,b,c,d] of segments)for(let i=0;i<=256;i++){
+   const t=i/256,u=1-t;
+   samples.push([u*u*u*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],
+    u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]]);
+  }
+  return x=>{
+   let lo=0,hi=samples.length-1;
+   while(hi-lo>1){const mid=(lo+hi)>>1;if(samples[mid][0]<x)lo=mid;else hi=mid;}
+   const a=samples[lo],b=samples[hi],slope=(b[1]-a[1])/(b[0]-a[0]);
+   return [a[1]+(x-a[0])*slope,Math.sqrt(1+slope*slope)];
+  };
+ };
+ const topEdge=edge([
+  [[1232,139],[1250,176],[1264,187],[1280,169]],
+  [[1280,169],[1400,135],[1530,89],[1620,91]],
+  [[1620,91],[1760,90],[1900,93],[1980,101]],
+  [[1980,101],[2020,103],[2035,108],[2048,126]],
+ ]);
+ const bottomEdge=edge([
+  [[1232,578],[1246,603],[1264,611],[1280,614]],
+  [[1280,614],[1500,628],[1740,629],[1850,627]],
+  [[1850,627],[1940,627],[1980,578],[2048,508]],
+ ]);
+ for(let x=1232;x<2048;x++){
+  const [top,topSlope]=topEdge(x),[bottom,bottomSlope]=bottomEdge(x);
+  for(let y=72;y<648;y++){
+   const leftFade=smooth((x-1232)/32);
+   const distance=Math.min((y-top)/topSlope,(bottom-y)/bottomSlope,Math.hypot(x-1024,y-358)-328);
+   if(distance<0)continue;
+   const edgeAlpha=255*(1-smooth(distance/10));
+   put(x,y,[2,3,5,Math.round(edgeAlpha*leftFade)]);
+  }
  }
- // Erase compass/example-map leftovers outside the rectangular aperture as well.
- // Top boundary was sampled before clearing; it contains only the map's dark rim.
  for(let i=0;i<data.length;i+=4)if(data[i+3]===0)data.fill(0,i,i+3);
  await sharp(data,{raw:info}).png().toFile(path.join(dir,'cluster_sport_face.png'));
  const mask=Buffer.from('<svg width="75" height="57"><path d="M14 3 L57 3 L65 16 L73 22 L72 43 L62 51 L12 51 L3 43 L3 22 L10 16Z" fill="white"/></svg>');

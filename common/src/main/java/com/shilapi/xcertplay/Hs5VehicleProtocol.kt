@@ -35,6 +35,9 @@ internal class Hs5VehicleBinder(
     fun listen(listener: IBinder, register: Boolean): Boolean =
         exchange(if (register) 42 else 43, { writeStrongBinder(listener) }) { true } ?: false
 
+    fun listenAt(code: Int, listener: IBinder): Boolean =
+        exchange(code, { writeStrongBinder(listener) }) { true } ?: false
+
     val alive: Boolean get() = remote.isBinderAlive
 
     private fun <T> exchange(code: Int, write: Parcel.() -> Unit, read: Parcel.() -> T): T? {
@@ -149,7 +152,7 @@ internal class Hs5VehiclePush(
 
     companion object {
         const val DESCRIPTOR = "ltd.qisi.adapterproxy.listener.IVehicleCarStateChangedListener"
-        private val READINGS = setOf(10, 11, 29, 30)
+        private val READINGS = setOf(10, 11, 29, 30, 31, 48)
     }
 }
 
@@ -316,6 +319,9 @@ internal data class Hs5VehicleSample(
     val fuelWarning: Hs5TimedInt = Hs5TimedInt(),
     val tires: List<Hs5TimedInt> = List(4) { Hs5TimedInt() },
     val tireWarnings: List<Hs5TimedInt> = List(4) { Hs5TimedInt() },
+    val averageFuelConsumption: Hs5TimedInt = Hs5TimedInt(),
+    val totalMileage: Hs5TimedInt = Hs5TimedInt(),
+    val remainingMileage: Hs5TimedInt = Hs5TimedInt(),
     val seatBelt: Hs5TimedInt = Hs5TimedInt(),
     val passengerSeatBelt: Hs5TimedInt = Hs5TimedInt(),
     val brake: Hs5TimedInt = Hs5TimedInt(),
@@ -330,11 +336,14 @@ internal data class Hs5VehicleSample(
     val fcwWarning: Hs5TimedInt = Hs5TimedInt(),
     val aebWarning: Hs5TimedInt = Hs5TimedInt(),
     val hudFcwDisplay: Hs5TimedInt = Hs5TimedInt(),
+    val hudCruiseDisplay: Hs5TimedInt = Hs5TimedInt(),
     val hudAdasDisplay: Hs5TimedInt = Hs5TimedInt(),
     val cruiseMode: Hs5TimedInt = Hs5TimedInt(),
     val aebDisplay: Hs5TimedInt = Hs5TimedInt(),
     val can: Hs5CanReadings = Hs5CanReadings(),
     val canAt: Long = Long.MIN_VALUE,
+    val leadVehicle: Hs5LeadVehicleReading = Hs5LeadVehicleReading(),
+    val leadVehicleAt: Long = Long.MIN_VALUE,
 ) {
     fun vehicle(now: Long, lights: Boolean?): OemClusterVehicleState {
         fun pushed(reading: Hs5TimedInt) = if (pushConnected) reading.value else reading.fresh(now)
@@ -364,9 +373,17 @@ internal data class Hs5VehicleSample(
                 pushed(reading)?.takeIf { it == 0 || it == 1 }?.let { it == 1 }
             },
             positionLights = lights,
+            // On the target 322200 head unit these getters already arrive in display units.
+            // Dividing again rendered both values ten times too small in the original cluster.
+            averageFuelConsumption = pushed(averageFuelConsumption)?.takeIf { it in 0..1000 && it != 254 && it != 255 }?.toFloat(),
+            totalMileageKm = pushed(totalMileage)?.takeIf { it in 0..100_000_000 }?.toFloat(),
+            remainingMileageKm = pushed(remainingMileage)?.takeIf { it in 0..1022 },
             lowBeam = lowBeam.fresh(now)?.let { QisiPositionLightBinder.night(it) },
             driveModeCode = driveMode.fresh(now)?.takeIf { it in 1..10 },
             outsideCelsius = outside.fresh(now), // ATC 93 already returns Celsius as float.
+            assistance = leadVehicle.takeIf {
+                leadVehicleAt >= 0 && now >= leadVehicleAt && now - leadVehicleAt <= MAX_AGE_MS
+            }?.detected?.let { OemClusterAssistance(leadVehicleDetected = it) },
             assistanceStatus = OemClusterAssistanceStatus(
                 acc = acc.fresh(now), fcw = fcw.fresh(now), aeb = aeb.fresh(now),
                 ldw = ldw.fresh(now), lka = lka.fresh(now),

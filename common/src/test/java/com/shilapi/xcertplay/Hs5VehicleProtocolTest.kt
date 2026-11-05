@@ -12,6 +12,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class Hs5VehicleProtocolTest {
+    @Test fun systemTireWarningIsDeliveredAsAScalarNotificationAndTruncatedPayloadIsIgnored() {
+        val events = mutableListOf<Pair<Int, Int>>()
+        val listener = Hs5VehiclePush { code, raw -> events += code to raw }
+        for (raw in listOf(null, 1, 0)) {
+            val data = Parcel.obtain()
+            try {
+                data.writeInterfaceToken(Hs5VehiclePush.DESCRIPTOR)
+                if (raw != null) data.writeInt(raw)
+                listener.transact(48, data, null, IBinder.FLAG_ONEWAY)
+            } finally { data.recycle() }
+        }
+        assertEquals(listOf(48 to 1, 48 to 0), events)
+    }
+
     @Test fun speedHundredthsAreConvertedBeforeRangeCheckingWithoutRounding() {
         for ((raw, expected) in listOf(0 to 0f, 1 to .01f, 125 to 1.25f, 4300 to 43f, 26000 to 260f)) {
             assertEquals(expected, Hs5VehicleSpeed.kph(raw))
@@ -316,5 +330,18 @@ class Hs5VehicleProtocolTest {
         assertNull(sample.vehicle(2601, null).assistanceStatus)
         assertNull(Hs5VehicleSample(hudFcwDisplay = Hs5TimedInt(-2, 100),
             hudAdasDisplay = Hs5TimedInt(-65534, 100)).vehicle(100, null).assistanceStatus)
+    }
+
+    @Test fun objectPresenceRequiresFreshBinaryDetectionRatherThanWarningOrCruiseEnums() {
+        for (raw in listOf(0, 1)) {
+            val sample = Hs5VehicleSample(leadVehicle = Hs5LeadVehicleReading(raw), leadVehicleAt = 100)
+            assertEquals(raw == 1, sample.vehicle(100, null).assistance!!.leadVehicleDetected)
+            assertNull(sample.vehicle(2601, null).assistance)
+            assertNull(sample.vehicle(99, null).assistance)
+        }
+        for (raw in listOf(null, -1, 2, 254, 255)) {
+            assertNull(Hs5VehicleSample(leadVehicle = Hs5LeadVehicleReading(raw), leadVehicleAt = 100)
+                .vehicle(100, null).assistance)
+        }
     }
 }

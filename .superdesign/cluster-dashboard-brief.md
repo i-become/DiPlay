@@ -2,6 +2,10 @@
 
 Current approved blue/cyan Urban reference supersedes the historical OEM-photo brief below. The live map spans from the left dial centre to the right dial centre, aligns to the dial tops and ends at the tire panel top. Both dials overlay the map. Remove broad side gradients; retain only a tiny top/bottom antialias transition. Increase source rendering density by 1.5x (capped at 150%) for more geographic context in both browsing and navigation, without rebuilding the Surface on guidance changes. Native preview map/data are fixtures; actual Amap camera behaviour needs in-car verification. Original remains the default style.
 
+2026-10-28 lane guidance: merge one row of current junction lane arrows into the existing turn card, increasing its height only when phone-provided lane information is visible. Keep the original distance/road typography, with cyan/thicker/underlined recommended branches and grey other directions. Never crop or wrap the physical lane order. The existing route summary stays at the bottom. No extra map panels or polling. Native full/compact previews use test-only map, music and lane data.
+
+2026-10-28 compact refinement: size the shared guidance card to its text and lane content, retaining distance/road fonts and turn-arrow size. Use a 56-design-pixel lane row and minimal vertical padding. Show turn and lanes independently; hide the whole card only when neither exists. Route totals remain independent of next-turn availability, and all navigation components disappear when the route ends or expires. Native full/compact/RTL previews exercise absent sections and long roads without adding runtime fixtures.
+
 ## Historical reference
 
 # HS5 factory cluster photograph reproduction

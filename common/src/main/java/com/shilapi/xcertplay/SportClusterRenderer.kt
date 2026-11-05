@@ -18,6 +18,10 @@ import android.text.TextUtils
 import com.shilapi.xcertplay.airplay.AirPlayInsets
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
+import java.text.DateFormat
+import java.text.NumberFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -27,10 +31,13 @@ import kotlin.math.sin
 internal object SportClusterGeometry {
     const val WIDTH = 2048f
     const val HEIGHT = 768f
-    const val MAP_LEFT = 1310f
-    const val MAP_TOP = 140f
-    const val MAP_WIDTH = 738f
-    const val MAP_HEIGHT = 492f
+    // Overscan behind the dial so the map can meet the lower red arc with a soft join.
+    // The visible opening is still clipped by cluster_sport_face.png; the extra 48 px are
+    // intentionally hidden below the opaque tachometer and only become visible at the arc.
+    const val MAP_LEFT = 1232f
+    const val MAP_TOP = 48f
+    const val MAP_WIDTH = 816f
+    const val MAP_HEIGHT = 612f
     const val MAP_ASPECT = MAP_WIDTH / MAP_HEIGHT
     const val DIAL_X = 1024f
     const val DIAL_Y = 358f
@@ -56,9 +63,9 @@ internal object SportClusterGeometry {
 
     fun streamConfig(width: Int, height: Int, scalePercent: Int, markerXPercent: Int, markerYPercent: Int): com.shilapi.xcertplay.airplay.AirPlayDisplayConfig {
         val viewport = mapBounds(width, height)
-        // 3:2 in blocks of 24x16: both codec dimensions remain multiples of eight.
-        val blocks = (viewport.height() * ClusterMapRenderPolicy.scalePercent(scalePercent) / 100 / 16).roundToInt().coerceAtLeast(1)
-        return CarPlayClusterDisplay.config(blocks * 24, blocks * 16, scalePercent = 100,
+        // 4:3 in blocks of 32x24: both codec dimensions remain multiples of eight.
+        val blocks = (viewport.height() * ClusterMapRenderPolicy.scalePercent(scalePercent) / 100 / 24).roundToInt().coerceAtLeast(1)
+        return CarPlayClusterDisplay.config(blocks * 32, blocks * 24, scalePercent = 100,
             content = CarPlayClusterDisplay.Content.MAP, markerXPercent = markerXPercent,
             markerYPercent = markerYPercent,
             baseSafeArea = AirPlayInsets(top = 8, bottom = 8, left = 48, right = 48))
@@ -77,6 +84,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
     private val muted = Color.rgb(177, 186, 197)
     private val red = Color.rgb(255, 36, 48)
     private val typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+    private val guidanceCard = ClusterGuidanceCard(context, sport = true)
 
     override fun draw(canvas: Canvas, width: Int, height: Int, state: ClusterDashboardState, night: Boolean,
                       includeNeedles: Boolean) {
@@ -87,7 +95,6 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         canvas.scale(scale, scale)
         reset()
         canvas.drawBitmap(image(R.drawable.cluster_sport_face), 0f, 0f, paint)
-        mapBlend(canvas)
         val car = state.vehicle.validated()
         assistance(canvas, car)
         music(canvas, state)
@@ -113,11 +120,9 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
             needle(canvas, OemClusterGeometry.speedDegrees(it), 220f, 300f)
         }
         rpm?.takeIf { it.isFinite() && it in 0f..8000f }?.let {
-            needle(canvas, OemClusterGeometry.needleDegrees(it, 7000f), 176f, 201f)
+            // Keep the outer tip fixed and extend the original 25-pixel needle inward by 1/3.
+            needle(canvas, OemClusterGeometry.needleDegrees(it, 7000f), 201f - 25f * 4f / 3f, 201f)
         }
-        text(canvas, speed?.takeIf { it.isFinite() && it in 0f..260f }?.roundToInt()?.toString() ?: "—",
-            1024f, 115f, 34f, 92f, white, center = true)
-        text(canvas, "km/h", 1024f, 139f, 18f, 80f, white, center = true)
         if (rpm == null) text(canvas, "—", 1024f, 497f, 18f, 80f, muted, center = true)
     }
 
@@ -137,27 +142,12 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         val marks = (0..200 step 20).toList() + listOf(230, 260)
         for (v in 0..260 step 5) tick(OemClusterGeometry.speedDegrees(v.toFloat()), 299f,
             if (v in marks) 17f else if (v % 10 == 0) 10f else 6f, v in marks)
-        // The top-centre slot shows current speed, as in the reference.
-        for (v in marks.filter { it != 120 }) label(OemClusterGeometry.speedDegrees(v.toFloat()), 260f, v.toString(), 24f)
+        for (v in marks) label(OemClusterGeometry.speedDegrees(v.toFloat()), 260f, v.toString(), 24f)
         for (v in 0..70) tick(OemClusterGeometry.needleDegrees(v * 100f, 7000f), 201f,
             if (v % 10 == 0) 15f else if (v % 10 == 5) 11f else 6f, v % 10 == 0 || v % 10 == 5, v >= 60)
         for (v in 0..7) label(OemClusterGeometry.needleDegrees(v * 1000f, 7000f), 169f, v.toString(), 20f, v >= 6)
         text(canvas, "x1000r/min", 1024f, 529f, 18f, 170f, white, center = true)
         text(canvas, "km/h", 1024f, 590f, 18f, 110f, white, center = true)
-    }
-
-    private fun mapBlend(canvas: Canvas) {
-        canvas.save()
-        canvas.clipRect(1310f, 140f, 2048f, 632f)
-        path.reset(); path.addRect(1310f, 140f, 2048f, 632f, Path.Direction.CW)
-        path.op(Path().apply { addCircle(1024f, 358f, 328f, Path.Direction.CW) }, Path.Op.DIFFERENCE)
-        canvas.clipPath(path)
-        reset()
-        paint.shader = RadialGradient(1024f, 358f, 352f,
-            intArrayOf(Color.BLACK, Color.argb(230, 0, 0, 0), Color.TRANSPARENT),
-            floatArrayOf(0f, 328f / 352f, 1f), Shader.TileMode.CLAMP)
-        canvas.drawCircle(1024f, 358f, 352f, paint)
-        reset(); canvas.restore()
     }
 
     private fun assistance(canvas: Canvas, car: OemClusterVehicleState) {
@@ -223,34 +213,38 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
 
     private fun navigation(canvas: Canvas, state: ClusterDashboardState) {
         val nav = state.guidance
-        if (!nav.connected) return
-        val maneuver = nav.maneuverType ?: return
-        val routeDetails = nav.remainingMeters != null || nav.remainingSeconds != null
-        val bounds = RectF(1428f, 156f, 1813f, if (routeDetails) 315f else 267f)
-        reset(); paint.shader = LinearGradient(1428f, 156f, 1813f, 315f,
-            Color.rgb(3, 15, 22), Color.rgb(12, 23, 32), Shader.TileMode.CLAMP)
-        canvas.drawRoundRect(bounds, 15f, 15f, paint)
-        reset(Color.rgb(43, 58, 72)); paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f
-        canvas.drawRoundRect(bounds, 15f, 15f, paint)
-        context.getDrawable(NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide))?.mutate()?.let {
-            it.setTint(white); it.setBounds(1458, 179, 1525, 246); it.draw(canvas)
+        if (!nav.connected || !nav.navigating) return
+        guidanceCard.draw(canvas, nav)
+        val value = navigationSummary(nav)
+        if (value.isEmpty()) return
+        reset(muted); paint.textSize = 23f
+        val fitted = TextUtils.ellipsize(value, paint, 488f, TextUtils.TruncateAt.END).toString()
+        val width = paint.measureText(fitted) + 32f
+        val height = paint.descent() - paint.ascent() + 12f
+        val bounds = RectF(1698f - width / 2, 624f - height, 1698f + width / 2, 624f)
+        reset(Color.argb(240, 3, 15, 22)); canvas.drawRoundRect(bounds, 12f, 12f, paint)
+        text(canvas, fitted, bounds.left + 16f, bounds.top + 6f - paint.ascent(), 23f, width - 32f, muted)
+    }
+
+    internal fun navigationSummary(nav: com.shilapi.xcertplay.glance.CarPlayGlance.Snapshot): String {
+        // Keep route totals together, with remaining distance as the final value.
+        val arrival = nav.arrivalEpochSeconds?.takeIf { it > 0 }?.let {
+            context.getString(R.string.settings_original_cluster_arrival,
+                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it * 1000)))
         }
-        val distance = if (nav.distanceMeters < 1000) context.getString(R.string.cluster_dashboard_meters, nav.distanceMeters)
-            else context.getString(R.string.cluster_dashboard_kilometers, nav.distanceMeters / 1000.0)
-        text(canvas, distance, 1537f, 209f, 35f, 252f)
-        text(canvas, nav.road, 1537f, 245f, 23f, 252f)
-        if (routeDetails) {
-            line(canvas, 1429f, 267f, 1812f, 267f, Color.rgb(42, 54, 65), 1f)
-            nav.remainingMeters?.takeIf { it >= 0 }?.let {
-                val value = context.getString(R.string.cluster_dashboard_remaining) + " " +
-                    context.getString(R.string.cluster_dashboard_kilometers, it / 1000.0)
-                text(canvas, value, 1456f, 300f, 23f, 221f, muted)
-            }
-            nav.remainingSeconds?.takeIf { it >= 0 }?.let {
-                val value = context.getString(R.string.cluster_dashboard_minutes, (it / 60).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                text(canvas, value, 1789f, 300f, 23f, 119f, muted, right = true)
-            }
+        val duration = nav.remainingSeconds?.takeIf { it >= 0 }?.let { seconds ->
+            val minutes = ((seconds + 59) / 60).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            if (minutes < 60) context.getString(R.string.widget_minutes, minutes)
+            else context.getString(R.string.original_cluster_hours_minutes, minutes / 60, minutes % 60)
         }
+        val distance = nav.remainingMeters?.takeIf { it >= 0 }?.let {
+            val kilometers = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+                maximumFractionDigits = 1
+                isGroupingUsed = false
+            }.format(it / 1000.0)
+            context.getString(R.string.original_cluster_kilometers, kilometers)
+        }
+        return listOfNotNull(arrival, duration, distance).joinToString("   ")
     }
 
     private fun tires(canvas: Canvas, vehicle: OemClusterVehicleState) {

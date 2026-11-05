@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiColors
@@ -25,6 +26,9 @@ import com.shilapi.xcertplay.newui.NewUiCompactValueRow
 import com.shilapi.xcertplay.newui.NewUiMainPageTitle
 import com.shilapi.xcertplay.newui.NewUiTwoColumnPage
 import com.shilapi.xcertplay.newui.NewUiTypography
+import com.shilapi.xcertplay.localizedLabel
+import com.shilapi.xcertplay.newui.NewUiAccentActionButton
+import com.shilapi.xcertplay.newui.NewUiLayout
 
 @Composable
 fun NewUiDisplayScreen(
@@ -42,11 +46,20 @@ fun NewUiDisplayScreen(
     onClusterFlyScreenDefaultOnConnectChanged: (Boolean) -> Unit,
     onClusterGestureChanged: (Boolean) -> Unit,
     onNightModeSelected: (Int) -> Unit,
+    onPickIconSize: () -> Unit = {},
+    onReconnect: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
         NewUiMainPageTitle(stringResource(R.string.new_ui_shell_display_page_title))
         NewUiTwoColumnPage(
+            modifier = Modifier.weight(1f),
             left = {
+                NewUiCompactValueRow(
+                    title = stringResource(R.string.settings_carplay_icon_size),
+                    subtitle = stringResource(R.string.settings_carplay_icon_size_description),
+                    value = state.carPlaySize.localizedLabel(LocalContext.current),
+                    onClick = onPickIconSize,
+                )
                 NewUiCompactValueRow(
                     title = stringResource(R.string.new_ui_shell_display_fps_title),
                     subtitle = stringResource(R.string.new_ui_shell_display_fps_sub),
@@ -126,6 +139,13 @@ fun NewUiDisplayScreen(
                 )
             },
         )
+        if (state.iconSizeReconnectNeeded) {
+            NewUiAccentActionButton(
+                label = stringResource(R.string.apply_and_reconnect),
+                onClick = onReconnect,
+                modifier = Modifier.padding(top = NewUiLayout.MainGap),
+            )
+        }
     }
 }
 

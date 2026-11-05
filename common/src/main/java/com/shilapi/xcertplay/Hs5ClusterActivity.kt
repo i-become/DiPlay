@@ -36,6 +36,7 @@ import java.util.UUID
  */
 class Hs5ClusterActivity : Activity() {
     private var dashboard: ClusterDashboardView? = null
+    private var originalOverlay: OriginalClusterOverlayView? = null
     private val foreground = Hs5ClusterForeground()
     internal val windowOutput: String get() = foreground.mode
 
@@ -70,6 +71,8 @@ class Hs5ClusterActivity : Activity() {
                         }
                     })
                 }, FrameLayout.LayoutParams(-1, -1))
+                addView(OriginalClusterOverlayView(this@Hs5ClusterActivity).also { originalOverlay = it },
+                    FrameLayout.LayoutParams(-1, -1))
             }
         }
         @Suppress("DEPRECATION")
@@ -89,6 +92,7 @@ class Hs5ClusterActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        originalOverlay?.setOverlayVisible(true)
         Hs5ClusterActivityOutput.focusChanged(this, resumed = true)
     }
 
@@ -99,6 +103,7 @@ class Hs5ClusterActivity : Activity() {
     }
 
     override fun onStop() {
+        originalOverlay?.setOverlayVisible(false)
         foreground.close()
         // Another window covering the cluster means the head unit took the fly screen back.
         if (!isFinishing) Hs5ClusterActivityOutput.closedOutside(this, "covered on cluster")

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_icon_size">Tamaño de los iconos de inicio de CarPlay</string>
+    <string name="settings_carplay_icon_size_description">Ajusta los iconos, el texto y los controles. Los cambios guardados se aplican en la próxima conexión de CarPlay.</string>
+</resources>

@@ -54,7 +54,7 @@ class OemClusterCompositingTest {
 
     @Test fun navigationCardsRequireAConnectedManeuverAndOnlyShowAvailableRouteFields() {
         val empty = render()
-        val maneuver = CarPlayGlance.Snapshot(connected = true, maneuverType = 2,
+        val maneuver = CarPlayGlance.Snapshot(connected = true, navigating = true, maneuverType = 2,
             distanceMeters = 300, road = "测试路段")
         fun sameRegion(a: Bitmap, b: Bitmap, left: Int, top: Int, right: Int, bottom: Int) {
             for (y in top until bottom) for (x in left until right) {
@@ -63,7 +63,7 @@ class OemClusterCompositingTest {
         }
         try {
             for (nav in listOf(CarPlayGlance.Snapshot(connected = true),
-                maneuver.copy(maneuverType = null, remainingMeters = 12300,
+                maneuver.copy(navigating = false, maneuverType = null, remainingMeters = 12300,
                     remainingSeconds = 600, arrivalEpochSeconds = 1792904280),
                 maneuver.copy(connected = false, remainingMeters = 12300))) {
                 val image = render(ClusterDashboardState(guidance = nav))
@@ -148,7 +148,7 @@ class OemClusterCompositingTest {
     @Test fun navigationDoesNotReintroduceAnInstructionOrDistanceInTheFooter() {
         val plain = render()
         val navigating = render(ClusterDashboardState(guidance = CarPlayGlance.Snapshot(
-            connected = true, maneuverType = 2, distanceMeters = 300, road = "道路不可覆盖地图",
+            connected = true, navigating = true, maneuverType = 2, distanceMeters = 300, road = "道路不可覆盖地图",
             remainingMeters = 12400)))
         try {
             for (y in 648 until 720) for (x in 800 until 1200) {

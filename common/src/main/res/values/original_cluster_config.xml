@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_cluster_config">Configure original instruments</string>
+    <string name="settings_original_cluster_tires">Tire pressure</string>
+    <string name="settings_original_cluster_driving">Driving information</string>
+    <string name="settings_original_cluster_turn">Turn card and lanes</string>
+    <string name="settings_original_cluster_time">Navigation time</string>
+    <string name="settings_original_cluster_preview_hint">Scaled preview · sample data. Long-press a component to drag it. Saving applies immediately to the original style.</string>
+    <string name="settings_original_cluster_reset">Reset to defaults</string>
+    <string name="settings_original_cluster_back">Back to instruments</string>
+    <string name="settings_original_cluster_save">Save</string>
+    <string name="settings_original_cluster_unsaved">Unsaved changes</string>
+    <string name="settings_original_cluster_discard_message">Leaving will discard your changes. Leave without saving?</string>
+    <string name="settings_original_cluster_discard">Discard and leave</string>
+    <string name="settings_original_cluster_keep_editing">Keep editing</string>
+    <string name="settings_original_cluster_fl">Front left</string>
+    <string name="settings_original_cluster_fr">Front right</string>
+    <string name="settings_original_cluster_rl">Rear left</string>
+    <string name="settings_original_cluster_rr">Rear right</string>
+    <string name="settings_original_cluster_consumption">Average fuel</string>
+    <string name="settings_original_cluster_odometer">Odometer</string>
+    <string name="settings_original_cluster_range">Range</string>
+    <string name="settings_original_cluster_arrival">%1$s arrival</string>
+    <string name="settings_original_cluster_minutes">%1$d min</string>
+    <string name="original_cluster_kilometers">%1$s km</string>
+    <string name="original_cluster_hours_minutes">%1$d:%2$02d h</string>
+</resources>

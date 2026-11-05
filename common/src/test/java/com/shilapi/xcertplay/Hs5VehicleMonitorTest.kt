@@ -41,10 +41,16 @@ class Hs5VehicleMonitorTest {
     private var rpmReads = 0
     private var unregisters = 0
     private var speed = 4200
+    private var drivingEnabled = false
+    private var drivingReads = 0
+    private val tirePressures = IntArray(4)
+    private val tireWarnings = IntArray(4)
     private var duringSpeedRead: (() -> Unit)? = null
     private var failSpeed = false
     private var reject = false
     private var allowListen = true
+    private var lead = Hs5LeadVehicleReading()
+    private val optionalManagers = mutableMapOf<Int, IBinder>()
     private var expectedLooper = Looper.getMainLooper()
     private var backgroundConnected: CountDownLatch? = null
     private var monitor: Hs5VehicleMonitor? = null
@@ -64,8 +70,9 @@ class Hs5VehicleMonitorTest {
                 reply!!.writeNoException()
                 return true
             }
-            assertTrue("Unexpected polled field $code", code in listOf(7, 6, 31, 58, 26, 80))
-            if (code == 26 || code == 80) assertTrue(data.readInt() in 0..3)
+            assertTrue("Unexpected polled field $code", code in listOf(7, 6, 31, 58, 26, 80, 25, 24, 2))
+            if (code in listOf(25, 24, 2)) { assertTrue(drivingEnabled); drivingReads++ }
+            val wheel = if (code == 26 || code == 80) data.readInt().also { assertTrue(it in 0..3) } else 0
             assertEquals(0, data.dataAvail())
             reads++
             if (code == 7) duringSpeedRead?.invoke()
@@ -74,7 +81,15 @@ class Hs5VehicleMonitorTest {
                 return true
             }
             reply!!.writeNoException()
-            reply.writeInt(if (code == 7) speed else 0)
+            reply.writeInt(when (code) {
+                7 -> speed
+                25 -> 86
+                24 -> 12680
+                2 -> 620
+                26 -> tirePressures[wheel]
+                80 -> tireWarnings[wheel]
+                else -> 0
+            })
             backgroundConnected?.countDown()
             return true
         }
@@ -85,9 +100,10 @@ class Hs5VehicleMonitorTest {
             assertSame(expectedLooper, Looper.myLooper())
             data.enforceInterface(QisiPositionLightBinder.ROOT)
             assertEquals(1, code)
-            assertEquals("No optional getter-only managers", 15, data.readInt())
+            val id = data.readInt()
+            assertTrue(id in listOf(15, 23, 46))
             reply!!.writeNoException()
-            reply.writeStrongBinder(state)
+            reply.writeStrongBinder(if (id == 15) state else optionalManagers[id])
             return true
         }
     }
@@ -112,7 +128,10 @@ class Hs5VehicleMonitorTest {
                 assertSame(expectedLooper, Looper.myLooper())
                 rpmReads++
                 Hs5RpmReading(rpmPrimary = 700f, rpmOem = 700, rpcAvailable = true)
-            }, record = { records.add(it) })
+            }, record = { records.add(it) }, leadVehicleReader = Hs5LeadVehicleReader {
+                assertSame(expectedLooper, Looper.myLooper())
+                lead
+            }, drivingInfoEnabled = { drivingEnabled })
         monitor!!.start()
         if (worker === main) idle()
     }
@@ -130,7 +149,101 @@ class Hs5VehicleMonitorTest {
 
     @After fun close() { monitor?.stop(); idle(); DiagnosticLogging.setEnabled(false) }
 
-    @Test fun oneInitialSnapshotThenPushOnlyWithoutIdleQueriesOrCanReads() {
+    @Test fun drivingInformationReadsOnlyOnDemandAndVehicleEventsAndReceivesRangePushes() {
+        drivingEnabled = true
+        start(); connect()
+        assertEquals(3, drivingReads)
+        fun driving() = monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null)
+        assertEquals(86f, driving().averageFuelConsumption!!, .001f)
+        assertEquals(12680f, driving().totalMileageKm!!, .001f)
+        assertEquals(620, driving().remainingMileageKm)
+        idle(10000)
+        assertEquals("Idle must not start a driving-info poll loop", 3, drivingReads)
+        emit(4200); idle(1000)
+        assertEquals(6, drivingReads)
+        emit(590, code = 31); idle()
+        assertEquals(590, driving().remainingMileageKm)
+        emit(4400); idle(1000)
+        assertEquals("A stale getter must not replace a newer range push", 590, driving().remainingMileageKm)
+        drivingEnabled = false
+        idle(2000)
+        val before = drivingReads
+        emit(4300); idle(2000)
+        monitor!!.requestDrivingInfo(); idle()
+        assertEquals("Hidden driving widget must not read its getters", before, drivingReads)
+    }
+
+    @Test fun actualObjectDetectionReachesTheClusterAndIsClearedOnLossAndDisconnect() {
+        lead = Hs5LeadVehicleReading(1, "test-ObjectDetection")
+        start(); connect()
+        fun assistance() = monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).assistance
+        assertEquals(true, assistance()!!.leadVehicleDetected)
+        lead = Hs5LeadVehicleReading(0, "test-ObjectDetection")
+        idle(750)
+        assertEquals(false, assistance()!!.leadVehicleDetected)
+        lead = Hs5LeadVehicleReading(7, "unknown")
+        idle(750)
+        assertNull(assistance())
+        lead = Hs5LeadVehicleReading(1, "test-ObjectDetection")
+        idle(750)
+        assertEquals(true, assistance()!!.leadVehicleDetected)
+        connection.onServiceDisconnected(component); idle()
+        assertNull(assistance())
+    }
+
+    @Test fun optionalHudAndIfcManagersUseReadOnlyGettersAndReleaseTheirListeners() {
+        val callbacks = mutableMapOf<Hs5AssistancePush.Module, IBinder>()
+        val removed = mutableListOf<Hs5AssistancePush.Module>()
+        val getterCalls = mutableMapOf<Hs5AssistancePush.Module, MutableList<Int>>()
+        for (module in Hs5AssistancePush.Module.entries) {
+            optionalManagers[module.id] = object : Binder() {
+                init { attachInterface(null, module.descriptor) }
+                override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+                    data.enforceInterface(module.descriptor)
+                    if (code == module.register || code == module.unregister) {
+                        val callback = data.readStrongBinder()!!
+                        if (code == module.register) callbacks[module] = callback else {
+                            assertSame(callbacks[module], callback)
+                            removed += module
+                        }
+                    } else {
+                        val allowed = if (module == Hs5AssistancePush.Module.HUD) listOf(10, 17)
+                            else listOf(5, 2, 7, 8, 15, 14, 27)
+                        assertTrue("Unsafe/unknown transaction $module/$code", code in allowed)
+                        getterCalls.getOrPut(module) { mutableListOf() }.add(code)
+                    }
+                    assertEquals(0, data.dataAvail())
+                    reply!!.writeNoException()
+                    if (code != module.register && code != module.unregister) reply.writeInt(1)
+                    return true
+                }
+            }
+        }
+        start(); connect()
+        assertEquals(2, callbacks.size)
+        assertEquals(9, getterCalls.values.sumOf { it.size })
+        fun push(module: Hs5AssistancePush.Module, code: Int, raw: Int) {
+            val data = Parcel.obtain()
+            try {
+                data.writeInterfaceToken(module.listenerDescriptor); data.writeInt(raw)
+                assertTrue(callbacks.getValue(module).transact(code, data, null, IBinder.FLAG_ONEWAY))
+            } finally { data.recycle() }
+            idle()
+        }
+        push(Hs5AssistancePush.Module.HUD, 13, 7)
+        push(Hs5AssistancePush.Module.IFC, 2, 3)
+        assertEquals(7, monitor!!.sample.hudFcwDisplay.value)
+        assertEquals(3, monitor!!.sample.acc.value)
+        assertNull(monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).assistance)
+        idle(5000)
+        assertEquals(9, getterCalls.values.sumOf { it.size })
+        monitor!!.stop(); idle()
+        assertEquals(2, removed.size)
+        push(Hs5AssistancePush.Module.HUD, 13, 2)
+        assertEquals(Hs5VehicleSample(), monitor!!.sample)
+    }
+
+    @Test fun vehicleEventsRefreshTiresWithoutIdleQueriesOrLegacyCanReads() {
         start(); connect()
         assertEquals(42f, kph())
         assertEquals(12, reads)
@@ -145,7 +258,7 @@ class Hs5VehicleMonitorTest {
         emit(125); idle()
         assertEquals(1.25f, kph())
         assertEquals(125, changes.last().speed.value)
-        assertEquals(12, reads)
+        assertEquals(20, reads)
     }
 
     @Test fun pushDuringBootstrapWinsOverLaggingGetter() {
@@ -226,10 +339,13 @@ class Hs5VehicleMonitorTest {
         assertFalse(monitor!!.sample.pushConnected)
     }
 
-    @Test fun individualTirePushesRetainWheelIdentityAndNeverPollAgain() {
+    @Test fun individualTirePushesRetainWheelIdentityAndUnknownIndicesRefreshGetters() {
         start(); connect()
         val before = reads
         fun tire(code: Int, wheel: Int, raw: Int) {
+            if (wheel in 0..3) {
+                if (code == 47) tirePressures[wheel] = raw else tireWarnings[wheel] = raw
+            }
             val data = Parcel.obtain()
             try {
                 data.writeInterfaceToken(Hs5VehiclePush.DESCRIPTOR)
@@ -244,9 +360,70 @@ class Hs5VehicleMonitorTest {
         assertEquals(2.33f, car.tirePressureBar[2]!!, .00001f)
         assertEquals(true, car.tireWarning[2])
         assertNull(car.tirePressureBar[0])
-        assertEquals(before, reads)
+        assertEquals(before + 8, reads)
         tire(47, 2, 255)
         assertNull(monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
+        tire(47, 2, 260)
+        assertEquals(2.6f, monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
+    }
+
+    @Test fun tireGettersRefreshAndNotifyTheVisibleClusterWithoutDedicatedTireCallbacks() {
+        tirePressures.fill(240)
+        start(); connect()
+        assertEquals(listOf(2.4f, 2.4f, 2.4f, 2.4f), changes.last().vehicle(0, null).tirePressureBar)
+        tirePressures[0] = 230
+        tirePressures[3] = 260
+        tireWarnings[3] = 1
+        emit(1500); idle(1000)
+        val displayed = changes.last().vehicle(SystemClock.elapsedRealtime(), null)
+        assertEquals(listOf(2.3f, 2.4f, 2.4f, 2.6f), displayed.tirePressureBar)
+        assertEquals(listOf(false, false, false, true), displayed.tireWarning)
+        assertEquals(1, binds)
+        assertEquals(0, unregisters)
+        assertEquals(20, reads)
+        val notifications = changes.size
+        idle(1000)
+        emit(1500, code = 10); idle()
+        // Identical tire values do not independently request another redraw.
+        val afterSpeedNotification = changes.size
+        assertEquals(notifications + 1, afterSpeedNotification)
+        idle(60_000)
+        assertEquals(afterSpeedNotification, changes.size)
+        assertEquals(28, reads)
+    }
+
+    @Test fun speedBurstsCoalesceTireReadsWithoutPostponingThemAndIdleDoesNotPoll() {
+        tirePressures.fill(240)
+        start(); connect()
+        tirePressures[1] = 245
+        repeat(10) {
+            repeat(20) { emit(2000) }
+            idle(100)
+        }
+        assertEquals(20, reads)
+        assertEquals(2.45f, monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[1])
+        val afterBurst = reads
+        idle(60_000)
+        assertEquals(afterBurst, reads)
+        // Gear changes also refresh tires, including while parked with no speed event.
+        tirePressures[1] = 250
+        emit(0, code = 11); idle()
+        assertEquals(2.5f, changes.last().vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[1])
+        assertEquals(afterBurst + 8, reads)
+    }
+
+    @Test fun systemTireWarningRefreshesAllWheelsImmediatelyAndStopCancelsDeferredReads() {
+        tirePressures.fill(240)
+        start(); connect()
+        tireWarnings[2] = 1
+        emit(1, code = 48); idle()
+        assertEquals(20, reads) // No need to wait for the regular vehicle-event throttle.
+        assertEquals(true, changes.last().vehicle(SystemClock.elapsedRealtime(), null).tireWarning[2])
+        emit(100); idle() // Queues a refresh for later.
+        monitor!!.stop(); idle()
+        idle(60_000)
+        assertEquals(20, reads)
+        assertEquals(Hs5VehicleSample(), monitor!!.sample)
     }
 
     @Test fun otherDocumentedPushesUpdateWithoutAnyGetter() {
@@ -296,7 +473,9 @@ class Hs5VehicleMonitorTest {
             start(worker)
             assertTrue(backgroundConnected!!.await(3, TimeUnit.SECONDS))
             val flushed = CountDownLatch(1)
-            worker.post { flushed.countDown() }
+            // Connect queues an initial RPM read, which can replace a pending UI
+            // notification. Drain that queued work before running the main looper.
+            worker.post { worker.post { flushed.countDown() } }
             assertTrue(flushed.await(3, TimeUnit.SECONDS))
             idle()
             assertTrue(changes.isNotEmpty())

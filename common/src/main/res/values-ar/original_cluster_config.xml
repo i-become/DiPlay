@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_cluster_config">إعداد لوحة العدادات الأصلية</string>
+    <string name="settings_original_cluster_tires">ضغط الإطارات</string>
+    <string name="settings_original_cluster_driving">معلومات القيادة</string>
+    <string name="settings_original_cluster_turn">المنعطفات والمسارات</string>
+    <string name="settings_original_cluster_time">وقت الملاحة</string>
+    <string name="settings_original_cluster_preview_hint">معاينة مصغرة · بيانات تجريبية. اضغط مطولاً على المكوّن لسحبه. يطبق الحفظ الإعدادات فوراً على النمط الأصلي.</string>
+    <string name="settings_original_cluster_reset">استعادة الإعدادات الافتراضية</string>
+    <string name="settings_original_cluster_back">العودة إلى العدادات</string>
+    <string name="settings_original_cluster_save">حفظ</string>
+    <string name="settings_original_cluster_unsaved">تغييرات غير محفوظة</string>
+    <string name="settings_original_cluster_discard_message">ستفقد التغييرات عند المغادرة. هل تريد الخروج دون حفظ؟</string>
+    <string name="settings_original_cluster_discard">تجاهل ومغادرة</string>
+    <string name="settings_original_cluster_keep_editing">متابعة التحرير</string>
+    <string name="settings_original_cluster_fl">أمامي أيسر</string>
+    <string name="settings_original_cluster_fr">أمامي أيمن</string>
+    <string name="settings_original_cluster_rl">خلفي أيسر</string>
+    <string name="settings_original_cluster_rr">خلفي أيمن</string>
+    <string name="settings_original_cluster_consumption">متوسط الاستهلاك</string>
+    <string name="settings_original_cluster_odometer">المسافة الكلية</string>
+    <string name="settings_original_cluster_range">المدى</string>
+    <string name="settings_original_cluster_arrival">الوصول %1$s</string>
+    <string name="settings_original_cluster_minutes">%1$d دقيقة</string>
+    <string name="original_cluster_kilometers">%1$s كم</string>
+    <string name="original_cluster_hours_minutes">%1$d:%2$02d ساعة</string>
+</resources>

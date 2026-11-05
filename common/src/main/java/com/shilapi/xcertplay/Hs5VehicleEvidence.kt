@@ -9,7 +9,11 @@ internal class Hs5VehicleEvidence {
             "brakeRaw=${sample.brake.fresh(at)} rpmCandidate=${sample.can.rpm} " +
             "rpmOem=${sample.can.rpmOem} engineSpeedRule=${sample.can.rpmRule} " +
             "rpmDebugByte7=${sample.can.rpmDebugByte7} rpmNote=${sample.can.note} " +
-            "coolantCandidate=${sample.can.coolant} remainFuelRaw=${sample.fuel.fresh(at)} $can"
+            "coolantCandidate=${sample.can.coolant} remainFuelRaw=${sample.fuel.fresh(at)} " +
+            "objectDetectionRaw=${sample.leadVehicle.raw} objectDetectionSource=${sample.leadVehicle.source} " +
+            "hudCruiseDisplay=${sample.hudCruiseDisplay.value} hudFcwDisplay=${sample.hudFcwDisplay.value} " +
+            "acc=${sample.acc.value} cruiseMode=${sample.cruiseMode.value} " +
+            "tirePressureKpa=${sample.tires.map { it.value }} tireWarningRaw=${sample.tireWarnings.map { it.value }} $can"
     }
 
     @Volatile private var readings: List<Reading> = emptyList()

@@ -128,6 +128,10 @@ class NewUiConnectionActions(
     /** Called only after the apply-and-reconnect dialog. Also handles a retained session
      * whose host Activity is gone; both map geometry and native surfaces must be rebuilt. */
     fun reconnectAfterClusterStyleChange() {
+        reconnectAfterDisplayChange()
+    }
+
+    fun reconnectAfterDisplayChange() {
         if (!CarPlayBackgroundSession.hasSession()) return
         val wireless = AirPlayPersistence.loadWirelessEnabled(activity)
         disconnect {

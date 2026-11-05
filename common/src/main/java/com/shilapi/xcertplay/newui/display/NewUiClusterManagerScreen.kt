@@ -28,6 +28,7 @@ fun NewUiClusterManagerScreen(
     selectedStyle: ClusterStyle,
     onBack: () -> Unit,
     onApply: (ClusterStyle) -> Unit,
+    onConfigureOriginal: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().testTag("cluster-manager")) {
         NewUiSubpageTitle(R.string.settings_cluster_manager)
@@ -38,7 +39,7 @@ fun NewUiClusterManagerScreen(
             Text(stringResource(R.string.settings_cluster_manager_description),
                 color = NewUiColors.TextSecondary, style = NewUiTypography.SettingSubtitle)
             ClusterStyle.entries.forEach { style ->
-                ClusterStyleCard(style, style == selectedStyle) { onApply(style) }
+                ClusterStyleCard(style, style == selectedStyle, onConfigureOriginal) { onApply(style) }
             }
         }
         NewUiSubpageBottomBar(backLabelRes = R.string.new_ui_back_to_display, onBack = onBack)
@@ -46,7 +47,7 @@ fun NewUiClusterManagerScreen(
 }
 
 @Composable
-private fun ClusterStyleCard(style: ClusterStyle, selected: Boolean, onApply: () -> Unit) {
+private fun ClusterStyleCard(style: ClusterStyle, selected: Boolean, onConfigureOriginal: () -> Unit, onApply: () -> Unit) {
     val shape = RoundedCornerShape(NewUiLayout.PageCardRadius)
     BoxWithConstraints(
         Modifier.fillMaxWidth().clip(shape).background(NewUiColors.CardNormal)
@@ -60,12 +61,12 @@ private fun ClusterStyleCard(style: ClusterStyle, selected: Boolean, onApply: ()
             Row(horizontalArrangement = Arrangement.spacedBy(NewUiLayout.ClusterCardGap),
                 verticalAlignment = Alignment.CenterVertically) {
                 ClusterStylePreviewImage(style, Modifier.weight(1.4f))
-                ClusterStyleDetails(style, selected, onApply, Modifier.weight(1f))
+                ClusterStyleDetails(style, selected, onApply, onConfigureOriginal, Modifier.weight(1f))
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(NewUiLayout.RowGap)) {
                 ClusterStylePreviewImage(style, Modifier.fillMaxWidth())
-                ClusterStyleDetails(style, selected, onApply, Modifier.fillMaxWidth())
+                ClusterStyleDetails(style, selected, onApply, onConfigureOriginal, Modifier.fillMaxWidth())
             }
         }
     }
@@ -85,18 +86,26 @@ private fun ClusterStylePreviewImage(style: ClusterStyle, modifier: Modifier) {
 }
 
 @Composable
-private fun ClusterStyleDetails(style: ClusterStyle, selected: Boolean, onApply: () -> Unit, modifier: Modifier) {
+private fun ClusterStyleDetails(style: ClusterStyle, selected: Boolean, onApply: () -> Unit, onConfigureOriginal: () -> Unit, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(NewUiLayout.RowGap)) {
         Text(stringResource(style.titleRes), color = NewUiColors.TextPrimary,
             style = NewUiTypography.ActionTitle)
         Text(stringResource(style.descriptionRes), color = NewUiColors.TextSecondary,
             style = NewUiTypography.SettingSubtitle)
+        if (style == ClusterStyle.ORIGINAL) Text(
+            text = stringResource(R.string.settings_cluster_style_original_author),
+            color = NewUiColors.TextSecondary,
+            style = NewUiTypography.SettingSubtitle,
+        )
         NewUiAccentActionButton(
             label = stringResource(if (selected) R.string.settings_cluster_style_applied
                 else R.string.settings_cluster_style_apply),
             enabled = !selected, onClick = onApply,
             modifier = Modifier.testTag("cluster-apply-" + style.preferenceValue),
         )
+        if (style == ClusterStyle.ORIGINAL) NewUiSecondaryActionButton(
+            label = stringResource(R.string.settings_original_cluster_config),
+            onClick = onConfigureOriginal, modifier = Modifier.testTag("cluster-configure-original"))
     }
 }
 

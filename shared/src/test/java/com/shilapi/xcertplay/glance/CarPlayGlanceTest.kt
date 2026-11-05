@@ -5,6 +5,7 @@ import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.hud.BydHudRouteState
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,6 +32,7 @@ class CarPlayGlanceTest {
 
     @Before
     fun reset() {
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false)
         CarPlayGlance.listener = null
         CarPlayGlance.setConnected(true)
         CarPlayGlance.setConnected(false)
@@ -38,6 +40,28 @@ class CarPlayGlanceTest {
 
     @After
     fun clear() = reset()
+
+    @Test fun laneDiagnosticsAreBoundedOptInAndClearedWhenDisabled() {
+        val logging = com.shilapi.xcertplay.diagnostics.DiagnosticLogging
+        CarPlayGlance.setConnected(true)
+        val lane = frame(0x5204) {
+            u16(0, 42); u16(1, 0)
+            group(2) { u16(0, 0); u8(1, 2); i16(2, 0); i16(2, 90); i16(3, 90) }
+        }
+        CarPlayGlance.onFrame(lane)
+        assertEquals("CarPlay lane diagnostics disabled", CarPlayGlance.laneDiagnosticReport())
+        logging.setEnabled(true)
+        repeat(40) { CarPlayGlance.onFrame(lane) }
+        CarPlayGlance.onFrame(frame(0x5204) { u16(0, 41); u16(1, 0) })
+        val report = CarPlayGlance.laneDiagnosticReport()
+        assertTrue(report.contains("lanePackets=41 rejectedLanePackets=1"))
+        assertEquals(12, report.lineSequence().count { it.startsWith("id=") })
+        logging.setEnabled(false)
+        logging.setEnabled(true)
+        val cleared = CarPlayGlance.laneDiagnosticReport()
+        assertTrue(cleared.contains("lanePackets=0 rejectedLanePackets=0"))
+        assertFalse(cleared.contains("hex128="))
+    }
 
     @Test
     fun followsTheNextTurnAndTheSong() {
@@ -61,6 +85,17 @@ class CarPlayGlanceTest {
         assertEquals("Numb — Linkin Park", now.song)
         assertTrue(now.playing)
         assertEquals(now, seen.last())
+    }
+
+    @Test
+    fun publishesManeuverDescriptionAsRoadFallbackForClusterStyles() {
+        CarPlayGlance.setConnected(true)
+        CarPlayGlance.onFrame(frame(0x5202) {
+            u16(1, 3); string(2, "Continue onto Central Avenue"); u8(3, 2)
+        })
+        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1); u16List(0x0d, listOf(3)) })
+
+        assertEquals("Continue onto Central Avenue", CarPlayGlance.snapshot().road)
     }
 
     @Test
@@ -168,5 +203,69 @@ class CarPlayGlanceTest {
 
         assertEquals(before, CarPlayGlance.snapshot())
         assertEquals(0, calls)
+    }
+
+    @Test fun lanesAndRouteTotalsPublishWithoutNextTurnAndClearOnRouteEndOrTimeout() {
+        withRouteClock { advance ->
+            CarPlayGlance.setConnected(true)
+            val update = frame(0x5201) {
+                u8(1, 1); u32(7, 12800); u64(6, 1080); u64(5, 1792904280)
+                u16(0x10, 0); u8(0x12, 1)
+            }
+            val lane = frame(0x5204) {
+                u16(0, 42); u16(1, 0)
+                group(2) { u16(0, 0); u8(1, 2); i16(2, 90) }
+            }
+            CarPlayGlance.onFrame(update)
+            CarPlayGlance.onFrame(lane)
+            val now = CarPlayGlance.snapshot()
+            assertNull(now.maneuverType)
+            assertEquals(1, now.lanes.size)
+            assertEquals(12800L, now.remainingMeters)
+            assertEquals(1080L, now.remainingSeconds)
+            assertEquals(1792904280L, now.arrivalEpochSeconds)
+            for (end in listOf(0, 2)) {
+                CarPlayGlance.onFrame(frame(0x5201) { u8(1, end) })
+                val ended = CarPlayGlance.snapshot()
+                assertTrue(ended.lanes.isEmpty())
+                assertNull(ended.remainingMeters); assertNull(ended.remainingSeconds); assertNull(ended.arrivalEpochSeconds)
+                CarPlayGlance.onFrame(update); CarPlayGlance.onFrame(lane)
+            }
+            advance(30_000_000_000L)
+            val stale = CarPlayGlance.snapshot()
+            assertTrue(stale.lanes.isEmpty())
+            assertNull(stale.remainingMeters); assertNull(stale.remainingSeconds); assertNull(stale.arrivalEpochSeconds)
+        }
+    }
+
+    @Test fun lanesPublishWithTheCurrentRouteAndDisappearOnArrivalExpiryOrDisconnect() {
+        withRouteClock { advance ->
+            CarPlayGlance.setConnected(true)
+            CarPlayGlance.onFrame(frame(0x5202) { u16(1, 1); u8(3, 2) })
+            CarPlayGlance.onFrame(frame(0x5201) {
+                u8(1, 1); u16List(0x0d, listOf(1)); u16(0x10, 0); u8(0x12, 1)
+            })
+            val seen = mutableListOf<CarPlayGlance.Snapshot>()
+            val release = CarPlayGlance.subscribe { seen += it }
+            try {
+                val lane = frame(0x5204) {
+                    u16(0, 42); u16(1, 0)
+                    group(2) { u16(0, 0); u8(1, 2); i16(2, 90) }
+                }
+                CarPlayGlance.onFrame(lane)
+                assertEquals(90, seen.last().lanes.single().direction)
+                advance(30_000_000_000L)
+                assertTrue(CarPlayGlance.snapshot().lanes.isEmpty())
+                CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1); u16(0x10, 0); u8(0x12, 1) })
+                assertTrue(CarPlayGlance.snapshot().lanes.isEmpty())
+                CarPlayGlance.onFrame(lane)
+                assertEquals(1, CarPlayGlance.snapshot().lanes.size)
+                CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+                assertTrue(CarPlayGlance.snapshot().lanes.isEmpty())
+                CarPlayGlance.setConnected(false)
+                CarPlayGlance.onFrame(lane)
+                assertEquals(CarPlayGlance.Snapshot(), CarPlayGlance.snapshot())
+            } finally { release() }
+        }
     }
 }

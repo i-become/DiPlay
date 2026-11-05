@@ -8,6 +8,7 @@
     <string name="settings_cluster_style_sport_description">红色双环仪表，融合车辆场景、音乐与右侧 CarPlay 地图。</string>
     <string name="settings_cluster_style_basic_description">双仪表融合车辆信息、中间 CarPlay 地图及音乐。</string>
     <string name="settings_cluster_style_original">原始</string>
+    <string name="settings_cluster_style_original_author">由抖音 @沫忆吖 (moyiya95975) 设置小组件</string>
     <string name="settings_cluster_style_original_description">CarPlay 原生地图飞屏，不显示 DiPlay 自定义仪表。</string>
     <string name="settings_cluster_style_applied">已应用</string>
     <string name="settings_cluster_style_apply">应用到仪表盘</string>

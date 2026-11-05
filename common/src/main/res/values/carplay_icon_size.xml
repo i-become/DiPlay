@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_icon_size">CarPlay home screen icon size</string>
+    <string name="settings_carplay_icon_size_description">Adjusts icons, text and controls. Saved changes take effect the next time CarPlay connects.</string>
+</resources>

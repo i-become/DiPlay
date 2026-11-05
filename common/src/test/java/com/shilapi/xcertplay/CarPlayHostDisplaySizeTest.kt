@@ -78,6 +78,21 @@ class CarPlayHostDisplaySizeTest {
         assertStartupBeforeUi(1920, 720)
     }
 
+    @Test fun iconSizePresetsReachTheIphoneDisplayOfferWithoutChangingVideoResolution() {
+        allowStartup()
+        for (preset in CarPlaySize.entries) {
+            AirPlayPersistence.saveCarPlaySize(activity, preset)
+            invoke("loadPersistedSettings")
+            setField("maximumDetectedWidthPixels", 1920)
+            setField("maximumDetectedHeightPixels", 720)
+            val config = activity.javaClass.getDeclaredMethod("createAirPlayConfig", sizeClass)
+                .apply { isAccessible = true }.invoke(activity, size(1920, 720)) as AirPlayConfig
+            assertEquals(preset.widthMillimeters, config.main.widthPhysicalMm)
+            assertEquals(1920, config.main.widthPixels)
+            assertEquals(720, config.main.heightPixels)
+        }
+    }
+
     @Test fun hongqiEarlyStartupUsesTheActualNarrowWindowInsteadOfTheWholeDisplay() {
         assertStartupBeforeUi(700, 720)
     }

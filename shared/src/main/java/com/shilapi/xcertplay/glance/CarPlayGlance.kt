@@ -2,16 +2,18 @@ package com.shilapi.xcertplay.glance
 
 import com.shilapi.xcertplay.hud.BydHudRouteState
 import com.shilapi.xcertplay.hud.ClusterSongState
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
  * What CarPlay is doing, at a glance, for widgets and other screens outside CarPlay: the next
- * maneuver from iAP2 route guidance (0x5201/0x5202) and the song from NowPlayingUpdate (0x5001).
+ * maneuver and junction lanes from iAP2 route guidance (0x5201/0x5202/0x5204), and the song
+ * from NowPlayingUpdate (0x5001).
  * Fed by every CarPlay session, whatever the BYD output settings.
  */
 object CarPlayGlance {
-    /** One state of the glance; [maneuverType] is Apple's RouteGuidanceManeuverType, null without a route. */
+    /** [maneuverType] is Apple's RouteGuidanceManeuverType; a route may have no next turn. */
     data class Snapshot(
         val connected: Boolean = false,
         val maneuverType: Int? = null,
@@ -24,12 +26,20 @@ object CarPlayGlance {
         val song: String? = null,
         val playing: Boolean = false,
         val navigating: Boolean = false,
+        val lanes: List<CarPlayLane> = emptyList(),
     )
 
     private val route = BydHudRouteState()
     private val song = ClusterSongState()
     private var connected = false
     private var last = Snapshot()
+    private val laneState = CarPlayLaneState()
+    private var evidenceGeneration = -1L
+    private var evidenceStop: AutoCloseable? = null
+    private var routePackets = 0L
+    private var lanePackets = 0L
+    private var rejectedLanePackets = 0L
+    private val laneEvidence = ArrayDeque<String>()
 
     /** Called with each new snapshot, on the thread that changed it. */
     @Volatile var listener: ((Snapshot) -> Unit)? = null
@@ -55,15 +65,63 @@ object CarPlayGlance {
 
     fun onFrame(frame: Iap2Frame) {
         val changed = synchronized(this) {
+            var lanesAccepted: Boolean? = null
             when (frame.messageId) {
-                BydHudRouteState.ROUTE_GUIDANCE_UPDATE, BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE ->
+                BydHudRouteState.ROUTE_GUIDANCE_UPDATE, BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE -> {
                     runCatching { route.accept(frame.messageId, frame.payload) }
+                    if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE) laneState.acceptRoute(frame.payload)
+                }
+                CarPlayLaneGuidance.MESSAGE_ID -> {
+                    if (!connected) return
+                    lanesAccepted = laneState.acceptLanes(frame.payload)
+                }
                 ClusterSongState.NOW_PLAYING_UPDATE -> runCatching { song.accept(frame) }
                 else -> return
             }
-            publishLocked()
+            publishLocked().also {
+                if (DiagnosticLogging.enabled && (frame.messageId == 0x5201 || frame.messageId == 0x5204)) {
+                    recordLaneEvidence(frame, lanesAccepted)
+                }
+            }
         }
         changed?.let(::notifyChanged)
+    }
+
+    /** Bounded protocol evidence; never capture payloads or format them with logging disabled. */
+    private fun recordLaneEvidence(frame: Iap2Frame, accepted: Boolean?) {
+        val token = DiagnosticLogging.generation
+        DiagnosticLogging.write(token) {
+            if (evidenceGeneration != token) {
+                clearLaneEvidence()
+                evidenceGeneration = token
+                evidenceStop = DiagnosticLogging.onDisabled { synchronized(this) { clearLaneEvidence() } }
+            }
+            if (frame.messageId == 0x5201) routePackets++ else {
+                lanePackets++
+                if (accepted == false) rejectedLanePackets++
+            }
+            val hex = frame.payload.take(128).joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+            if (laneEvidence.size == 12) laneEvidence.removeFirst()
+            laneEvidence.addLast("id=${frame.messageId.toString(16)} bytes=${frame.payload.size} " +
+                "accepted=$accepted navigating=${last.navigating} ${laneState.diagnosticState()} hex128=$hex")
+        }
+    }
+
+    private fun clearLaneEvidence() {
+        evidenceStop?.close()
+        evidenceStop = null
+        evidenceGeneration = -1L
+        routePackets = 0
+        lanePackets = 0
+        rejectedLanePackets = 0
+        laneEvidence.clear()
+    }
+
+    fun laneDiagnosticReport(): String = synchronized(this) {
+        if (!DiagnosticLogging.enabled) return "CarPlay lane diagnostics disabled"
+        "routePackets=$routePackets lanePackets=$lanePackets rejectedLanePackets=$rejectedLanePackets " +
+            "connected=$connected navigating=${last.navigating} displayedLanes=${last.lanes.size} " +
+            "${laneState.diagnosticState()}\n" + laneEvidence.joinToString("\n")
     }
 
     fun setConnected(next: Boolean) {
@@ -73,6 +131,7 @@ object CarPlayGlance {
             if (!next) {
                 route.clear()
                 song.clear()
+                laneState.clear()
             }
             publishLocked()
         }
@@ -81,19 +140,23 @@ object CarPlayGlance {
 
     private fun publishLocked(): Snapshot? {
         val maneuver = route.currentApple()
+        val navigating = connected && route.isNavigating()
+        val summary = if (navigating) route.currentSummary() else null
+        if (last.navigating && !navigating) laneState.clear()
         val current = song.current()
         val next = Snapshot(
             connected = connected,
             maneuverType = maneuver?.type,
-            navigating = connected && route.isNavigating(),
+            navigating = navigating,
             drivingSide = maneuver?.drivingSide ?: 0,
             distanceMeters = maneuver?.distanceMeters ?: 0,
             road = maneuver?.road.orEmpty(),
-            arrivalEpochSeconds = maneuver?.arrivalEpochSeconds,
-            remainingSeconds = maneuver?.remainingSeconds,
-            remainingMeters = maneuver?.remainingMeters,
+            arrivalEpochSeconds = summary?.arrivalEpochSeconds,
+            remainingSeconds = summary?.remainingSeconds,
+            remainingMeters = summary?.remainingMeters,
             song = current?.text,
             playing = current?.playing ?: false,
+            lanes = if (navigating) laneState.current() else emptyList(),
         )
         if (next == last) return null
         last = next

@@ -8,6 +8,7 @@
     <string name="settings_cluster_style_sport_description">Red concentric instruments with a vehicle scene, music and a right-side CarPlay map.</string>
     <string name="settings_cluster_style_basic_description">Twin dials with vehicle information, a central CarPlay map and music.</string>
     <string name="settings_cluster_style_original">Original</string>
+    <string name="settings_cluster_style_original_author">Widget setup by Douyin @沫忆吖 (moyiya95975)</string>
     <string name="settings_cluster_style_original_description">The original CarPlay map projection, without DiPlay’s custom dials.</string>
     <string name="settings_cluster_style_applied">Applied</string>
     <string name="settings_cluster_style_apply">Apply to cluster</string>

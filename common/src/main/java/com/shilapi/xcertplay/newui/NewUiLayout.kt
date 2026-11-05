@@ -56,5 +56,7 @@ object NewUiLayout {
     val ClusterPreviewMaxWidth = 660.dp
     val ClusterSelectionBorder = 2.dp
     val ClusterCardBorder = 1.dp
+    val ClusterEditorGap = 20.dp
+    const val ClusterEditorPreviewWeight = 1.7f
     const val TopBarHongqiBadgeAspectRatio = 1700f / 500f
 }

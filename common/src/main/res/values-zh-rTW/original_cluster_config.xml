@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_cluster_config">原始儀表設定</string>
+    <string name="settings_original_cluster_tires">胎壓顯示</string>
+    <string name="settings_original_cluster_driving">行車資訊</string>
+    <string name="settings_original_cluster_turn">轉向卡與車道箭頭</string>
+    <string name="settings_original_cluster_time">導航時間</string>
+    <string name="settings_original_cluster_preview_hint">等比例預覽 · 範例資料。長按元件可拖曳位置，儲存後立即套用於原始風格。</string>
+    <string name="settings_original_cluster_reset">重設為預設配置</string>
+    <string name="settings_original_cluster_back">返回儀表管理</string>
+    <string name="settings_original_cluster_save">儲存</string>
+    <string name="settings_original_cluster_unsaved">有修改未儲存</string>
+    <string name="settings_original_cluster_discard_message">離開會遺失目前修改，是否放棄修改並離開？</string>
+    <string name="settings_original_cluster_discard">放棄修改並離開</string>
+    <string name="settings_original_cluster_keep_editing">繼續編輯</string>
+    <string name="settings_original_cluster_fl">左前輪</string>
+    <string name="settings_original_cluster_fr">右前輪</string>
+    <string name="settings_original_cluster_rl">左後輪</string>
+    <string name="settings_original_cluster_rr">右後輪</string>
+    <string name="settings_original_cluster_consumption">平均油耗</string>
+    <string name="settings_original_cluster_odometer">總里程</string>
+    <string name="settings_original_cluster_range">續航里程</string>
+    <string name="settings_original_cluster_arrival">%1$s 抵達</string>
+    <string name="settings_original_cluster_minutes">%1$d 分鐘</string>
+    <string name="original_cluster_kilometers">%1$s公里</string>
+    <string name="original_cluster_hours_minutes">%1$d:%2$02d 小時</string>
+</resources>

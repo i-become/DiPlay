@@ -137,6 +137,17 @@ class BydHudRouteStateTest {
     }
 
     @Test
+    fun `uses maneuver description when next-road and current-road fields are absent`() {
+        val state = BydHudRouteState()
+        state.accept(BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE,
+            tlvs(tlv(0x01, 0, 4), tlv(0x02, *utf8z("Turn right onto Central Avenue")), tlv(0x03, 2)))
+        state.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE,
+            tlvs(tlv(0x01, 1), tlv(0x0d, 0, 4)))
+
+        assertEquals("Turn right onto Central Avenue", state.current()!!.road)
+    }
+
+    @Test
     fun `roundabout exit has blank arrow and exit icon`() {
         val state = BydHudRouteState()
         state.accept(BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE, tlvs(tlv(0x01, 0, 0), tlv(0x03, 29)))

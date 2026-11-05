@@ -3,6 +3,8 @@ package com.shilapi.xcertplay.newui.display
 import android.content.Context
 import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
+import com.shilapi.xcertplay.airplay.CarPlaySize
+import com.shilapi.xcertplay.CarPlayBackgroundSession
 import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.CarPlayNightMode
 import com.shilapi.xcertplay.ClusterStyle
@@ -25,6 +27,8 @@ data class NewUiDisplayState(
     val carPlayNightMode: CarPlayNightMode,
     val clusterStyle: ClusterStyle = ClusterStyle.ORIGINAL,
     val clusterManagerAvailable: Boolean = false,
+    val carPlaySize: CarPlaySize = CarPlaySize.DEFAULT,
+    val iconSizeReconnectNeeded: Boolean = false,
 ) {
     val fpsLabel: String
         get() = "${AirPlayDisplaySettings.sanitizeFps(fps)} FPS"
@@ -59,6 +63,8 @@ internal object NewUiDisplayStateReader {
         val videoCodecLabel = if (AirPlayPersistence.loadHevcEnabled(context)) "HEVC" else "H.264"
         return NewUiDisplayState(
             fps = AirPlayPersistence.loadFps(context),
+            carPlaySize = AirPlayPersistence.loadCarPlaySize(context),
+            iconSizeReconnectNeeded = iconSizeNeedsReconnect(context),
             clusterStyle = AirPlayPersistence.loadClusterStyle(context),
             clusterManagerAvailable = ClusterDashboardView.supported(context),
             smoothVideoEnabled = AirPlayPersistence.loadSmoothVideo(context),
@@ -83,9 +89,20 @@ internal object NewUiDisplayStateReader {
             },
         )
     }
+
+    private fun iconSizeNeedsReconnect(context: Context): Boolean {
+        val display = CarPlayBackgroundSession.snapshot()?.display ?: return false
+        val reference = display.physicalSizeReferenceMm ?: return false
+        return reference != AirPlayPersistence.loadWidthPhysicalMm(context) ||
+            display.physicalSizeBasis != AirPlayPersistence.loadPhysicalSizeBasis(context)
+    }
 }
 
 internal object NewUiDisplayActions {
+    fun saveCarPlaySize(context: Context, size: CarPlaySize) {
+        AirPlayPersistence.saveCarPlaySize(context, size)
+    }
+
     fun saveClusterStyle(context: Context, style: ClusterStyle) {
         if (AirPlayPersistence.loadClusterStyle(context) == style) return
         AirPlayPersistence.saveClusterStyle(context, style)

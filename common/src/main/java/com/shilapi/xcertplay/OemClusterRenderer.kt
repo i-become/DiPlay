@@ -43,6 +43,9 @@ internal data class OemClusterVehicleState(
     // Wheel order follows the Qisi protocol: front-left, front-right, rear-left, rear-right.
     val tirePressureBar: List<Float?> = emptyList(),
     val tireWarning: List<Boolean?> = emptyList(),
+    val averageFuelConsumption: Float? = null,
+    val totalMileageKm: Float? = null,
+    val remainingMileageKm: Int? = null,
 ) {
     fun validated() = copy(
         speedKph = speedKph.validIn(0f, 260f), rpm = rpm.validIn(0f, 8000f),
@@ -53,6 +56,9 @@ internal data class OemClusterVehicleState(
         assistanceStatus = assistanceStatus?.validated(),
         tirePressureBar = tirePressureBar.take(4).map { it.validIn(0f, 7f) },
         tireWarning = tireWarning.take(4),
+        averageFuelConsumption = averageFuelConsumption.validIn(0f, 100f),
+        totalMileageKm = totalMileageKm.validIn(0f, 10_000_000f),
+        remainingMileageKm = remainingMileageKm?.takeIf { it in 0..1022 },
     )
 
     private fun Float?.validIn(low: Float, high: Float) = this?.takeIf { it.isFinite() && it in low..high }
@@ -182,6 +188,7 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
     private val muted = Color.rgb(166, 191, 222)
     private val navy = Color.rgb(0, 18, 39)
     private val typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+    private val guidanceCard = ClusterGuidanceCard(context, sport = false)
     private val date = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
 
     override fun draw(canvas: Canvas, width: Int, height: Int, state: ClusterDashboardState, @Suppress("UNUSED_PARAMETER") night: Boolean,
@@ -375,19 +382,8 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
 
     private fun navigation(canvas: Canvas, state: ClusterDashboardState) {
         val nav = state.guidance
-        // The route parser clears the maneuver at route end/disconnect. Metadata alone
-        // must not leave an empty card or stale arrival strip over the browsing map.
-        if (!nav.connected) return
-        val maneuver = nav.maneuverType ?: return
-        reset(Color.argb(249, 0, 21, 45)); canvas.drawRoundRect(RectF(767f, 112f, 1228f, 214f), 12f, 12f, paint)
-        outline(canvas, RectF(767f, 112f, 1228f, 214f), 12f, Color.rgb(83, 128, 183), 1.4f)
-        context.getDrawable(NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide))?.mutate()?.let {
-            it.setTint(white); it.setBounds(804, 126, 877, 199); it.draw(canvas)
-        }
-        val turnDistance = if (nav.distanceMeters < 1000) context.getString(R.string.cluster_dashboard_meters, nav.distanceMeters)
-            else context.getString(R.string.cluster_dashboard_kilometers, nav.distanceMeters / 1000.0)
-        text(canvas, turnDistance, 889f, 160f, 36f, 320f, Color.rgb(119, 228, 255))
-        text(canvas, nav.road, 889f, 195f, 22f, 320f)
+        if (!nav.connected || !nav.navigating) return
+        guidanceCard.draw(canvas, nav)
         // Every route field is optional. Do not draw empty placeholders over the map.
         val meters = nav.remainingMeters?.takeIf { it >= 0 }
         val arrival = nav.arrivalEpochSeconds?.takeIf { it > 0 && it <= Long.MAX_VALUE / 1000 }

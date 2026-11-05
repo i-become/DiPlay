@@ -846,6 +846,17 @@ object AirPlayPersistence {
             .apply()
     }
 
+    fun loadCarPlaySize(context: Context): com.shilapi.xcertplay.airplay.CarPlaySize =
+        com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(loadWidthPhysicalMm(context))
+
+    /** Keep the preset and its reference axis together, including upgrades from height-based settings. */
+    fun saveCarPlaySize(context: Context, size: com.shilapi.xcertplay.airplay.CarPlaySize) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_WIDTH_PHYSICAL_MM, size.widthMillimeters)
+            .putString(KEY_PHYSICAL_SIZE_BASIS, AirPlayPhysicalSizeBasis.WIDTH.name)
+            .apply()
+    }
+
     fun loadPhysicalSizeBasis(context: Context): AirPlayPhysicalSizeBasis {
         val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_PHYSICAL_SIZE_BASIS, null)

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_icon_size">حجم أيقونات شاشة CarPlay الرئيسية</string>
+    <string name="settings_carplay_icon_size_description">يضبط حجم الأيقونات والنصوص وعناصر التحكم. تسري التغييرات المحفوظة عند اتصال CarPlay في المرة القادمة.</string>
+</resources>

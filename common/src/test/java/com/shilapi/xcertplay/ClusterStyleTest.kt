@@ -52,12 +52,15 @@ class ClusterStyleTest {
         try {
             assertTrue(Hs5ClusterActivityOutput.open(launcher.get(), display, owner))
             val launch = shadowOf(launcher.get()).nextStartedActivity
-            val controller = Robolectric.buildActivity(Hs5ClusterActivity::class.java, launch).setup()
+            val controller = Robolectric.buildActivity(Hs5ClusterActivity::class.java, launch).setup().visible()
             try {
                 val window = controller.get()
                 val content = window.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as FrameLayout
-                assertEquals(1, content.childCount)
+                assertEquals(2, content.childCount)
                 assertTrue(content.getChildAt(0) is SurfaceView)
+                assertTrue(content.getChildAt(1) is OriginalClusterOverlayView)
+                assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, content.getChildAt(1).layoutParams.width)
+                assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, content.getChildAt(1).layoutParams.height)
                 window.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK))
                 assertTrue(window.isFinishing)
                 assertTrue(closed)

@@ -8,6 +8,7 @@
     <string name="settings_cluster_style_sport_description">Esferas rojas concéntricas con vista del vehículo, música y mapa CarPlay a la derecha.</string>
     <string name="settings_cluster_style_basic_description">Dos esferas con información del vehículo, mapa CarPlay central y música.</string>
     <string name="settings_cluster_style_original">Original</string>
+    <string name="settings_cluster_style_original_author">Widgets configurados por Douyin @沫忆吖 (moyiya95975)</string>
     <string name="settings_cluster_style_original_description">Proyección del mapa original de CarPlay sin las esferas personalizadas de DiPlay.</string>
     <string name="settings_cluster_style_applied">Aplicado</string>
     <string name="settings_cluster_style_apply">Aplicar al cuadro</string>

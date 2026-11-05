@@ -52,6 +52,7 @@ internal class ClusterMapPresentation(
     private var videoView: View? = null
     private var streamActive = false
     private var dashboard: ClusterDashboardView? = null
+    private var originalOverlay: OriginalClusterOverlayView? = null
     private val dashboardForeground = Hs5ClusterForeground()
     var outputSurface: Surface? = null
         private set
@@ -162,8 +163,14 @@ internal class ClusterMapPresentation(
             }, FrameLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt(), Gravity.CENTER))
         }
         root.addView(waitingLabel, FrameLayout.LayoutParams(videoParams))
-        turnCardView = ClusterTurnCardView(context).apply { visibility = View.GONE }
-        root.addView(turnCardView, FrameLayout.LayoutParams(-1, -1))
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(context) &&
+            AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL) {
+            root.addView(OriginalClusterOverlayView(context).also { originalOverlay = it }, FrameLayout.LayoutParams(-1, -1))
+            originalOverlay?.setOverlayVisible(mapVisible)
+        } else {
+            turnCardView = ClusterTurnCardView(context).apply { visibility = View.GONE }
+            root.addView(turnCardView, FrameLayout.LayoutParams(-1, -1))
+        }
         root.addView(ClusterSpeedometerView(context), FrameLayout.LayoutParams(-1, -1))
         if (AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)) {
             root.addView(SimulatedUltraLeftSpeedGauge(context), FrameLayout.LayoutParams(-1, -1))
@@ -207,6 +214,7 @@ internal class ClusterMapPresentation(
     fun setMapVisible(visible: Boolean) {
         mapVisible = visible
         dashboard?.setDashboardVisible(visible)
+        originalOverlay?.setOverlayVisible(visible)
         dashboardForeground.setVisible(visible)
         window?.let { window ->
             val alpha = if (visible) 1f else 0f

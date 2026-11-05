@@ -8,6 +8,7 @@
     <string name="settings_cluster_style_sport_description">عدادات حمراء متحدة المركز مع مشهد السيارة والموسيقى وخريطة CarPlay على اليمين.</string>
     <string name="settings_cluster_style_basic_description">عدادان مع معلومات السيارة وخريطة CarPlay في الوسط والموسيقى.</string>
     <string name="settings_cluster_style_original">أصلي</string>
+    <string name="settings_cluster_style_original_author">إعداد الأدوات بواسطة Douyin @沫忆吖 (moyiya95975)</string>
     <string name="settings_cluster_style_original_description">عرض خريطة CarPlay الأصلية دون عدادات DiPlay المخصصة.</string>
     <string name="settings_cluster_style_applied">مطبّق</string>
     <string name="settings_cluster_style_apply">تطبيق على لوحة العدادات</string>

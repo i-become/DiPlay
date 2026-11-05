@@ -54,6 +54,7 @@ import com.shilapi.xcertplay.launchCarButtonImagePicker
 import com.shilapi.xcertplay.update.BackgroundUpdateScheduler
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.newui.connection.NewUiConnectionActions
+import com.shilapi.xcertplay.newui.display.NewUiOriginalClusterConfigScreen
 import com.shilapi.xcertplay.newui.connection.NewUiConnectionMethodActions
 import com.shilapi.xcertplay.newui.connection.NewUiConnectionMethodDraft
 import com.shilapi.xcertplay.newui.connection.NewUiConnectPhoneScreen
@@ -79,6 +80,7 @@ import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticQrScreen
 import com.shilapi.xcertplay.newui.diagnostics.NewUiDiagnosticsSubpage
 import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
+import com.shilapi.xcertplay.newui.display.NewUiDisplayIconSizeScreen
 import com.shilapi.xcertplay.newui.display.NewUiClusterManagerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayNavMarkerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayScreen
@@ -134,6 +136,7 @@ class NewUiActivity : ComponentActivity() {
     private var updateUiState by mutableStateOf(NewUiUpdateUiState())
     private lateinit var updateController: NewUiUpdateController
     private lateinit var subpageBackCallback: OnBackPressedCallback
+    private var originalClusterExitGuard: ((() -> Unit) -> Unit)? = null
     private var connectPhoneAfterSave by mutableStateOf(false)
     private var phoneSelectionState by mutableStateOf(NewUiPhoneSelectionState.placeholder)
     private var connectionMethodDraft by mutableStateOf(
@@ -251,11 +254,14 @@ class NewUiActivity : ComponentActivity() {
                     showHs5Branding = true,
                     topBarStatus = topBarStatus,
                     onDestinationSelected = { selected ->
-                        if (selected == destination && hasSubpage(selected)) {
-                            popSubpageFor(selected)
-                        } else {
-                            popAllSubpages()
-                            destination = selected
+                        leaveOriginalClusterConfig {
+                            if (selected == destination && hasSubpage(selected)) {
+                                if (displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG)
+                                    closeOriginalClusterConfig() else popSubpageFor(selected)
+                            } else {
+                                popAllSubpages()
+                                destination = selected
+                            }
                         }
                     },
                     onOpenHeadUnitHome = { NewUiHeadUnitIntents.openHome(activity) },
@@ -319,6 +325,16 @@ class NewUiActivity : ComponentActivity() {
                             )
                         }
                         NewUiDestination.DISPLAY -> when (displaySubpage) {
+                            NewUiDisplaySubpage.ICON_SIZE -> NewUiDisplayIconSizeScreen(
+                                selectedSize = displayState.carPlaySize,
+                                reconnectNeeded = displayState.iconSizeReconnectNeeded,
+                                onBack = { popDisplaySubpage() },
+                                onSelectSize = { size ->
+                                    NewUiDisplayActions.saveCarPlaySize(activity, size)
+                                    markReconnectNeeded()
+                                },
+                                onReconnect = { connectionActions.reconnectAfterDisplayChange() },
+                            )
                             NewUiDisplaySubpage.FPS -> NewUiDisplayFpsScreen(
                                 selectedFps = displayState.fps,
                                 onBack = { popDisplaySubpage() },
@@ -358,6 +374,10 @@ class NewUiActivity : ComponentActivity() {
                             NewUiDisplaySubpage.CLUSTER_MANAGER -> NewUiClusterManagerScreen(
                                 selectedStyle = displayState.clusterStyle,
                                 onBack = { popDisplaySubpage() },
+                                onConfigureOriginal = {
+                                    displaySubpage = NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG
+                                    syncSubpageBackCallback()
+                                },
                                 onApply = { style ->
                                     if (style != displayState.clusterStyle) {
                                         applyWithReconnectConfirm(
@@ -373,6 +393,10 @@ class NewUiActivity : ComponentActivity() {
                                     }
                                 },
                             )
+                            NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG -> NewUiOriginalClusterConfigScreen(
+                                onBack = { closeOriginalClusterConfig() },
+                                registerExitGuard = { originalClusterExitGuard = it },
+                            )
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
                                 navMarkerSummary = getString(
@@ -381,6 +405,11 @@ class NewUiActivity : ComponentActivity() {
                                     clusterNavMarkerY,
                                 ),
                                 onPickFps = { openDisplayFpsPage() },
+                                onPickIconSize = {
+                                    displaySubpage = NewUiDisplaySubpage.ICON_SIZE
+                                    syncSubpageBackCallback()
+                                },
+                                onReconnect = { connectionActions.reconnectAfterDisplayChange() },
                                 onPickNavMarker = { openDisplayNavMarkerPage() },
                                 onOpenClusterManager = {
                                     displaySubpage = NewUiDisplaySubpage.CLUSTER_MANAGER
@@ -689,6 +718,8 @@ class NewUiActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString(DiPlayLauncher.EXTRA_PAGE, navigationPageExtra())
+        outState.putBoolean("original_cluster_editor", destination == NewUiDestination.DISPLAY &&
+            displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG)
         super.onSaveInstanceState(outState)
     }
 
@@ -765,6 +796,11 @@ class NewUiActivity : ComponentActivity() {
         if (connectionSubpage == NewUiConnectionSubpage.CONNECTION_METHOD) {
             manualHotspotOffHint = NewUiConnectionMethodActions.manualHotspotOff(this)
         }
+    }
+
+    /** Saving a display preference never interrupts a running session. */
+    private fun markReconnectNeeded() {
+        displayState = NewUiDisplayStateReader.read(this)
     }
 
     private fun saveDiagnosticReport(customDirectory: String? = null) {
@@ -861,8 +897,25 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun popDisplaySubpage() {
+        if (displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG) {
+            leaveOriginalClusterConfig { closeOriginalClusterConfig() }
+            return
+        }
         displaySubpage = NewUiDisplaySubpage.MAIN
         syncSubpageBackCallback()
+    }
+
+    private fun closeOriginalClusterConfig() {
+        originalClusterExitGuard = null
+        displaySubpage = NewUiDisplaySubpage.CLUSTER_MANAGER
+        syncSubpageBackCallback()
+    }
+
+    private fun leaveOriginalClusterConfig(exit: () -> Unit) {
+        val guard = originalClusterExitGuard.takeIf {
+            destination == NewUiDestination.DISPLAY && displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG
+        }
+        if (guard != null) guard(exit) else exit()
     }
 
     private fun openDisplayFpsPage() {
@@ -923,6 +976,12 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun restoreNavigation(state: Bundle) {
+        if (state.getBoolean("original_cluster_editor")) {
+            destination = NewUiDestination.DISPLAY
+            displaySubpage = NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG
+            syncSubpageBackCallback()
+            return
+        }
         when (state.getString(DiPlayLauncher.EXTRA_PAGE)) {
             "settings" -> destination = NewUiDestination.SETTINGS
             else -> destination = NewUiDestination.CONNECTION

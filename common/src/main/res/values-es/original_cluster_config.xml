@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_cluster_config">Configurar cuadro original</string>
+    <string name="settings_original_cluster_tires">Presión de neumáticos</string>
+    <string name="settings_original_cluster_driving">Información de viaje</string>
+    <string name="settings_original_cluster_turn">Giros y carriles</string>
+    <string name="settings_original_cluster_time">Tiempo de navegación</string>
+    <string name="settings_original_cluster_preview_hint">Vista a escala · datos de ejemplo. Mantén pulsado un componente para moverlo. Al guardar se aplica al estilo original.</string>
+    <string name="settings_original_cluster_reset">Restablecer valores</string>
+    <string name="settings_original_cluster_back">Volver a cuadros</string>
+    <string name="settings_original_cluster_save">Guardar</string>
+    <string name="settings_original_cluster_unsaved">Cambios sin guardar</string>
+    <string name="settings_original_cluster_discard_message">Al salir se perderán los cambios. ¿Quieres salir sin guardar?</string>
+    <string name="settings_original_cluster_discard">Descartar y salir</string>
+    <string name="settings_original_cluster_keep_editing">Seguir editando</string>
+    <string name="settings_original_cluster_fl">Del. izq.</string>
+    <string name="settings_original_cluster_fr">Del. der.</string>
+    <string name="settings_original_cluster_rl">Tras. izq.</string>
+    <string name="settings_original_cluster_rr">Tras. der.</string>
+    <string name="settings_original_cluster_consumption">Consumo medio</string>
+    <string name="settings_original_cluster_odometer">Kilometraje</string>
+    <string name="settings_original_cluster_range">Autonomía</string>
+    <string name="settings_original_cluster_arrival">Llegada %1$s</string>
+    <string name="settings_original_cluster_minutes">%1$d min</string>
+    <string name="original_cluster_kilometers">%1$s km</string>
+    <string name="original_cluster_hours_minutes">%1$d:%2$02d h</string>
+</resources>

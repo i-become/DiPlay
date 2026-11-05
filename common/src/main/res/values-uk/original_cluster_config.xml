@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_cluster_config">Налаштувати початковий стиль</string>
+    <string name="settings_original_cluster_tires">Тиск у шинах</string>
+    <string name="settings_original_cluster_driving">Дані поїздки</string>
+    <string name="settings_original_cluster_turn">Повороти та смуги</string>
+    <string name="settings_original_cluster_time">Час навігації</string>
+    <string name="settings_original_cluster_preview_hint">Масштабний перегляд · приклад даних. Утримуйте блок для переміщення. Збереження одразу застосовує зміни початкового стилю.</string>
+    <string name="settings_original_cluster_reset">Скинути налаштування</string>
+    <string name="settings_original_cluster_back">До стилів приладів</string>
+    <string name="settings_original_cluster_save">Зберегти</string>
+    <string name="settings_original_cluster_unsaved">Є незбережені зміни</string>
+    <string name="settings_original_cluster_discard_message">Після виходу зміни буде втрачено. Вийти без збереження?</string>
+    <string name="settings_original_cluster_discard">Відхилити й вийти</string>
+    <string name="settings_original_cluster_keep_editing">Продовжити</string>
+    <string name="settings_original_cluster_fl">Перед. лів.</string>
+    <string name="settings_original_cluster_fr">Перед. прав.</string>
+    <string name="settings_original_cluster_rl">Зад. лів.</string>
+    <string name="settings_original_cluster_rr">Зад. прав.</string>
+    <string name="settings_original_cluster_consumption">Сер. витрата</string>
+    <string name="settings_original_cluster_odometer">Пробіг</string>
+    <string name="settings_original_cluster_range">Запас ходу</string>
+    <string name="settings_original_cluster_arrival">Прибуття %1$s</string>
+    <string name="settings_original_cluster_minutes">%1$d хв</string>
+    <string name="original_cluster_kilometers">%1$s км</string>
+    <string name="original_cluster_hours_minutes">%1$d:%2$02d год</string>
+</resources>

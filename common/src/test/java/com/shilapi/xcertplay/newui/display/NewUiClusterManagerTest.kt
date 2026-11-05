@@ -44,6 +44,7 @@ class NewUiClusterManagerTest {
         val selections = mutableListOf<ClusterStyle>()
         var selected by mutableStateOf(ClusterStyle.BASIC)
         var backs = 0
+        var configurations = 0
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -52,14 +53,19 @@ class NewUiClusterManagerTest {
             ) {
                 NewUiTheme {
                     NewUiShell(NewUiDestination.DISPLAY, true, NewUiTopBarStatus.placeholder, {}, {}) {
-                        NewUiClusterManagerScreen(selected, { backs++ }, { selected = it; selections += it })
+                        NewUiClusterManagerScreen(selected, { backs++ }, { selected = it; selections += it },
+                            onConfigureOriginal = { configurations++ })
                     }
                 }
             }
         }
         screenshot(name + "-overview")
         compose.onNodeWithTag("cluster-apply-basic").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText(compose.activity.getString(R.string.settings_cluster_style_original_author))
+            .performScrollTo().assertIsDisplayed()
         screenshot(name + "-basic")
+        compose.onNodeWithTag("cluster-configure-original").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, configurations); assertTrue(selections.isEmpty()) }
         compose.onNodeWithTag("cluster-apply-original").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("cluster-apply-original").assertIsNotEnabled()
         compose.runOnIdle { assertEquals(listOf(ClusterStyle.ORIGINAL), selections) }

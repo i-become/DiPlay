@@ -13,6 +13,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
@@ -40,11 +42,12 @@ class SportClusterRendererTest {
             assertEquals("pixel at $x,$y", pixel(a, x,y), pixel(b, x,y))
     }
 
-    @Test fun sportSurfaceAndStreamUseRightSideThreeToTwoViewport() {
+    @Test fun sportSurfaceAndStreamCoverTheEntireRedFrameWithoutStretching() {
         for ((w,h) in listOf(2048 to 768, 1280 to 480, 1920 to 1080)) {
             val expected = SportClusterGeometry.mapBounds(w,h)
-            assertEquals(1.5f, expected.width()/expected.height(), .001f)
-            assertTrue(expected.left > w*.6f)
+            assertEquals(4f/3f, expected.width()/expected.height(), .001f)
+            // The surface intentionally overscans beneath the tachometer to soften the lower-left join.
+            assertTrue(expected.left > w*.58f)
             assertTrue(expected.right <= w)
             val view = ClusterDashboardView(context, style = ClusterStyle.SPORT)
             view.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),
@@ -54,7 +57,7 @@ class SportClusterRendererTest {
             assertTrue(kotlin.math.abs(expected.top.toInt() - view.mapSurface.top) <= 1)
         }
         val config = ClusterStyle.SPORT.streamConfig(2048,768,100,50,50)
-        assertEquals(1.5f, config.widthPixels.toFloat()/config.heightPixels, .001f)
+        assertEquals(4f/3f, config.widthPixels.toFloat()/config.heightPixels, .001f)
         assertEquals(0, config.widthPixels%8)
         assertEquals(0, config.heightPixels%8)
     }
@@ -90,7 +93,7 @@ class SportClusterRendererTest {
                 try {
                     assertTrue(combined.sameAs(split))
                     for((angle,radius) in listOf(OemClusterGeometry.speedDegrees(speed) to 260,
-                        OemClusterGeometry.needleDegrees(speed/260*7000,7000f) to 187)) {
+                        OemClusterGeometry.needleDegrees(speed/260*7000,7000f) to 170)) {
                         val a=Math.toRadians(angle.toDouble())
                         val x=(1024+kotlin.math.cos(a)*radius).toInt()
                         val y=(358+kotlin.math.sin(a)*radius).toInt()
@@ -109,20 +112,58 @@ class SportClusterRendererTest {
         try {
             assertEquals(0, Color.alpha(pixel(empty, 1700,430)))
             assertEquals(0, Color.alpha(pixel(empty, 1550,220)))
-            assertTrue(Color.alpha(pixel(empty, 1800,145)) > Color.alpha(pixel(empty, 1800,165)))
+            // The old rectangular top (140) and bottom (632) must no longer limit the map.
+            assertEquals(0, Color.alpha(pixel(empty, 1700,115)))
+            assertEquals(0, Color.alpha(pixel(empty, 1500,610)))
+            assertTrue(Color.alpha(pixel(empty, 1700,94)) > Color.alpha(pixel(empty, 1700,106)))
+            assertEquals(0, Color.alpha(pixel(empty, 1700,106)))
+            assertTrue(Color.alpha(pixel(empty, 1700,626)) > Color.alpha(pixel(empty, 1700,613)))
+            assertEquals(0, Color.alpha(pixel(empty, 1700,613)))
+            assertTrue(Color.alpha(pixel(empty, 1700,86)) >= 248)
             for(nav in listOf(CarPlayGlance.Snapshot(connected=true),
                 CarPlayGlance.Snapshot(connected=false,maneuverType=2),
                 CarPlayGlance.Snapshot(connected=true,remainingMeters=12800))) {
                 val image=render(ClusterDashboardState(guidance=nav))
                 try {assertSameRegion(empty,image,1428,156,1813,315)}finally{image.recycle()}
             }
-            val image=render(ClusterDashboardState(guidance=CarPlayGlance.Snapshot(connected=true,
+            val image=render(ClusterDashboardState(guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,
                 maneuverType=2,distanceMeters=1200,road="望京西路")))
             try {
                 assertTrue(Color.alpha(pixel(image, 1700,220))>=248)
                 assertSameRegion(empty,image,1430,275,1800,315)
             }finally{image.recycle()}
         }finally{empty.recycle()}
+    }
+
+    @Test fun topScaleIsFixedAt120AndHasNoSpeedUnitOrLiveReadout() {
+        val empty = render()
+        val image = render(ClusterDashboardState(vehicle = OemClusterVehicleState(speedKph=80f,rpm=2300f)))
+        try {
+            assertSameRegion(empty,image,980,85,1070,149)
+            // The fixed 120 scale label occupies the top tick, even without vehicle data.
+            var digits = 0
+            for(y in 80..110) for(x in 1000..1047) {
+                val color = pixel(empty,x,y)
+                if(Color.red(color)>180 && Color.green(color)>180) digits++
+            }
+            assertTrue("top tick must include its fixed scale label",digits>60)
+            // No extra km/h under that label; only the original dark scale well remains.
+            for(y in 120..145) for(x in 995..1053)
+                assertTrue("unexpected unit beneath 120", Color.red(pixel(empty,x,y))<100)
+        } finally {empty.recycle();image.recycle()}
+    }
+
+    @Test fun navigationSummaryEndsWithRemainingDistance() {
+        val renderer = SportClusterRenderer(context)
+        try {
+            val nav = CarPlayGlance.Snapshot(connected = true, navigating = true,
+                arrivalEpochSeconds = 1793457180, remainingSeconds = 12900, remainingMeters = 24000)
+            val arrival = context.getString(com.shilapi.xcertplay.host.R.string.settings_original_cluster_arrival,
+                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(nav.arrivalEpochSeconds!! * 1000)))
+            val duration = context.getString(com.shilapi.xcertplay.host.R.string.original_cluster_hours_minutes, 3, 35)
+            val distance = context.getString(com.shilapi.xcertplay.host.R.string.original_cluster_kilometers, "24")
+            assertEquals(listOf(arrival, duration, distance).joinToString("   "), renderer.navigationSummary(nav))
+        } finally { renderer.release() }
     }
 
     @Test fun onlyTheWarnedTireAndItsPressureTurnRed() {
@@ -151,7 +192,7 @@ class SportClusterRendererTest {
         val reference=javaClass.classLoader!!.getResourceAsStream("cluster/sport-reference.png")!!.use{BitmapFactory.decodeStream(it)}
         val cover=Bitmap.createBitmap(reference,976,239,96,96)
         val state=ClusterDashboardState(
-            guidance=CarPlayGlance.Snapshot(connected=true,maneuverType=2,distanceMeters=1200,
+            guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,maneuverType=2,distanceMeters=1200,
                 road="进入 望京西路",remainingMeters=12800,remainingSeconds=1080),
             music=ClusterDashboardMusic(CarPlayNowPlaying(title="晴天",artist="周杰伦",elapsedMillis=112000,
                 durationMillis=269000,playing=true),cover),
@@ -166,7 +207,8 @@ class SportClusterRendererTest {
                 val canvas=Canvas(image);canvas.drawColor(Color.rgb(2,3,5))
                 // Only the reference's right map is test content; never shipped in APK resources.
                 if (name != "sport-waiting") {
-                    val mapSource = if(name == "sport-idle") Rect(1310,316,2048,632) else Rect(1310,140,2048,632)
+                    // A clean 4:3 map-only crop excludes the reference's example guidance card.
+                    val mapSource = Rect(1528,320,1928,620)
                     canvas.drawBitmap(reference,mapSource,SportClusterGeometry.mapBounds(w,h),Paint(Paint.FILTER_BITMAP_FLAG))
                 }
                 val fixture=when(name) {

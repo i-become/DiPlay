@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_icon_size">CarPlay 桌面圖示大小</string>
+    <string name="settings_carplay_icon_size_description">調整桌面圖示、文字和控制項大小；儲存後下次連接 CarPlay 生效。</string>
+</resources>

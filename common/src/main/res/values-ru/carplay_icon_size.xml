@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_icon_size">Размер значков главного экрана CarPlay</string>
+    <string name="settings_carplay_icon_size_description">Изменяет размер значков, текста и элементов управления. Сохранённые изменения применяются при следующем подключении CarPlay.</string>
+</resources>

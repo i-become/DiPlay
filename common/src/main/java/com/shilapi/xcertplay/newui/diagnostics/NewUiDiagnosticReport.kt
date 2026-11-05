@@ -70,6 +70,8 @@ internal object NewUiDiagnosticReport {
         appendLine(HongqiPositionLights.report())
         appendLine("--- HS5 instrument vehicle data ---")
         appendLine(HongqiClusterVehicleData.report())
+        appendLine("--- CarPlay lane guidance ---")
+        appendLine(com.shilapi.xcertplay.glance.CarPlayGlance.laneDiagnosticReport())
         appendLine()
         appendLine("--- Cluster displays ---")
         appendLine(runCatching { ClusterMapPresentation.diagnosticReport(context) }.getOrElse { "unavailable: ${it.javaClass.simpleName}" })
