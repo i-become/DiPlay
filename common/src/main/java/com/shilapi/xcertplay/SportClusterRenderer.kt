@@ -158,10 +158,19 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
                 val y = 407f + i * 4f
                 line(canvas, 334f - i * 4f, y, 382f + i * 4f, y, Color.rgb(39, 236, 142), 2f)
             }
+        } else if (data != null && data.leadVehicleDetected == null) {
+            text(canvas, "?", 360f, 369f, 18f, 20f, Color.rgb(166, 191, 222), center = true)
         }
-        // Preserve the reference's road perspective; highlight only detected lane sides.
-        if (data?.leftLaneDetected == true) line(canvas, 333f, 354f, 211f, 604f, red, 2f)
-        if (data?.rightLaneDetected == true) line(canvas, 388f, 354f, 513f, 604f, red, 2f)
+        // White means detected, gray means clear, and dark gray means the frame is unknown.
+        fun laneColor(value: Boolean?) = when (value) {
+            true -> Color.WHITE
+            false -> Color.rgb(125, 137, 150)
+            null -> Color.rgb(47, 67, 84)
+        }
+        val leftColor = laneColor(data?.leftLaneDetected)
+        val rightColor = laneColor(data?.rightLaneDetected)
+        line(canvas, 333f, 354f, 211f, 604f, leftColor, 2f)
+        line(canvas, 388f, 354f, 513f, 604f, rightColor, 2f)
         val warning = car.assistanceStatus?.fcwWarning
         if (warning == 1 || warning == 2) {
             val color = if (warning == 2) red else Color.rgb(255, 192, 61)

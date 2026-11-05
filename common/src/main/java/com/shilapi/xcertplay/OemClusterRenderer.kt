@@ -94,10 +94,10 @@ internal data class OemClusterAssistanceStatus(
 }
 
 internal data class OemClusterAssistance(
-    val leadVehicleDetected: Boolean,
+    val leadVehicleDetected: Boolean? = null,
     val followingBars: Int = 0,
-    val leftLaneDetected: Boolean = false,
-    val rightLaneDetected: Boolean = false,
+    val leftLaneDetected: Boolean? = null,
+    val rightLaneDetected: Boolean? = null,
 )
 
 /** Geometry is shared by Android layout, map negotiation and screenshots. All units are
@@ -313,7 +313,11 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
             val detected = if (left) data?.leftLaneDetected else data?.rightLaneDetected
             val direction = if (left) -1 else 1
             line(canvas, 432f + direction * 25, 329f, 432f + direction * 115, 514f,
-                if (detected == true) cyan else Color.rgb(17, 106, 206), 2f)
+                when (detected) {
+                    true -> white
+                    false -> Color.rgb(125, 137, 150)
+                    null -> Color.rgb(47, 67, 84)
+                }, 2f)
             for (i in 0..5) {
                 val y = 338f + i * 25
                 val x = 432f + direction * (30f + i * 12)
@@ -326,6 +330,8 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
                 val y = 352f + i * 8
                 line(canvas, 413f - i * 3, y, 451f + i * 3, y, Color.rgb(24, 235, 131), 4f)
             }
+        } else if (data != null && data.leadVehicleDetected == null) {
+            text(canvas, "?", 432f, 339f, 18f, 20f, muted, true)
         }
         bitmap(canvas, R.drawable.cluster_basic_car_own, RectF(379f, 391f, 483f, 493f))
         if (warning == 1 || warning == 2) {

@@ -341,7 +341,22 @@ class Hs5VehicleProtocolTest {
         }
         for (raw in listOf(null, -1, 2, 254, 255)) {
             assertNull(Hs5VehicleSample(leadVehicle = Hs5LeadVehicleReading(raw), leadVehicleAt = 100)
-                .vehicle(100, null).assistance)
+                .vehicle(100, null).assistance!!.leadVehicleDetected)
         }
+    }
+
+    @Test fun freshAdasReadingCarriesLaneBitsAndUnknownsThroughToTheCluster() {
+        val allLanes = Hs5VehicleSample(leadVehicle = Hs5LeadVehicleReading(
+            raw = 0, laneDetectState = 2, leftLaneDetected = false, rightLaneDetected = true,
+        ), leadVehicleAt = 100).vehicle(100, null).assistance!!
+        assertEquals(false, allLanes.leadVehicleDetected)
+        assertEquals(false, allLanes.leftLaneDetected)
+        assertEquals(true, allLanes.rightLaneDetected)
+
+        val unavailable = Hs5VehicleSample(leadVehicleAt = 100).vehicle(100, null).assistance!!
+        assertNull(unavailable.leadVehicleDetected)
+        assertNull(unavailable.leftLaneDetected)
+        assertNull(unavailable.rightLaneDetected)
+        assertNull(Hs5VehicleSample(leadVehicleAt = 100).vehicle(2601, null).assistance)
     }
 }

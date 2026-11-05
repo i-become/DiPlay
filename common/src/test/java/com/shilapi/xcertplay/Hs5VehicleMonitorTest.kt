@@ -183,7 +183,7 @@ class Hs5VehicleMonitorTest {
         assertEquals(false, assistance()!!.leadVehicleDetected)
         lead = Hs5LeadVehicleReading(7, "unknown")
         idle(750)
-        assertNull(assistance())
+        assertNull(assistance()!!.leadVehicleDetected)
         lead = Hs5LeadVehicleReading(1, "test-ObjectDetection")
         idle(750)
         assertEquals(true, assistance()!!.leadVehicleDetected)
@@ -234,7 +234,7 @@ class Hs5VehicleMonitorTest {
         push(Hs5AssistancePush.Module.IFC, 2, 3)
         assertEquals(7, monitor!!.sample.hudFcwDisplay.value)
         assertEquals(3, monitor!!.sample.acc.value)
-        assertNull(monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).assistance)
+        assertNull(monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).assistance!!.leadVehicleDetected)
         idle(5000)
         assertEquals(9, getterCalls.values.sumOf { it.size })
         monitor!!.stop(); idle()
@@ -434,7 +434,7 @@ class Hs5VehicleMonitorTest {
         assertEquals(.5f, car.fuelFraction)
         assertEquals(true, car.lowFuelWarning)
         assertEquals(700f, car.rpm!!, 0f)
-        assertNull(car.assistance)
+        assertNull(car.assistance!!.leadVehicleDetected)
         assertEquals(12, reads)
     }
 

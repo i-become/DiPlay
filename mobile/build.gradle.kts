@@ -55,7 +55,7 @@ android {
         }
         release {
             optimization {
-                enable = false
+                enable = true
             }
             signingConfig = signingConfigs.getByName("release")
         }
@@ -72,7 +72,6 @@ android {
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(project(":common"))
-    implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.app.projected)
     implementation(libs.androidx.compose.material3)

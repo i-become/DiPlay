@@ -383,7 +383,13 @@ internal data class Hs5VehicleSample(
             outsideCelsius = outside.fresh(now), // ATC 93 already returns Celsius as float.
             assistance = leadVehicle.takeIf {
                 leadVehicleAt >= 0 && now >= leadVehicleAt && now - leadVehicleAt <= MAX_AGE_MS
-            }?.detected?.let { OemClusterAssistance(leadVehicleDetected = it) },
+            }?.let { reading ->
+                OemClusterAssistance(
+                    leadVehicleDetected = reading.detected,
+                    leftLaneDetected = reading.leftLaneDetected,
+                    rightLaneDetected = reading.rightLaneDetected,
+                )
+            },
             assistanceStatus = OemClusterAssistanceStatus(
                 acc = acc.fresh(now), fcw = fcw.fresh(now), aeb = aeb.fresh(now),
                 ldw = ldw.fresh(now), lka = lka.fresh(now),
