@@ -86,7 +86,7 @@ async function main() {
  }
  // Transparent RGB is cleared as well, so no example content survives asset inspection.
  for(let i=0;i<data.length;i+=4)if(data[i+3]===0)data.fill(0,i,i+3);
- await sharp(data,{raw:info}).png().toFile(path.join(dir,'cluster_basic_face.png'));
+ await sharp(data,{raw:info}).webp({lossless:true}).toFile(path.join(dir,'cluster_basic_face.webp'));
  const cars=[['own',377,391,104,102,[[19,0],[78,0],[80,10],[96,18],[101,55],[95,94],[10,95],[2,55],[8,20],[20,12]]],
  ['lead',406,303,54,51,[[10,0],[44,0],[48,9],[53,25],[47,48],[4,48],[0,25],[5,9]]],
  ['top',975,598,57,90,[[12,0],[40,0],[47,10],[48,68],[40,87],[12,87],[5,68],[6,10]]]];

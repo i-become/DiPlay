@@ -125,6 +125,40 @@ class AudioChannelMappingTest {
         )
     }
 
+    @Test
+    fun automaticNavigationUsesConfiguredLegacyStreamUnlessUsageMappingIsEnabled() {
+        val navigation = AudioChannelMapper.map(
+            audioType = "default",
+            payloadType = 100,
+            mode = AudioChannelMappingMode.MOBILE_COMPATIBLE,
+            navigationStreamType = 14,
+        )
+
+        assertEquals(14, AudioChannelRouting.legacyStreamOverride(
+            selection = navigation,
+            mediaChannel = 0,
+            navigationChannel = 0,
+            useAutomaticNavigationStream = true,
+        ))
+        assertEquals(0, AudioChannelRouting.legacyStreamOverride(
+            selection = navigation,
+            mediaChannel = 0,
+            navigationChannel = 0,
+            useAutomaticNavigationStream = false,
+        ))
+    }
+
+    @Test
+    fun explicitNavigationChannelOverridesAutomaticRoute() {
+        val navigation = AudioChannelSelection(AudioChannel.NAVIGATION, AudioContentType.SPEECH, 14)
+        assertEquals(7, AudioChannelRouting.legacyStreamOverride(
+            selection = navigation,
+            mediaChannel = 0,
+            navigationChannel = 7,
+            useAutomaticNavigationStream = false,
+        ))
+    }
+
     private fun assertMapped(
         mode: AudioChannelMappingMode,
         audioType: String,

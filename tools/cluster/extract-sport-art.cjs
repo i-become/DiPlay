@@ -100,7 +100,7 @@ async function main() {
   }
  }
  for(let i=0;i<data.length;i+=4)if(data[i+3]===0)data.fill(0,i,i+3);
- await sharp(data,{raw:info}).png().toFile(path.join(dir,'cluster_sport_face.png'));
+ await sharp(data,{raw:info}).webp({lossless:true}).toFile(path.join(dir,'cluster_sport_face.webp'));
  const mask=Buffer.from('<svg width="75" height="57"><path d="M14 3 L57 3 L65 16 L73 22 L72 43 L62 51 L12 51 L3 43 L3 22 L10 16Z" fill="white"/></svg>');
  await sharp(input).extract({left:320,top:350,width:75,height:57}).ensureAlpha().composite([{input:mask,blend:'dest-in'}]).png().toFile(path.join(dir,'cluster_sport_car_lead.png'));
  const testDir=path.join(root,'common/src/test/resources/cluster');fs.mkdirSync(testDir,{recursive:true});

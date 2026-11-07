@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -36,12 +37,12 @@ class StandaloneHudDemoActivity : Activity() {
                 val distance = if (turn == 1) 500 else 800
                 val road = if (turn == 1) "Muscat Road" else "Sultan Qaboos Street"
                 transmit(BydStandalonePackets.guidance(if (turn == 1) 2 else 3, 0, distance, road)!!)
-                if (turn != lastTurn) Log.i(TAG, "APP_GUIDANCE uid=${Process.myUid()} turn=$turn distance=$distance")
+                if (turn != lastTurn) DiagnosticLogging.logcat { Log.i(TAG, "APP_GUIDANCE uid=${Process.myUid()} turn=$turn distance=$distance") }
                 lastTurn = turn
                 status.text = (if (turn == 1) "LEFT — 500 m" else "RIGHT — 800 m") + "\n" + road
                 handler.postDelayed(this, 1_000)
             } catch (error: Exception) {
-                Log.e(TAG, "Demo failed", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "Demo failed", error) }
                 clear("send failed")
             }
         }
@@ -72,11 +73,11 @@ class StandaloneHudDemoActivity : Activity() {
         })
         try {
             validateTarget()
-            Log.i(TAG, "PREFLIGHT_OK uid=${Process.myUid()} stock receiver verified")
+            DiagnosticLogging.logcat { Log.i(TAG, "PREFLIGHT_OK uid=${Process.myUid()} stock receiver verified") }
             if (intent.getBooleanExtra("run", false) && state == null) handler.post { startDemo() }
         } catch (error: Exception) {
             status.text = "Test unavailable: ${error.message}"
-            Log.e(TAG, "Preflight failed", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "Preflight failed", error) }
         }
     }
 
@@ -108,11 +109,11 @@ class StandaloneHudDemoActivity : Activity() {
             started = SystemClock.elapsedRealtime()
             running = true
             lastTurn = 0
-            Log.i(TAG, "APP_START uid=${Process.myUid()} helper=none")
+            DiagnosticLogging.logcat { Log.i(TAG, "APP_START uid=${Process.myUid()} helper=none") }
             // Start and subsequent records target the same manifest receiver.
             handler.postDelayed(tick, 250)
         } catch (error: Exception) {
-            Log.e(TAG, "Standalone preflight/start failed", error)
+            DiagnosticLogging.logcat { Log.e(TAG, "Standalone preflight/start failed", error) }
             status.text = "Test unavailable: ${error.message}"
             clear("start failed")
         }
@@ -130,11 +131,11 @@ class StandaloneHudDemoActivity : Activity() {
             try {
                 transmit(StandaloneHudPackets.clear())
                 // Broadcast delivery is not a hardware acknowledgement.
-                Log.i(TAG, "APP_CLEAR_SENT uid=${Process.myUid()} reason=$reason")
+                DiagnosticLogging.logcat { Log.i(TAG, "APP_CLEAR_SENT uid=${Process.myUid()} reason=$reason") }
                 showing = false
                 status.text = "Clear sent — check windshield"
             } catch (error: Exception) {
-                Log.e(TAG, "Clear failed; retry with Clear HUD", error)
+                DiagnosticLogging.logcat { Log.e(TAG, "Clear failed; retry with Clear HUD", error) }
                 status.text = "Clear failed — tap Clear HUD"
             }
         }

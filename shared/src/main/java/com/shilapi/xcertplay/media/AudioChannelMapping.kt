@@ -25,6 +25,22 @@ internal data class AudioChannelSelection(
     val streamType: Int = AudioManager.STREAM_MUSIC,
 )
 
+/** Chooses the legacy stream override while preserving usage-based fallback semantics. */
+internal object AudioChannelRouting {
+    fun legacyStreamOverride(
+        selection: AudioChannelSelection,
+        mediaChannel: Int,
+        navigationChannel: Int,
+        useAutomaticNavigationStream: Boolean,
+    ): Int = when (selection.channel) {
+        AudioChannel.MEDIA -> mediaChannel
+        AudioChannel.NAVIGATION -> navigationChannel.takeIf { it != 0 }
+            ?: selection.streamType.takeIf { useAutomaticNavigationStream && it in 1..20 }
+            ?: 0
+        else -> 0
+    }
+}
+
 /**
  * Maps CarPlay stream metadata to Android audio routing values.
  *

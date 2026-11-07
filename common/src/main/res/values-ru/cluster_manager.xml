@@ -8,7 +8,7 @@
     <string name="settings_cluster_style_sport_description">Красные концентрические шкалы, вид автомобиля, музыка и карта CarPlay справа.</string>
     <string name="settings_cluster_style_basic_description">Два циферблата с данными автомобиля, картой CarPlay в центре и музыкой.</string>
     <string name="settings_cluster_style_original">Оригинальный</string>
-    <string name="settings_cluster_style_original_author">Виджеты настроены Douyin @沫忆吖 (moyiya95975)</string>
+    <string name="settings_cluster_style_original_author">Виджеты разработаны Douyin @沫忆吖 (moyiya95975)</string>
     <string name="settings_cluster_style_original_description">Исходная карта CarPlay без собственных циферблатов DiPlay.</string>
     <string name="settings_cluster_style_applied">Применён</string>
     <string name="settings_cluster_style_apply">Применить к панели</string>

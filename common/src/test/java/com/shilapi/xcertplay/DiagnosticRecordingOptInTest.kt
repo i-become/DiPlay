@@ -34,8 +34,20 @@ class DiagnosticRecordingOptInTest {
                 AsyncDiagnosticLog.append(log, "off")
             }
             assertTrue(AsyncDiagnosticLog.awaitIdle(2_000))
-            assertFalse(target.parentFile.exists())
+            assertFalse(root.resolve("logs").exists())
         } finally { root.deleteRecursively() }
+    }
+
+    @Test fun disabledStartupTraceDoesNotCreateItsDirectory() {
+        val root = Files.createTempDirectory("diplay-no-startup-trace").toFile().resolve("logs")
+        try {
+            val store = StartupTraceStore(root)
+            store.append("disabled")
+            store.clear()
+            assertTrue(store.awaitIdle(2_000))
+            store.close()
+            assertFalse(root.exists())
+        } finally { root.parentFile?.deleteRecursively() }
     }
 
     @Test fun capturedCallbacksCannotWriteIntoAReenabledSession() {

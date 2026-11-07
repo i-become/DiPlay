@@ -39,7 +39,13 @@ class AudioCodecOutputReleaseTest {
         assertEquals(listOf("copy", "release", "write"), OutputCodec.events)
     }
 
-    private fun drain(audioType: String, failCopy: Boolean = false, failWrite: Boolean = false) {
+    @Test fun navigationPlaybackIsReportedWithDiagnosticsDisabled() {
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(false)
+        drain("default", verifyNavigation = true)
+    }
+
+    private fun drain(audioType: String, failCopy: Boolean = false, failWrite: Boolean = false,
+        verifyNavigation: Boolean = false) {
         OutputCodec.events.clear()
         OutputCodec.available = true
         OutputCodec.failCopy = failCopy
@@ -55,7 +61,7 @@ class AudioCodecOutputReleaseTest {
         val constructor = type.declaredConstructors.single { !it.isSynthetic }.apply { isAccessible = true }
         val arguments = mutableListOf<Any?>(
             AudioFormat(AudioCodecKind.AAC_LC, 48_000, 2, 96, audioType), false, false, 0, 0,
-            AudioFocusCoordinator(null, false, false), 0, 500,
+            AudioFocusCoordinator(null, false, false), NavigationAudioFocusCoordinator(null, false), 0, 500,
         )
         constructor.parameterTypes.drop(arguments.size).forEach { parameter ->
             arguments.add(when (parameter) {
@@ -74,12 +80,18 @@ class AudioCodecOutputReleaseTest {
         set("track", track)
         set("fadeApplied", true)
         set("playbackStarted", true)
+        if (verifyNavigation) {
+            set("mappedChannel", AudioChannel.NAVIGATION)
+            set("actualLegacyStreamType", 14)
+        }
         try {
             type.getDeclaredMethod("drainCodec", MediaCodec::class.java).apply { isAccessible = true }.invoke(renderer, codec)
             assertFalse("expected injected failure", failCopy || failWrite)
+            if (verifyNavigation) assertEquals(NavigationPlaybackSnapshot(true, 14), NavigationPlayback.snapshot())
         } catch (error: InvocationTargetException) {
             assertTrue(error.cause is IllegalStateException && (failCopy || failWrite))
         } finally {
+            type.getDeclaredMethod("close").apply { isAccessible = true }.invoke(renderer)
             track.release()
             codec.release()
         }

@@ -47,6 +47,7 @@ internal class AudioFocusCoordinator(
     private val enabled: Boolean,
     private val muteMediaOnTransientLoss: Boolean = true,
     private val report: (String) -> Unit = {},
+    private val ownNavigationFocusHeld: () -> Boolean = { false },
 ) {
     private data class Entry(val channel: AudioChannel, val attributes: AudioAttributes, var appliedVolume: Float = FULL_VOLUME)
 
@@ -76,7 +77,11 @@ internal class AudioFocusCoordinator(
             }
             runCatching { DiagnosticLogging.record { report("Audio: focus change=$change activeTracks=${active.size}") } }
             when (change) {
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> setMediaVolume(DUCKED_VOLUME)
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    // The iPhone already mixes/ducks its own navigation. The Hongqi navigation
+                    // request selects the wheel's volume target; do not duck our music a second time.
+                    if (!ownNavigationFocusHeld()) setMediaVolume(DUCKED_VOLUME)
+                }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                     if (muteMediaOnTransientLoss) {
                         // This reports a temporary Android focus owner, not a confirmed call.
@@ -224,11 +229,17 @@ class AndroidMediaSink(
     private val appContext = context?.applicationContext
     private val ambientSinkToken = AmbientMusicController.openSink(appContext)
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
+    private val navigationAudioFocus = NavigationAudioFocusCoordinator(
+        appContext,
+        audioFocusEnabled && appContext != null && Hs5HeadUnit.isHeadUnit(appContext),
+        onAudioDiagnostic,
+    )
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
         audioFocusEnabled,
         audioFocusAutoYield,
         onAudioDiagnostic,
+        ownNavigationFocusHeld = { navigationAudioFocus.held },
     )
 
     /** The media-key session may own Android's current focus request for this same sink. */
@@ -639,6 +650,7 @@ class AndroidMediaSink(
         recoveryExecutor.shutdownNow()
         // Audio workers close asynchronously; none may reacquire focus after their sink closes.
         audioFocusCoordinator.close()
+        navigationAudioFocus.close()
         audioRenderers.values.forEach(AudioRenderer::close)
         audioRenderers.clear()
         callEchoReferences.clear()
@@ -709,6 +721,7 @@ class AndroidMediaSink(
             mediaChannel,
             navigationChannel,
             audioFocusCoordinator,
+            navigationAudioFocus,
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
@@ -1729,6 +1742,7 @@ private class AudioRenderer(
     private val mediaChannel: Int,
     private val navigationChannel: Int,
     private val audioFocusCoordinator: AudioFocusCoordinator,
+    private val navigationAudioFocus: NavigationAudioFocusCoordinator,
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
@@ -1823,6 +1837,7 @@ private class AudioRenderer(
         AmbientMusicController.closeRenderer(ambientRendererToken)
         running = false
         NavigationPlayback.close(navigationPlaybackToken)
+        navigationAudioFocus.release(navigationPlaybackToken)
         thread.interrupt()
     }
 
@@ -1928,7 +1943,7 @@ private class AudioRenderer(
         }
         val selection = mappedSelection()
         mappedChannel = selection.channel
-        val streamOverride = channelOverride(selection.channel)
+        val streamOverride = channelOverride(selection)
         actualLegacyStreamType = streamOverride.takeIf { it != 0 }
         var attributes = audioAttributesFor(selection, streamOverride)
         trackAttributes = attributes
@@ -2013,16 +2028,25 @@ private class AudioRenderer(
     }
 
     /** 0 uses usage-based routing; 1–20 attempt legacy stream types supported by the head unit. */
-    private fun channelOverride(channel: AudioChannel): Int = when (channel) {
-        AudioChannel.MEDIA -> mediaChannel
-        AudioChannel.NAVIGATION -> navigationChannel
-        else -> 0
+    private fun channelOverride(selection: AudioChannelSelection): Int {
+        if (selection.channel == AudioChannel.NAVIGATION && navigationAudioFocus.navigationAttributes != null) {
+            return 0
+        }
+        return AudioChannelRouting.legacyStreamOverride(
+            selection = selection,
+            mediaChannel = mediaChannel,
+            navigationChannel = navigationChannel,
+            useAutomaticNavigationStream = !advancedAudioChannelMapping,
+        )
     }
 
     private fun audioAttributesFor(
         selection: AudioChannelSelection,
         streamOverride: Int,
     ): AudioAttributes {
+        if (selection.channel == AudioChannel.NAVIGATION) {
+            navigationAudioFocus.navigationAttributes?.let { return it }
+        }
         if (streamOverride in AudioManager.STREAM_SYSTEM..AudioManager.STREAM_ACCESSIBILITY) {
             // Android accepts only its defined legacy stream IDs here. BYD audio policy can
             // map these standard streams to vehicle outputs; arbitrary channel numbers are
@@ -2049,6 +2073,7 @@ private class AudioRenderer(
             audioType = format.audioType,
             payloadType = format.payloadType,
             mode = mode,
+            navigationStreamType = navigationStreamType,
         )
         return if (speakerphoneCall) AudioChannelMapper.playCallOnSpeaker(selection) else selection
     }
@@ -2061,7 +2086,8 @@ private class AudioRenderer(
 
     /**
      * Shares a sink-level focus request across all active non-navigation renderers.
-     * Navigation guidance intentionally takes no focus: it overlays media without ducking it.
+     * Generic navigation overlays media without taking focus. Hongqi's volume-target focus is
+     * managed separately while navigation PCM is actually playing.
      */
     private fun requestAudioFocus() {
         val channel = mappedChannel ?: return
@@ -2082,20 +2108,6 @@ private class AudioRenderer(
         .setChannelMask(channelMask)
         .setEncoding(encoding)
         .build()
-
-    private fun streamType(): Int {
-        val mode = if (advancedAudioChannelMapping) {
-            AudioChannelMappingMode.AUTOMOTIVE_BUS
-        } else {
-            AudioChannelMappingMode.MOBILE_COMPATIBLE
-        }
-        return AudioChannelMapper.map(
-            audioType = format.audioType,
-            payloadType = format.payloadType,
-            mode = mode,
-            navigationStreamType = navigationStreamType,
-        ).streamType
-    }
 
     private fun aacAudioSpecificConfig(): ByteArray {
         val frequencyIndex = MediaCodecSupport.aacFrequencyIndex(format.sampleRate)
@@ -2359,21 +2371,32 @@ private class AudioRenderer(
     private fun startPlayback(track: AudioTrack) {
         diagnosticStage = "track-play"
         underrunsAtPlaybackStart = track.underrunCount
+        prepareNavigationFocus(track)
         track.play()
         playbackStarted = true
         reportNavigationPlayback(track)
     }
 
+    private fun prepareNavigationFocus(track: AudioTrack) {
+        if (mappedChannel != AudioChannel.NAVIGATION) return
+        runCatching {
+            val pendingFrames = bufferProgress.queuedBytes(track.playbackHeadPosition) / frameBytes
+            val bufferedMillis = (pendingFrames * 1000L + format.sampleRate - 1L) / format.sampleRate
+            NavigationPlayback.played(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis)
+            navigationAudioFocus.prepare(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis)
+        }
+    }
+
     private fun reportNavigationPlayback(track: AudioTrack) {
-        if (!DiagnosticLogging.enabled) return
         if (!running) return
         val priorityVoice = mappedChannel == AudioChannel.PHONE || mappedChannel == AudioChannel.ASSISTANT
         if (mappedChannel != AudioChannel.NAVIGATION && !priorityVoice) return
-        // The optional key-routing hint must never interrupt audio on unusual vendor ROMs.
+        // Playback state is needed with diagnostic recording off as well.
         runCatching {
             val pendingFrames = bufferProgress.queuedBytes(track.playbackHeadPosition) / frameBytes
             val bufferedMillis = (pendingFrames * 1000L + format.sampleRate - 1L) / format.sampleRate
             NavigationPlayback.played(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis, priorityVoice)
+            navigationAudioFocus.played(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis, priorityVoice)
         }
     }
 
@@ -2483,6 +2506,7 @@ private class AudioRenderer(
     @Synchronized
     private fun release() {
         NavigationPlayback.close(navigationPlaybackToken)
+        navigationAudioFocus.release(navigationPlaybackToken)
         AmbientMusicController.closeRenderer(ambientRendererToken)
         abandonAudioFocus()
         val codec = codec

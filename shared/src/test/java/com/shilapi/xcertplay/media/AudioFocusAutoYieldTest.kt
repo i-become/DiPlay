@@ -84,6 +84,22 @@ class AudioFocusAutoYieldTest {
         assertTrue(volumes(phone).isEmpty())
     }
 
+    @Test fun ownNavigationFocusDoesNotDuckMusicAgainButExternalFocusStillDoes() {
+        var navigationHeld = true
+        val coordinator = AudioFocusCoordinator(context, true, ownNavigationFocusHeld = { navigationHeld })
+            .also(coordinators::add)
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+        assertTrue(volumes(media).isEmpty())
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertEquals(listOf(0f), volumes(media))
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        navigationHeld = false
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+        assertEquals(listOf(0f, 1f, 0.2f), volumes(media))
+    }
+
     @Test fun optionOffKeepsTransientAudioAndFocusOffIgnoresForwardedEvents() {
         val optionOff = coordinator(autoYield = false)
         val first = track()

@@ -3,6 +3,7 @@ package com.shilapi.xcertplay
 import android.content.Context
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import java.io.File
 
 /** Strict projection target, discovered afresh through the authorized shell. */
@@ -63,6 +64,7 @@ internal object AdbClusterRouter {
     }
 
     fun launch(context: Context, token: String, holdStockMap: Boolean = true, prepare: (Int) -> Boolean): Result {
+        val recordingToken = DiagnosticLogging.generation
         var success = false
         val text = buildString {
             appendLine("ADB direct cluster launch capturedAt=${java.util.Date()}")
@@ -93,7 +95,9 @@ internal object AdbClusterRouter {
             }
         }
         // A failed diagnostic write must not leave launchPending stuck forever.
-        runCatching { File(context.filesDir, REPORT).writeText(text) }
+        DiagnosticLogging.write(recordingToken) {
+            runCatching { File(context.filesDir, REPORT).writeText(text) }
+        }
         return Result(success, text)
     }
 

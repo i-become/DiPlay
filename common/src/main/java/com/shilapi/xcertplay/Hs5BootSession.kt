@@ -12,6 +12,7 @@ import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.CarPlayMediaEngine
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
+import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
@@ -50,7 +51,9 @@ internal object Hs5BootSession {
                         videoWidth = profile.config.main.widthPixels,
                         videoHeight = profile.config.main.heightPixels,
                         preferSoftwareHevcDecoder = AirPlayPersistence.loadHevcSoftwareDecoderEnabled(app),
-                        advancedAudioChannelMapping = AirPlayPersistence.loadAdvancedAudioChannelMapping(app),
+                        advancedAudioChannelMapping =
+                            app.resources.getBoolean(R.bool.config_advanced_audio_channel_mapping) &&
+                                AirPlayPersistence.loadAdvancedAudioChannelMapping(app),
                         audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(app),
                         audioFocusAutoYield = AirPlayPersistence.loadAudioFocusAutoYield(app),
                         mediaChannel = AirPlayPersistence.loadMediaAudioChannel(app),

@@ -27,8 +27,8 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 1301
-        versionName = "1.3.1"
+        versionCode = 1306
+        versionName = "1.3.6"
 
     }
 
@@ -67,17 +67,35 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // Match the app's seven languages, including both Chinese scripts.
+        // Region variants must be listed explicitly; language-only filters do not keep them.
+        localeFilters += setOf(
+            "en", "en-rAU", "en-rCA", "en-rGB", "en-rIN", "en-rXC",
+            "zh", "zh-rCN", "zh-rHK", "zh-rTW",
+            "ar", "ru", "es", "es-rUS", "uk",
+        )
+    }
+    packaging {
+        resources {
+            // Only lightweight Bouncy Castle primitives are used; R8 removes all Picnic
+            // classes, but cannot remove their unreferenced algorithm lookup tables.
+            excludes += setOf(
+                "org/bouncycastle/pqc/crypto/picnic/lowmcL1.bin.properties",
+                "org/bouncycastle/pqc/crypto/picnic/lowmcL3.bin.properties",
+                "org/bouncycastle/pqc/crypto/picnic/lowmcL5.bin.properties",
+            )
+        }
+    }
 }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(project(":common"))
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.app.projected)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)

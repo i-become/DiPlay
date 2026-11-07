@@ -45,4 +45,7 @@ android {
 
 dependencies {
     implementation(project(":common"))
+    // Only the AAOS app exposes a Car App Library service. Do not pull its
+    // manifest components and keep rules into the standalone head-unit APK.
+    implementation(libs.androidx.app)
 }

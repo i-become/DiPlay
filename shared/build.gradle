@@ -38,7 +38,8 @@ android {
     }
 }
 dependencies {
-    implementation libs.androidx.app
+    // API annotations are needed only to compile the platform adapters.
+    compileOnly libs.androidx.annotation
     implementation libs.bouncycastle
     implementation libs.jmdns
     testImplementation libs.junit
