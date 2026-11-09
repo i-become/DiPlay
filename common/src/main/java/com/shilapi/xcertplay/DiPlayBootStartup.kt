@@ -24,6 +24,8 @@ internal object DiPlayBootStartup {
         if (!Hs5HeadUnit.isHeadUnit(app)) return
         Hs5BootBluetoothWarmup.scheduleIfNeeded(app)
         if (launchEnabled) {
+            // Schedule directly from process/boot entry, before Service or Activity dispatch.
+            Hs5BootSession.schedule(app)
             DiPlaySessionService.startWarmup(app)
         }
         Hs5HongqiStartupWarmup.schedule(app)

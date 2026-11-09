@@ -10,6 +10,22 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class ClusterTurnOverlayExpiryTest {
+    @Test fun lateLaneOnlyEventPublishesWithoutAManeuverAndExpires() = withRoute { route, advance, events ->
+        route.clear()
+        Hs5NavigationOutputs.onFrame(com.shilapi.xcertplay.iap2.message.Iap2Messages.buildRaw(0x5201) {
+            u16(0x10, 17); u8(0x12, 1)
+        })
+        assertNull(events.last())
+        Hs5NavigationOutputs.onFrame(com.shilapi.xcertplay.iap2.message.Iap2Messages.buildRaw(0x5204) {
+            u16(1, 17); group(2) { u16(0, 0); u8(1, 2); i16(2, 0); i16(2, 90); i16(3, 90) }
+        })
+        assertEquals(0, events.last()!!.icon)
+        assertEquals(listOf(0, 90), events.last()!!.lanes.single().directions)
+        assertEquals(90, events.last()!!.lanes.single().selectedDirection)
+        advance(30_000_000_000L)
+        Hs5NavigationOutputs.refreshTurnOverlay()
+        assertNull(events.last())
+    }
     @Test fun silentRouteClearsThePublishedCardWithoutAnotherPhonePacket() = withRoute { route, advance, events ->
         advance(120_000_000_000L)
         assertNull(route.currentApple())
@@ -54,7 +70,7 @@ class ClusterTurnOverlayExpiryTest {
         Hs5NavigationOutputs.refreshTurnOverlay()
         assertNull(route.currentApple())
         assertNull(events.last())
-        route.accept(Hs5RouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x01, 2))
+        route.clear() // Explicit session stop, rather than guessing state two means arrival.
         route.accept(Hs5RouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x0a, 0, 0, 0, 5))
         assertNull(route.currentApple())
     }

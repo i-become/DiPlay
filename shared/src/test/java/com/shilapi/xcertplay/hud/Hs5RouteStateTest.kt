@@ -4,6 +4,7 @@ import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Hs5RouteStateTest {
@@ -43,7 +44,7 @@ class Hs5RouteStateTest {
     fun `route end clears guidance`() {
         val state = populatedState()
 
-        val change = state.accept(Hs5RouteState.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x01, 2)))
+        val change = state.accept(Hs5RouteState.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x01, 0)))
 
         assertEquals(Hs5RouteChange.CLEAR, change)
         assertNull(state.current())
@@ -61,13 +62,14 @@ class Hs5RouteStateTest {
     }
 
     @Test
-    fun `overlay still clears on arrival even when NoRouteSet is ignored`() {
+    fun `overlay retains uncertain state two`() {
         val state = populatedState(keepAcrossNoRoute = true)
+        val before = state.current()
 
         val change = state.accept(Hs5RouteState.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x01, 2)))
 
-        assertEquals(Hs5RouteChange.CLEAR, change)
-        assertNull(state.current())
+        assertEquals(Hs5RouteChange.GUIDANCE, change)
+        assertEquals(before, state.current())
     }
 
     @Test
@@ -190,11 +192,7 @@ class Hs5RouteStateTest {
         assertEquals(90, maneuver.exitAngle)
         assertEquals("Exit 12", maneuver.exitInfo)
         assertEquals(3, maneuver.laneGuidanceIndex)
-        assertEquals("Use the 2 left lanes", maneuver.laneGuidanceDescription)
-        assertEquals(2, maneuver.lanes.size)
-        assertEquals(2, maneuver.lanes[0].status)
-        assertEquals(90, maneuver.lanes[0].highlightedAngle)
-        assertEquals(listOf(255, -90), maneuver.lanes[1].angles)
+        assertTrue(maneuver.lanes.isEmpty()) // Unsupported geometry hides the event.
     }
 
     @Test

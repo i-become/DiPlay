@@ -47,6 +47,7 @@ internal class AudioFocusCoordinator(
     private val muteMediaOnTransientLoss: Boolean = true,
     private val report: (String) -> Unit = {},
     private val ownNavigationFocusHeld: () -> Boolean = { false },
+    private val keepMusicDuringCall: () -> Boolean = { false },
 ) {
     private data class Entry(val channel: AudioChannel, val attributes: AudioAttributes, var appliedVolume: Float = FULL_VOLUME)
 
@@ -79,10 +80,10 @@ internal class AudioFocusCoordinator(
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     // The iPhone already mixes/ducks its own navigation. The Hongqi navigation
                     // request selects the wheel's volume target; do not duck our music a second time.
-                    if (!ownNavigationFocusHeld()) setMediaVolume(DUCKED_VOLUME)
+                    if (!ownNavigationFocusHeld() && !keepMusicDuringCall()) setMediaVolume(DUCKED_VOLUME)
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                    if (muteMediaOnTransientLoss) {
+                    if (muteMediaOnTransientLoss && !keepMusicDuringCall()) {
                         // This reports a temporary Android focus owner, not a confirmed call.
                         DiagnosticLogging.logcat { Log.i(TAG, "Audio: muting media during transient focus loss") }
                         setMediaVolume(0f)
@@ -107,6 +108,9 @@ internal class AudioFocusCoordinator(
     fun release(track: AudioTrack) {
         if (active.remove(track) != null) refreshRequest()
     }
+
+    @Synchronized
+    fun callPolicyChanged() { if (keepMusicDuringCall()) setMediaVolume(FULL_VOLUME) }
 
     fun onExternalFocusChange(change: Int) {
         val current = synchronized(this) { currentListener }
@@ -238,6 +242,7 @@ class AndroidMediaSink(
         audioFocusAutoYield,
         onAudioDiagnostic,
         ownNavigationFocusHeld = { navigationAudioFocus.held },
+        keepMusicDuringCall = { CallInterruptionSettings.keepMusic(appContext) },
     )
 
     /** The media-key session may own Android's current focus request for this same sink. */
@@ -516,6 +521,7 @@ class AndroidMediaSink(
         if (format.audioType == "media") updateMediaAudio(id, true)
         if (CarPlayTelephonyAudio.tracksCallLikeAudio(format.audioType)) {
             CarPlayTelephonyAudio.started(id, format.audioType)
+            audioFocusCoordinator.callPolicyChanged()
         }
     }
 
@@ -549,6 +555,7 @@ class AndroidMediaSink(
         try {
             if (CarPlayTelephonyAudio.tracksCallLikeAudio(config.audioType)) {
                 CarPlayTelephonyAudio.started(id, config.audioType)
+                audioFocusCoordinator.callPolicyChanged()
             }
             val speakerphoneCall = config.audioType == "telephony" &&
                 appContext != null && BluetoothSuspend.isSuspendedByUs(appContext)
@@ -580,7 +587,15 @@ class AndroidMediaSink(
         }
     }
 
-    private fun needsCommunicationMode(audioType: String): Boolean = when (audioType) {
+    fun onCallInterruptionSettingChanged() {
+        audioFocusCoordinator.callPolicyChanged()
+        if (!CallInterruptionSettings.enabled(appContext)) restoreAudioMode(null)
+        else microphoneUplinks.keys.firstOrNull { needsCommunicationMode(it.audioType) &&
+            !(it.audioType == "telephony" && appContext != null && BluetoothSuspend.isSuspendedByUs(appContext))
+        }?.let(::enterCommunicationMode)
+    }
+
+    private fun needsCommunicationMode(audioType: String): Boolean = CallInterruptionSettings.enabled(appContext) && when (audioType) {
         "telephony" -> true
         "speechrecognition" -> Hs5HeadUnit.detected
         else -> false

@@ -39,6 +39,24 @@ class AudioFocusAutoYieldTest {
         VolumeTrackingAudioTrack.volumes.clear()
     }
 
+    @Test fun callPolicyPreservesMusicAndCanRestoreAnAlreadyMutedTrack() {
+        var preserve = false
+        val coordinator = AudioFocusCoordinator(context, true, keepMusicDuringCall = { preserve })
+            .also(coordinators::add)
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.onExternalFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertEquals(listOf(0f), volumes(media))
+        preserve = true
+        coordinator.callPolicyChanged()
+        coordinator.onExternalFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        coordinator.onExternalFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+        assertEquals(listOf(0f, 1f), volumes(media))
+        preserve = false
+        coordinator.onExternalFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertEquals(listOf(0f, 1f, 0f), volumes(media))
+    }
+
     @Test fun transientLossMutesOnlyMediaAndGainPreservesUserStreamVolume() {
         val coordinator = coordinator()
         val media = track(); val phone = track(); val assistant = track(); val navigation = track()

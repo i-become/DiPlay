@@ -28,6 +28,7 @@ fun NewUiSettingsScreen(
     onCheckUpdate: () -> Unit,
     onCarPlayWheelMediaChanged: (Boolean) -> Unit,
     onCarPlayWheelSiriChanged: (Boolean) -> Unit,
+    onCallsInterruptMusicChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
@@ -44,6 +45,12 @@ fun NewUiSettingsScreen(
                     title = stringResource(R.string.settings_car_bluetooth_audio),
                     checked = state.carBluetoothAudio,
                     onCheckedChange = onCarBluetoothAudioChanged,
+                )
+                NewUiCompactToggleRow(
+                    title = stringResource(R.string.settings_calls_interrupt_music),
+                    subtitle = stringResource(R.string.settings_calls_interrupt_music_help),
+                    checked = state.callsInterruptMusic,
+                    onCheckedChange = onCallsInterruptMusicChanged,
                 )
                 if (state.showHs5SteeringKeys) {
                     val wheelKeysEnabled = !state.carBluetoothAudio

@@ -10,10 +10,13 @@ data class ClusterTurnGuidance(
     val arrivalEpochSeconds: Long? = null,
     val remainingSeconds: Long? = null,
     val remainingMeters: Long? = null,
+    val lanes: List<com.shilapi.xcertplay.glance.CarPlayLane> = emptyList(),
 ) {
     companion object {
         internal fun from(frame: Hs5GuidanceFrame): ClusterTurnGuidance {
-            return ClusterTurnGuidance(frame.icon, frame.roundaboutExit, frame.distanceMeters, frame.road)
+            return ClusterTurnGuidance(frame.icon, frame.roundaboutExit, frame.distanceMeters, frame.road,
+                lanes = frame.lanes.map { lane -> com.shilapi.xcertplay.glance.CarPlayLane(
+                    lane.position, lane.angles.first(), lane.status, lane.highlightedAngle, lane.angles) })
         }
     }
 }

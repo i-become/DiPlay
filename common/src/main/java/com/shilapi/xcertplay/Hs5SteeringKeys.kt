@@ -62,6 +62,7 @@ internal object Hs5SteeringKeys {
     @Volatile private var viewFocusSuppressed = false
     private var viewFocusCooldownUntil = 0L
     private var phoneKeyHeld = false
+    private var mediaRightHeld = false
     private var shuttingDown = false
 
     @Volatile private var hardKeyGeneration = 0L
@@ -136,6 +137,7 @@ internal object Hs5SteeringKeys {
         hostGeneration++
         phoneKeyHeld = false
         hostRef = WeakReference(null)
+        mediaRightHeld = false
         VoiceAssistantKeyController.reset()
         releaseAll()
     }
@@ -451,6 +453,7 @@ internal object Hs5SteeringKeys {
         viewFocusListener = ViewFocusListener()
         viewFocusSuppressed = false
         phoneKeyHeld = false
+        mediaRightHeld = false
     }
 
     private fun releaseHardKeysLocked(context: Context, binder: IBinder) {
@@ -478,6 +481,7 @@ internal object Hs5SteeringKeys {
         registeredKeyCodes = intArrayOf()
         hardKeyListener = null
         phoneKeyHeld = false
+        mediaRightHeld = false
     }
 
     private fun releaseViewFocusLocked(binder: IBinder) {
@@ -524,6 +528,18 @@ internal object Hs5SteeringKeys {
         if (keyCode == KeyEvent.KEYCODE_CALL) {
             onPhoneKey(action, active)
             return
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) {
+            if (action == 1) {
+                if (!mediaRightHeld && AirPlayPersistence.loadCarPlayWheelMedia(context) &&
+                    Hs5NavigationOutputs.carPlayCall() == null && !CarPlayTelephonyAudio.active()) {
+                    CarPlayMediaKeys.onExternalMediaKey(CarPlayMediaButton.PLAY_PAUSE, "hs5-steer-long-right")
+                }
+                mediaRightHeld = true
+                return
+            }
+            if (action == 2) { mediaRightHeld = false; return }
+            if (mediaRightHeld) return
         }
         if (action != HARD_KEY_ACTION_DOWN) return
         val role = QisiSteeringServiceClient.carPlayActionForFactoryKey(keyCode) ?: return

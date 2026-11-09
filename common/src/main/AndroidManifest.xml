@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
+        <package android:name="com.alfus.controller" />
         <package android:name="ltd.qisi.sotasupportapp" />
         <package android:name="ltd.qisi.adapterservice" />
         <package android:name="ltd.qisi.systemservice" />

@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.hud
 
 import com.shilapi.xcertplay.glance.CarPlayLaneState
+import com.shilapi.xcertplay.glance.CarPlayLaneGuidance
 
 internal data class Hs5Guidance(
     val distanceMeters: Int,
@@ -60,7 +61,7 @@ internal class Hs5RouteState(
     /**
      * The dashboard overlay keeps the last instruction across a wireless session drop: the iPhone
      * often sends NoRouteSet (0) while the tunnel is tearing down, which is not a real arrival.
-     * Arrived (2) still ends the route. The overlay's own stale window retires a truly ended one.
+     * State 2 has uncertain semantics and retains the route. The overlay's own stale window retires a truly ended one.
      */
     private val keepAcrossNoRoute: Boolean = false,
 ) {
@@ -88,26 +89,37 @@ internal class Hs5RouteState(
     private var laneGuidanceIndex = -1
     private var laneGuidanceShowing = false
     private var laneGuidanceTotal = 0
-    private val laneBlocks = linkedMapOf<Int, List<Hs5LaneInfo>>()
-    private val laneDescriptions = linkedMapOf<Int, String>()
     /** Canonical parser for the iAP2 parameter-list lane event (0x5204). */
-    private val protocolLaneState = CarPlayLaneState()
+    private val protocolLaneState = CarPlayLaneState { nanoTime() }
     private var emptyListSinceNs: Long? = null
     private var lastRouteUpdateNs: Long? = null
+    internal fun monotonicNow(): Long = nanoTime()
+    internal fun currentLaneBlock(): CarPlayLaneState.Current? = protocolLaneState.currentBlock()
+    internal fun clearLaneMetadata() { protocolLaneState.clear() }
 
     fun accept(messageId: Int, payload: ByteArray): Hs5RouteChange {
         if (!validTlvs(payload)) return Hs5RouteChange.NONE
+        if (messageId == ROUTE_GUIDANCE_UPDATE) {
+            val valid = runCatching {
+                val fields = CarPlayLaneGuidance.fields(payload)
+                if (!CarPlayLaneGuidance.acceptsComponent(fields)) return Hs5RouteChange.NONE
+                CarPlayLaneGuidance.scalar(fields, 1, 1)
+                CarPlayLaneGuidance.scalar(fields, 0x10, 2)
+                CarPlayLaneGuidance.scalar(fields, 0x11, 2)
+                CarPlayLaneGuidance.scalar(fields, 0x12, 1)
+            }.isSuccess
+            if (!valid) return Hs5RouteChange.NONE
+        }
         val protocolLaneAccepted = if (messageId == LANE_GUIDANCE_UPDATE) {
             protocolLaneState.acceptLanes(payload)
         } else null
         val change = when (messageId) {
             ROUTE_GUIDANCE_UPDATE -> parseRouteUpdate(payload)
             ROUTE_GUIDANCE_MANEUVER_UPDATE -> parseManeuverUpdate(payload)
-            // The parameter-list decoder is authoritative for 0x5204. The legacy nested-TLV
-            // parser is retained only for older captures that do not conform to that format.
+            // Only the validated parameter-list decoder may commit lane data.
             LANE_GUIDANCE_UPDATE -> if (protocolLaneAccepted == true) {
                 if (current() != null) Hs5RouteChange.GUIDANCE else Hs5RouteChange.NONE
-            } else parseLaneUpdate(payload)
+            } else Hs5RouteChange.NONE
             else -> Hs5RouteChange.NONE
         }
         // Lane events are independent of route updates and may be prefetched. Keep the
@@ -136,20 +148,15 @@ internal class Hs5RouteState(
         val protocolLanes = protocolLaneState.currentBlock()
         val selectedLaneIndex = protocolLanes?.index ?: laneGuidanceIndex
         val selectedLanes = protocolLanes?.lanes?.map { lane ->
-            Hs5LaneInfo(
-                position = lane.index,
-                status = lane.status,
-                angles = lane.directions,
-                highlightedAngle = lane.highlightedDirection,
-            )
-        } ?: if (laneGuidanceShowing) laneBlocks[laneGuidanceIndex].orEmpty() else emptyList()
+            Hs5LaneInfo(lane.index, lane.status, lane.directions.distinct(), lane.highlightedDirection)
+        }.orEmpty()
         return Hs5AppleManeuver(
             distanceMeters, maneuver.type, maneuver.drivingSide,
             roadFor(maneuver), remainingSeconds, remainingMeters, arrivalEpochSeconds,
             destination, maneuver.junctionType, maneuver.junctionAngles, maneuver.exitAngle,
             maneuver.exitInfo, maneuver.linkedLaneGuidanceIndex, selectedLaneIndex,
-            protocolLanes != null || laneGuidanceShowing, laneGuidanceTotal,
-            laneDescriptions[selectedLaneIndex].orEmpty(), selectedLanes,
+            protocolLanes != null, laneGuidanceTotal,
+            "", selectedLanes,
         )
     }
 
@@ -175,8 +182,6 @@ internal class Hs5RouteState(
         laneGuidanceIndex = -1
         laneGuidanceShowing = false
         laneGuidanceTotal = 0
-        laneBlocks.clear()
-        laneDescriptions.clear()
         protocolLaneState.clear()
         emptyListSinceNs = null
         lastRouteUpdateNs = null
@@ -234,9 +239,9 @@ internal class Hs5RouteState(
             }
         }
 
-        // Only NoRouteSet (0) and Arrived (2) end the route. A wireless handoff often sends
+        // Only explicit state zero ends the route. A wireless handoff often sends
         // NoRouteSet while the session is still coming back — keep the overlay instruction then.
-        if (state == 0 || state == 2) {
+        if (state == 0) {
             return if (clear()) Hs5RouteChange.CLEAR else Hs5RouteChange.NONE
         }
         // The iPhone briefly sends an empty current list every few seconds and while rerouting. Keep the last
@@ -295,81 +300,6 @@ internal class Hs5RouteState(
         return if (current() != null) Hs5RouteChange.GUIDANCE else Hs5RouteChange.NONE
     }
 
-    private fun parseLaneUpdate(data: ByteArray): Hs5RouteChange {
-        var index = -1
-        var description = ""
-        var lanes = emptyList<Hs5LaneInfo>()
-        forEachTlv(data) { id, value, valueLength ->
-            when (id) {
-                0x0001 -> index = when {
-                    valueLength >= 2 -> u16(data, value)
-                    valueLength == 1 -> data[value].toInt() and 0xff
-                    else -> -1
-                }
-                0x0002 -> lanes = parseLaneInformations(data, value, valueLength)
-                0x0003 -> description = utf8(data, value, valueLength)
-            }
-        }
-        if (index < 0) return Hs5RouteChange.NONE
-        laneBlocks[index] = lanes.take(MAX_LANES)
-        laneDescriptions[index] = description
-        while (laneBlocks.size > MAX_LANE_BLOCKS) {
-            val first = laneBlocks.keys.firstOrNull { it != laneGuidanceIndex } ?: break
-            laneBlocks.remove(first)
-            laneDescriptions.remove(first)
-        }
-        return if (current() != null) Hs5RouteChange.GUIDANCE else Hs5RouteChange.NONE
-    }
-
-    private fun parseLaneInformations(data: ByteArray, offset: Int, length: Int): List<Hs5LaneInfo> {
-        val end = offset + length
-        if (offset < 0 || length < 0 || end > data.size) return emptyList()
-        val result = mutableListOf<Hs5LaneInfo>()
-        var position = -1
-        var status = -1
-        val angles = mutableListOf<Int>()
-        var highlighted: Int? = null
-        fun flush() {
-            if (position >= 0 || status >= 0 || angles.isNotEmpty() || highlighted != null) {
-                result += Hs5LaneInfo(position, status, angles.toList(), highlighted)
-            }
-            position = -1
-            status = -1
-            angles.clear()
-            highlighted = null
-        }
-        var cursor = offset
-        while (cursor + TLV_HEADER_BYTES <= end) {
-            val subLength = u16(data, cursor)
-            if (subLength < TLV_HEADER_BYTES || cursor + subLength > end) return result
-            val subId = u16(data, cursor + 2)
-            val value = cursor + TLV_HEADER_BYTES
-            val valueLength = subLength - TLV_HEADER_BYTES
-            when (subId) {
-                0x0000 -> {
-                    flush()
-                    position = when {
-                        valueLength >= 2 -> u16(data, value)
-                        valueLength == 1 -> data[value].toInt() and 0xff
-                        else -> result.size
-                    }
-                }
-                0x0001 -> if (valueLength >= 1) status = data[value].toInt() and 0xff
-                0x0002 -> {
-                    var i = 0
-                    while (i + 1 < valueLength && angles.size < MAX_LANE_ANGLES) {
-                        angles += u16(data, value + i).toShort().toInt()
-                        i += 2
-                    }
-                }
-                0x0003 -> if (valueLength >= 2) highlighted = u16(data, value).toShort().toInt()
-            }
-            cursor += subLength
-        }
-        if (cursor == end) flush()
-        return result
-    }
-
     private fun decodeLaneIndex(data: ByteArray, offset: Int, length: Int): Int = when {
         length >= 2 -> u16(data, offset)
         length == 1 -> data[offset].toInt() and 0xff
@@ -421,9 +351,6 @@ internal class Hs5RouteState(
         private const val TLV_HEADER_BYTES = 4
         private const val STALE_ROUTE_NS = 30_000_000_000L
         private const val EMPTY_LIST_HIDE_NS = 3_000_000_000L
-        private const val MAX_LANES = 16
-        private const val MAX_LANE_ANGLES = 16
-        private const val MAX_LANE_BLOCKS = 8
         private const val MAX_JUNCTION_ANGLES = 16
     }
 }

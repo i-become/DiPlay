@@ -129,6 +129,7 @@ class NewUiActivity : ComponentActivity() {
     private var clusterNavMarkerX by mutableStateOf(50)
     private var clusterNavMarkerY by mutableStateOf(45)
     private var clusterNavigationCrop by mutableStateOf(0)
+    private var clusterNavigationZoom by mutableStateOf(100)
     private var diagnosticsSubpage by mutableStateOf(NewUiDiagnosticsSubpage.MAIN)
     private var vehicleIconRevision by mutableStateOf(0)
     private var diagnosticReportTitle by mutableStateOf("")
@@ -347,6 +348,11 @@ class NewUiActivity : ComponentActivity() {
                                 xPercent = clusterNavMarkerX,
                                 yPercent = clusterNavMarkerY,
                                 navigationCrop = clusterNavigationCrop,
+                                navigationZoom = clusterNavigationZoom,
+                                onNavigationZoom = { value ->
+                                    com.shilapi.xcertplay.ClusterMapCropSettings.saveZoom(activity, value)
+                                    clusterNavigationZoom = value
+                                },
                                 onNavigationCrop = { value ->
                                     com.shilapi.xcertplay.ClusterMapCropSettings.save(activity, value)
                                     clusterNavigationCrop = value
@@ -597,6 +603,12 @@ class NewUiActivity : ComponentActivity() {
                                         NewUiSettingsActions.saveCarBluetoothAudio(activity, enabled)
                                     }
                                 },
+                                onCallsInterruptMusicChanged = { enabled ->
+                                    com.shilapi.xcertplay.media.CallInterruptionSettings.save(activity, enabled)
+                                    com.shilapi.xcertplay.telecom.PhoneAudioRoute.settingsChanged(activity)
+                                    CarPlayBackgroundSession.snapshot()?.sink?.onCallInterruptionSettingChanged()
+                                    refreshAll()
+                                },
                                 onAudioFocusChanged = { enabled ->
                                     applyWithReconnectConfirm(
                                         title = getString(R.string.contrib_audio_home_toggle_audio_focus),
@@ -787,6 +799,7 @@ class NewUiActivity : ComponentActivity() {
         clusterNavMarkerX = AirPlayPersistence.loadClusterMarkerXPercent(this)
         clusterNavMarkerY = AirPlayPersistence.loadClusterMarkerYPercent(this)
         clusterNavigationCrop = com.shilapi.xcertplay.ClusterMapCropSettings.load(this)
+        clusterNavigationZoom = com.shilapi.xcertplay.ClusterMapCropSettings.loadZoom(this)
         settingsState = NewUiSettingsStateReader.read(this)
         diagnosticStoragePath = NewUiDiagnosticsRepository.storageHint(this)
         diagnosticReports = NewUiDiagnosticsRepository.listReports(this)

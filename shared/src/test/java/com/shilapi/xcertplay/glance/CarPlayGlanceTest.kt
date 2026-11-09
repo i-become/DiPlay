@@ -46,7 +46,7 @@ class CarPlayGlanceTest {
         CarPlayGlance.setConnected(true)
         val lane = frame(0x5204) {
             u16(0, 42); u16(1, 0)
-            group(2) { u16(0, 0); u8(1, 2); i16(2, 0); i16(2, 90); i16(3, 90) }
+            group(2) { u16(0, 0); u8(1, 0); i16(2, 0); i16(2, 90); i16(3, 90) }
         }
         CarPlayGlance.onFrame(lane)
         assertEquals("CarPlay lane diagnostics disabled", CarPlayGlance.laneDiagnosticReport())
@@ -54,7 +54,7 @@ class CarPlayGlanceTest {
         repeat(40) { CarPlayGlance.onFrame(lane) }
         CarPlayGlance.onFrame(frame(0x5204) { u16(0, 41); u16(1, 0) })
         val report = CarPlayGlance.laneDiagnosticReport()
-        assertTrue(report.contains("lanePackets=41 rejectedLanePackets=1"))
+        assertTrue(report.contains("lanePackets=41 rejectedLanePackets=0"))
         assertEquals(12, report.lineSequence().count { it.startsWith("id=") })
         logging.setEnabled(false)
         logging.setEnabled(true)
@@ -106,7 +106,7 @@ class CarPlayGlanceTest {
         CarPlayGlance.onFrame(frame(0x5001) { group(0) { string(1, "Podcast") } })
 
         // Arrived: no turn any more, the song stays.
-        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 0) })
         assertNull(CarPlayGlance.snapshot().maneuverType)
         assertEquals("Podcast", CarPlayGlance.snapshot().song)
 
@@ -182,7 +182,7 @@ class CarPlayGlanceTest {
             assertEquals(false, CarPlayGlance.snapshot().navigating)
             CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1) })
             assertTrue(CarPlayGlance.snapshot().navigating)
-            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+            CarPlayGlance.onFrame(frame(0x5201) { u8(1, 0) })
             assertEquals(false, CarPlayGlance.snapshot().navigating)
             CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1) })
             advance(30_000_000_000L)
@@ -214,7 +214,7 @@ class CarPlayGlanceTest {
             }
             val lane = frame(0x5204) {
                 u16(0, 42); u16(1, 0)
-                group(2) { u16(0, 0); u8(1, 2); i16(2, 90) }
+                group(2) { u16(0, 0); u8(1, 0); i16(2, 90) }
             }
             CarPlayGlance.onFrame(update)
             CarPlayGlance.onFrame(lane)
@@ -224,7 +224,7 @@ class CarPlayGlanceTest {
             assertEquals(12800L, now.remainingMeters)
             assertEquals(1080L, now.remainingSeconds)
             assertEquals(1792904280L, now.arrivalEpochSeconds)
-            for (end in listOf(0, 2)) {
+            for (end in listOf(0)) {
                 CarPlayGlance.onFrame(frame(0x5201) { u8(1, end) })
                 val ended = CarPlayGlance.snapshot()
                 assertTrue(ended.lanes.isEmpty())
@@ -235,6 +235,26 @@ class CarPlayGlanceTest {
             val stale = CarPlayGlance.snapshot()
             assertTrue(stale.lanes.isEmpty())
             assertNull(stale.remainingMeters); assertNull(stale.remainingSeconds); assertNull(stale.arrivalEpochSeconds)
+        }
+    }
+
+    @Test fun expiryTimerNotifiesWithoutPollingAndDisconnectCancelsIt() {
+        withRouteClock { advance ->
+            CarPlayGlance.setConnected(true)
+            CarPlayGlance.onFrame(frame(0x5201) { u16(0x10, 7); u8(0x12, 1) })
+            CarPlayGlance.onFrame(frame(0x5204) {
+                u16(1, 7); group(2) { u16(0, 0); u8(1, 2); i16(2, 0) }
+            })
+            assertEquals(1, CarPlayGlance.snapshot().lanes.size)
+            val expired = java.util.concurrent.CountDownLatch(1)
+            val release = CarPlayGlance.subscribe { if (it.lanes.isEmpty()) expired.countDown() }
+            try {
+                advance(30_000_000_000L)
+                assertTrue("Scheduled expiry must notify without snapshot()", expired.await(4, java.util.concurrent.TimeUnit.SECONDS))
+                CarPlayGlance.setConnected(false)
+                val task = CarPlayGlance.javaClass.getDeclaredField("expiryTask").apply { isAccessible = true }
+                assertNull(task.get(CarPlayGlance))
+            } finally { release() }
         }
     }
 
@@ -250,7 +270,7 @@ class CarPlayGlanceTest {
             try {
                 val lane = frame(0x5204) {
                     u16(0, 42); u16(1, 0)
-                    group(2) { u16(0, 0); u8(1, 2); i16(2, 90) }
+                    group(2) { u16(0, 0); u8(1, 0); i16(2, 90) }
                 }
                 CarPlayGlance.onFrame(lane)
                 assertEquals(90, seen.last().lanes.single().direction)
@@ -260,7 +280,7 @@ class CarPlayGlanceTest {
                 assertTrue(CarPlayGlance.snapshot().lanes.isEmpty())
                 CarPlayGlance.onFrame(lane)
                 assertEquals(1, CarPlayGlance.snapshot().lanes.size)
-                CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+                CarPlayGlance.onFrame(frame(0x5201) { u8(1, 0) })
                 assertTrue(CarPlayGlance.snapshot().lanes.isEmpty())
                 CarPlayGlance.setConnected(false)
                 CarPlayGlance.onFrame(lane)

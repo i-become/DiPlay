@@ -20,7 +20,7 @@ object Hs5HeadUnit {
      * capture source often records silence; voice-communication and [android.media.AudioManager] call
      * mode match what Siri and WeChat VoIP need.
      */
-    val detected: Boolean = run {
+    val detected: Boolean get() = run {
         val tags = listOf(
             Build.BRAND,
             Build.MANUFACTURER,

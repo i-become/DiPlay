@@ -224,6 +224,7 @@ internal class ClusterDashboardView(
     private fun updateMapViewport() {
         val crop = ClusterMapViewport.navigation(state.guidance.connected && state.guidance.navigating,
             readNavigationCrop(), AirPlayPersistence.loadClusterMarkerYPercent(context))
+            .zoom(ClusterMapCropSettings.loadZoom(context), AirPlayPersistence.loadClusterMarkerYPercent(context))
         // API 28 SurfaceView transforms are composed by the platform. Keep holder dimensions,
         // decoder ownership and Surface identity unchanged when navigation starts/stops.
         mapSurface.pivotX = 0f

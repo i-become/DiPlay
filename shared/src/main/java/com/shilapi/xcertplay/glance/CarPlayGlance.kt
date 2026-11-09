@@ -4,6 +4,9 @@ import com.shilapi.xcertplay.hud.Hs5RouteState
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * What CarPlay is doing, at a glance, for widgets and other screens outside CarPlay: the next
@@ -26,12 +29,18 @@ object CarPlayGlance {
         val playing: Boolean = false,
         val navigating: Boolean = false,
         val lanes: List<CarPlayLane> = emptyList(),
-    )
+    ) {
+        val laneSourceType: String get() = if (lanes.isEmpty()) "none" else "metadata"
+    }
 
     private val route = Hs5RouteState()
     private var connected = false
     private var last = Snapshot()
-    private val laneState = CarPlayLaneState()
+    private val laneState = CarPlayLaneState { route.monotonicNow() }
+    private val expiryExecutor by lazy {
+        Executors.newSingleThreadScheduledExecutor { task -> Thread(task, "carplay-guidance-expiry").apply { isDaemon = true } }
+    }
+    private var expiryTask: ScheduledFuture<*>? = null
     private var evidenceGeneration = -1L
     private var evidenceStop: AutoCloseable? = null
     private var routePackets = 0L
@@ -67,7 +76,9 @@ object CarPlayGlance {
             when (frame.messageId) {
                 Hs5RouteState.ROUTE_GUIDANCE_UPDATE, Hs5RouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE -> {
                     runCatching { route.accept(frame.messageId, frame.payload) }
-                    if (frame.messageId == Hs5RouteState.ROUTE_GUIDANCE_UPDATE) laneState.acceptRoute(frame.payload)
+                    if (frame.messageId == Hs5RouteState.ROUTE_GUIDANCE_UPDATE) {
+                        laneState.acceptRoute(frame.payload)
+                    }
                 }
                 CarPlayLaneGuidance.MESSAGE_ID -> {
                     if (!connected) return
@@ -97,10 +108,9 @@ object CarPlayGlance {
                 lanePackets++
                 if (accepted == false) rejectedLanePackets++
             }
-            val hex = frame.payload.take(128).joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
             if (laneEvidence.size == 12) laneEvidence.removeFirst()
             laneEvidence.addLast("id=${frame.messageId.toString(16)} bytes=${frame.payload.size} " +
-                "accepted=$accepted navigating=${last.navigating} ${laneState.diagnosticState()} hex128=$hex")
+                "accepted=$accepted navigating=${last.navigating} ${laneState.diagnosticState()}")
         }
     }
 
@@ -125,7 +135,12 @@ object CarPlayGlance {
         val changed = synchronized(this) {
             if (connected == next) return
             connected = next
+            if (next && expiryTask == null) {
+                expiryTask = expiryExecutor.scheduleWithFixedDelay({ snapshot() }, 1, 1, TimeUnit.SECONDS)
+            }
             if (!next) {
+                expiryTask?.cancel(false)
+                expiryTask = null
                 route.clear()
                 laneState.clear()
             }
@@ -136,9 +151,8 @@ object CarPlayGlance {
 
     private fun publishLocked(): Snapshot? {
         val maneuver = route.currentApple()
-        val navigating = connected && route.isNavigating()
+        val navigating = connected && (route.isNavigating() || laneState.current().isNotEmpty())
         val summary = if (navigating) route.currentSummary() else null
-        if (last.navigating && !navigating) laneState.clear()
         val next = Snapshot(
             connected = connected,
             maneuverType = maneuver?.type,
@@ -151,7 +165,7 @@ object CarPlayGlance {
             remainingMeters = summary?.remainingMeters,
             song = null,
             playing = false,
-            lanes = if (navigating) laneState.current() else emptyList(),
+            lanes = if (connected) laneState.current() else emptyList(),
         )
         if (next == last) return null
         last = next

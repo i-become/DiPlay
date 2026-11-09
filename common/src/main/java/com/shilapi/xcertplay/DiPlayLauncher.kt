@@ -15,7 +15,14 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 internal object DiPlayLauncher {
     /** Start the configured Hongqi connection before constructing either full UI. */
     fun startAutomaticConnection(context: Context, fromBoot: Boolean = false): Boolean {
-        if (ConnectionProgressUiState.disconnected()) return false
+        if (ConnectionProgressUiState.disconnected() || HongqiScreenStatus.screenOff) return false
+        if (Hs5BootSession.isPreparing()) {
+            val app = context.applicationContext
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                startAutomaticConnection(app, fromBoot)
+            }, 50L)
+            return true
+        }
         val diagnosticStarted = android.os.SystemClock.elapsedRealtime()
         DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch enter fromBoot=$fromBoot") }
         val wireless = DiPlayPreferences.autoConnectWireless(context)
@@ -34,7 +41,7 @@ internal object DiPlayLauncher {
             DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=policy_skipped elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
             return false
         }
-        if (runCatching {
+        if (!CarPlayBackgroundSession.hasSession() && runCatching {
                 DiPlayBootstrap.ensure(context, AirPlayPersistence.loadMfiTarget(context))
             }.onFailure {
                 DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=bootstrap_failed failureClass=${it.javaClass.simpleName}") }

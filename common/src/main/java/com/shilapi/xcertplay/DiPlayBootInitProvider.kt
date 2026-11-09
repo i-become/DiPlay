@@ -17,6 +17,7 @@ class DiPlayBootInitProvider : ContentProvider() {
         CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.PROCESS_READY)
         if (!Hs5HeadUnit.isHeadUnit(app)) return true
         CarPlayStartupDiagnostics.initialize(app)
+        HongqiScreenStatus.initialize(app)
         HongqiPositionLights.initialize(app)
         if (!AirPlayPersistence.loadAutoStartOnBoot(app)) return true
         DiPlayBootStartup.runPrewarm(app, launchEnabled = true)

@@ -25,11 +25,14 @@ internal object Hs5BootSession {
     private val main = Handler(Looper.getMainLooper())
     private val scheduled = AtomicBoolean(false)
     private val generation = AtomicInteger()
+    @Volatile private var preparing = false
+    fun isPreparing(): Boolean = preparing
 
     fun schedule(context: Context) {
         val app = context.applicationContext
         if (!eligible(app) || CarPlayBackgroundSession.hasSession() || !scheduled.compareAndSet(false, true)) return
         val ticket = generation.get()
+        preparing = true
         Thread({
             val prepared = runCatching {
                 val profile = Hs5BootProfileCache.load(app) ?: return@runCatching null
@@ -39,7 +42,8 @@ internal object Hs5BootSession {
                 Triple(profile, identity, CarPlayRuntimeConfigFactory.create(app, identity))
             }.onFailure { record("prepare failed type=${it.javaClass.simpleName}") }.getOrNull()
             main.post {
-                if (prepared == null) { record("skip=display_profile_unavailable; first UI connection will cache it"); return@post }
+                preparing = false
+                if (prepared == null) { if (generation.get() == ticket) scheduled.set(false); record("skip=display_profile_unavailable; first UI connection will cache it"); return@post }
                 if (generation.get() != ticket || !eligible(app) || CarPlayBackgroundSession.hasSession()) return@post
                 val (profile, identity, runtime) = prepared
                 var renderer: AndroidMediaSink? = null
@@ -162,6 +166,7 @@ internal object Hs5BootSession {
     }
 
     private fun eligible(context: Context): Boolean = Hs5HeadUnit.isHeadUnit(context) &&
+        !ConnectionProgressUiState.disconnected() && !HongqiScreenStatus.screenOff &&
         AirPlayPersistence.loadAutoStartOnBoot(context) && DiPlayPreferences.autoConnect(context) &&
         DiPlayPreferences.autoConnectWireless(context) && !DiPlayPreferences.phoneAddress(context).isNullOrBlank() &&
         AirPlayPersistence.loadWirelessHotspotMode(context) != WirelessHotspotMode.MANUAL &&

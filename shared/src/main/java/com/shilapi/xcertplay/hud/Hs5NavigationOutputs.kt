@@ -55,9 +55,8 @@ object Hs5NavigationOutputs {
         val laneFrame = frame.messageId == Hs5RouteState.LANE_GUIDANCE_UPDATE
         if (!routeFrame && !laneFrame) return
         val owned = frame // Iap2Frame is immutable and defensively copies its payload.
-        // Lane events update the output workers' cached lane state, but must not replace the
-        // dashboard turn overlay: 0x5204 can arrive before the 0x5201 that activates it.
-        if (routeFrame) updateOverlay(owned)
+        // Cache prefetched events and publish late events for the selected junction.
+        updateOverlay(owned)
         hs5Guidance.submit { Hs5GuidanceBridge.onFrame(owned) }
     }
 
@@ -77,8 +76,10 @@ object Hs5NavigationOutputs {
     }
 
     private fun updateOverlay(frame: Iap2Frame) {
-        val change = synchronized(overlayLock) { overlayRoute.accept(frame.messageId, frame.payload) }
-        if (change != Hs5RouteChange.NONE) refreshTurnOverlay()
+        synchronized(overlayLock) { overlayRoute.accept(frame.messageId, frame.payload) }
+        // Lane-only guidance has no maneuver, so the HUD change enum may be NONE.
+        // Publish independently; refreshTurnOverlay suppresses unchanged snapshots.
+        refreshTurnOverlay()
     }
 
     /** Called every second while the presentation owner lives, even without incoming frames. */
@@ -99,6 +100,8 @@ object Hs5NavigationOutputs {
                 remainingSeconds = apple.remainingSeconds,
                 remainingMeters = apple.remainingMeters,
             )
+        } ?: overlayRoute.currentLaneBlock()?.let { block ->
+            ClusterTurnGuidance(0, 0, 0, "", lanes = block.lanes)
         }
     }
 
@@ -109,6 +112,9 @@ object Hs5NavigationOutputs {
         // and wired disconnect still clear it immediately.
         if (!preserveTurnOverlay) {
             synchronized(overlayLock) { overlayRoute.clear() }
+            refreshTurnOverlay()
+        } else {
+            synchronized(overlayLock) { overlayRoute.clearLaneMetadata() }
             refreshTurnOverlay()
         }
         synchronized(callLock) { calls.clear() }

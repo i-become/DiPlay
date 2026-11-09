@@ -1,9 +1,10 @@
 package com.shilapi.xcertplay.glance
 
+import com.shilapi.xcertplay.iap2.wire.Iap2Parameter
 import com.shilapi.xcertplay.iap2.wire.Iap2ParameterList
 import com.shilapi.xcertplay.iap2.wire.Iap2WireCodec
 
-/** Signed iAP2 directions: 0 = straight, positive = right, negative = left. */
+/** Raw metadata angles are signed degrees, with zero pointing forward. */
 data class CarPlayLane(
     val index: Int,
     val direction: Int,
@@ -11,116 +12,165 @@ data class CarPlayLane(
     val highlightedDirection: Int? = null,
     val directions: List<Int> = listOf(direction),
 ) {
-    // An unhighlighted lane is not necessarily closed to traffic.
-    val recommended: Boolean get() = status == 2
+    /** Observed rendering policy; status values are not official traffic restrictions. */
+    val selectedDirection: Int? get() = when {
+        status <= 0 -> null
+        highlightedDirection != null -> highlightedDirection.takeIf { it in directions && it in -180..180 }
+        status == 2 -> directions.distinct().singleOrNull()?.takeIf { it in -180..180 }
+        else -> null
+    }
+    val recommended: Boolean get() = selectedDirection != null
 }
 
-/** LaneGuidanceInfoUpdate (0x5204), not the vehicle's ADAS lane-detection signals. */
+/** Complete CSM parameter payloads only, after the existing authenticated iAP2 transport. */
 internal object CarPlayLaneGuidance {
     const val MESSAGE_ID = 0x5204
     data class Update(val index: Int, val lanes: List<CarPlayLane>)
 
-    /** An invalid packet clears the strip rather than inventing a straight/recommended lane. */
-    fun decode(payload: ByteArray): Update? = runCatching {
-        require(payload.size <= 8192)
-        val fields = Iap2ParameterList.parse(payload).asList()
-        fun scalar(id: Int, size: Int): ByteArray = fields.single { it.id == id }.payload.also {
-            require(it.size == size)
+    fun fields(payload: ByteArray): List<Iap2Parameter> {
+        require(payload.size <= 16384) { "payload-too-large" }
+        return Iap2ParameterList.parse(payload).asList()
+    }
+
+    fun scalar(fields: List<Iap2Parameter>, id: Int, size: Int, required: Boolean = false): ByteArray? {
+        val values = fields.filter { it.id == id }
+        require(values.size <= 1) { "duplicate-singleton:$id" }
+        val value = values.singleOrNull()?.payload
+        require(!required || value != null) { "missing-tag:$id" }
+        require(value == null || value.size == size) { "wrong-length:$id" }
+        return value
+    }
+
+    fun acceptsComponent(fields: List<Iap2Parameter>): Boolean {
+        val ids = fields.filter { it.id == 0 }.flatMap {
+            val bytes = it.payload
+            require(bytes.isNotEmpty() && bytes.size % 2 == 0) { "invalid-component-list" }
+            bytes.indices.step(2).map { offset -> Iap2WireCodec.readU16(bytes, offset) }
         }
-        require(Iap2WireCodec.readU16(scalar(0, 2)) == 42)
-        val index = Iap2WireCodec.readU16(scalar(1, 2))
-        val entries = fields.filter { it.id == 2 }
-        require(entries.size <= 16)
-        val lanes = entries.map { entry ->
-            val lane = Iap2ParameterList.parse(entry.payload).asList()
-            fun value(id: Int, size: Int): ByteArray = lane.single { it.id == id }.payload.also {
-                require(it.size == size)
+        return ids.isEmpty() || 42 in ids
+    }
+
+    fun decode(payload: ByteArray): Update? = runCatching { parse(fields(payload)) }.getOrNull()
+
+    fun parse(fields: List<Iap2Parameter>): Update? {
+        if (!acceptsComponent(fields)) return null
+        val index = Iap2WireCodec.readU16(scalar(fields, 1, 2, true)!!)
+        require(index != 65535) { "invalid-event-index" }
+        val lanes = mutableListOf<CarPlayLane>()
+        fun lane(parts: List<Iap2Parameter>) {
+            val position = Iap2WireCodec.readU16(scalar(parts, 0, 2, true)!!)
+            val status = scalar(parts, 1, 1, true)!![0].toInt() and 255
+            require(status in 0..2) { "unsupported-status" }
+            val angles = parts.filter { it.id == 2 }.flatMap {
+                val bytes = it.payload
+                require(bytes.isNotEmpty() && bytes.size % 2 == 0) { "invalid-angle-length" }
+                bytes.indices.step(2).map { offset -> Iap2WireCodec.readU16(bytes, offset).toShort().toInt() }
             }
-            fun angle(bytes: ByteArray): Int = Iap2WireCodec.readI16(bytes).also {
-                require(it in -180..180 || it == 1000)
-            }
-            // Multiple angle TLVs and packed vectors are both valid. 1000 means unknown.
-            val angles = lane.filter { it.id == 2 }.flatMap { field ->
-                require(field.payload.isNotEmpty() && field.payload.size % 2 == 0)
-                require(field.payload.size <= 32)
-                field.payload.toList().chunked(2).map { angle(it.toByteArray()) }
-            }
-            require(angles.isNotEmpty() && angles.size <= 16)
-            val directions = angles.filter { it != 1000 }.distinct()
-            val highlighted = lane.filter { it.id == 3 }
-            require(highlighted.size <= 1)
-            CarPlayLane(
-                index = Iap2WireCodec.readU16(value(0, 2)),
-                direction = directions.firstOrNull() ?: 1000,
-                status = value(1, 1)[0].toInt() and 0xff,
-                highlightedDirection = highlighted.singleOrNull()?.payload?.also {
-                    require(it.size == 2)
-                }?.let(::angle)?.takeUnless { it == 1000 },
-                directions = directions,
-            )
+            require(angles.size in 1..16) { "unsupported-angle-count" }
+            val highlight = scalar(parts, 3, 2)?.let { Iap2WireCodec.readI16(it) }
+            lanes += CarPlayLane(position, angles.first(), status, highlight, angles)
+            require(lanes.size <= 12) { "unsupported-lane-count" }
         }
-        require(lanes.map { it.index }.distinct().size == lanes.size)
-        Update(index, lanes.sortedBy { it.index })
-    }.getOrNull()
+        fields.filter { it.id == 2 }.forEach { container ->
+            val parts = mutableListOf<Iap2Parameter>()
+            fields(container.payload).forEach { field ->
+                if (field.id !in 0..3) return@forEach
+                if (field.id == 0 && parts.isNotEmpty()) { lane(parts); parts.clear() }
+                parts += field
+            }
+            if (parts.isNotEmpty()) lane(parts)
+        }
+        require(lanes.isNotEmpty()) { "missing-lanes" }
+        val sorted = lanes.sortedBy { it.index }
+        val start = sorted.first().index
+        require(start in 0..1 && sorted.map { it.index } == (start until start + sorted.size).toList()) {
+            "noncontiguous-positions"
+        }
+        return Update(index, sorted)
+    }
 }
 
-/** Cache future junctions separately; only the phone's current, visible lane block may be shown. */
-internal class CarPlayLaneState {
-    internal data class Current(
-        val index: Int,
-        val showing: Boolean,
-        val lanes: List<CarPlayLane>,
-    )
-
+/** Route-selected event cache, independent of maneuver availability and packet arrival order. */
+internal class CarPlayLaneState(private val nanoTime: () -> Long = System::nanoTime) {
+    internal data class Current(val index: Int, val showing: Boolean, val lanes: List<CarPlayLane>)
     private val blocks = linkedMapOf<Int, List<CarPlayLane>>()
     private var currentIndex: Int? = null
     private var showing = false
+    private var lastRouteNs: Long? = null
+    private var rawState: Int? = null
+    private var rawVisibility: Int? = null
+    private var reason = "no-route-update"
+
+    private fun expire() {
+        if (lastRouteNs?.let { nanoTime() - it >= 30_000_000_000L } == true) {
+            clear(); reason = "route-expired"
+        }
+    }
 
     fun acceptLanes(payload: ByteArray): Boolean {
-        val update = CarPlayLaneGuidance.decode(payload)
-        if (update == null) {
-            clear()
-            return false
-        }
-        blocks.remove(update.index)
-        blocks[update.index] = update.lanes
-        if (blocks.size > 8) blocks.remove(blocks.keys.first { it != currentIndex })
-        return true
+        expire()
+        return runCatching {
+            val update = CarPlayLaneGuidance.parse(CarPlayLaneGuidance.fields(payload))
+                ?: run { reason = "other-component"; return true }
+            blocks.remove(update.index)
+            blocks[update.index] = update.lanes
+            while (blocks.size > 32) blocks.remove(blocks.keys.first { it != currentIndex })
+            reason = "none"
+            true
+        }.getOrElse { reason = it.message ?: "invalid-lane-packet"; false }
     }
 
     fun acceptRoute(payload: ByteArray) {
+        expire()
         runCatching {
-            val fields = Iap2ParameterList.parse(payload).asList()
-            fun optional(id: Int, size: Int): ByteArray? = fields.filter { it.id == id }.let {
-                require(it.size <= 1)
-                it.singleOrNull()?.payload?.also { bytes -> require(bytes.size == size) }
+            val fields = CarPlayLaneGuidance.fields(payload)
+            if (!CarPlayLaneGuidance.acceptsComponent(fields)) { reason = "other-component"; return }
+            fun number(id: Int, size: Int): Int? = CarPlayLaneGuidance.scalar(fields, id, size)?.let {
+                if (size == 1) it[0].toInt() and 255 else Iap2WireCodec.readU16(it)
             }
-            val state = optional(1, 1)?.get(0)?.toInt()
-            val index = optional(0x10, 2)?.let { Iap2WireCodec.readU16(it) }
-            val count = optional(0x11, 2)?.let { Iap2WireCodec.readU16(it) }
-            val visible = optional(0x12, 1)?.get(0)?.toInt()
-            if (state == 0 || state == 2 || count == 0) clear()
-            else {
+            // Validate the complete update before committing any field.
+            val state = number(1, 1)
+            val index = number(0x10, 2)
+            val count = number(0x11, 2)
+            val visible = number(0x12, 1)
+            if (state == 0 || count == 0) clear() else {
                 if (index != null) currentIndex = index
                 if (visible != null) showing = visible == 1
+                lastRouteNs = nanoTime()
             }
-        }.onFailure { clear() }
+            if (state != null) rawState = state
+            if (visible != null) rawVisibility = visible
+            reason = if (visible != null && visible !in 0..1) "abnormal-visibility:$visible" else "none"
+        }.onFailure { reason = it.message ?: "invalid-route-packet" }
     }
 
-    fun current(): List<CarPlayLane> = if (showing) blocks[currentIndex].orEmpty() else emptyList()
+    fun current(): List<CarPlayLane> = currentBlock()?.lanes.orEmpty()
 
-    /** Metadata and lanes for the route-referenced block, including an empty valid block. */
-    fun currentBlock(): Current? = currentIndex?.let { index ->
-        if (!showing || !blocks.containsKey(index)) null
-        else Current(index, true, blocks[index].orEmpty())
+    fun currentBlock(): Current? {
+        expire()
+        if (!showing || lastRouteNs == null) return null
+        val index = currentIndex ?: return null
+        val lanes = blocks[index] ?: return null
+        // Preserve raw signed angles in the cache, but never invent unsupported geometry.
+        if (lanes.any { lane -> lane.directions.any { it !in -180..180 } }) {
+            reason = "unsupported-render-angle"
+            return null
+        }
+        if (lanes.any { it.highlightedDirection != null && (it.status == 0 || it.highlightedDirection !in it.directions) }) {
+            reason = "ignored-invalid-highlight"
+        }
+        return Current(index, true, lanes)
     }
 
-    fun diagnosticState(): String = "index=$currentIndex showing=$showing cached=${blocks.keys} " +
-        "lanes=${current().map { "${it.index}:${it.status}:${it.directions}:${it.highlightedDirection}" }}"
+    fun diagnosticState(): String {
+        val current = current()
+        return "component=42 index=$currentIndex showing=$showing rawState=$rawState rawVisibility=$rawVisibility " +
+            "cached=${blocks.keys} fresh=${lastRouteNs != null} sourceType=${if (current.isEmpty()) "none" else "metadata"} " +
+            "rejectReason=$reason lanes=${current.map { "${it.index}:${it.status}:${it.directions}:${it.highlightedDirection}" }}"
+    }
 
     fun clear() {
-        blocks.clear()
-        currentIndex = null
-        showing = false
+        blocks.clear(); currentIndex = null; showing = false; lastRouteNs = null
+        rawState = null; rawVisibility = null
     }
 }

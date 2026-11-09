@@ -187,7 +187,8 @@ object PhoneAudioRoute {
     internal fun ownCarPlayCallActive(): Boolean =
         carPlayCallActive || CarPlayTelephonyAudio.active()
 
-    private fun enabledFor(context: Context, reason: PhoneAudioReason): Boolean = when (reason) {
+    private fun enabledFor(context: Context, reason: PhoneAudioReason): Boolean =
+        com.shilapi.xcertplay.media.CallInterruptionSettings.enabled(context) && when (reason) {
         PhoneAudioReason.CARPLAY_CALL -> Hs5OutputSettings.phoneAudioRoute(context)
         PhoneAudioReason.VOIP_APP -> Hs5OutputSettings.phoneAudioRouteApps(context)
     }
