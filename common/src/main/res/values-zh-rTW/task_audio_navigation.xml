@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_zoom">儀表導航縮放</string>
+    <string name="settings_cluster_navigation_zoom_help">拖動後立即調整儀表地圖顯示大小，100%為原始大小。</string>
+    <string name="settings_calls_interrupt_music">來電中斷音樂</string>
+    <string name="settings_calls_interrupt_music_help">關閉後，DiPlay在來電及通話時保留本機音樂播放；iPhone仍可能自行暫停音樂。</string>
+</resources>

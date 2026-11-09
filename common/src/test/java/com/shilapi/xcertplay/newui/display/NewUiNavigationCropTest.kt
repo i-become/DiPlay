@@ -43,6 +43,7 @@ class NewUiNavigationCropTest {
         var value by mutableIntStateOf(0)
         var saves = 0
         var sourceSaves = 0
+        var zoom by mutableIntStateOf(100)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -52,7 +53,10 @@ class NewUiNavigationCropTest {
                 NewUiTheme {
                     NewUiShell(NewUiDestination.DISPLAY, true, NewUiTopBarStatus.placeholder, {}, {}) {
                         NewUiDisplayNavMarkerScreen(50, 45, {}, { _, _ -> sourceSaves++ }, {},
-                            navigationCrop = value, onNavigationCrop = {
+                            navigationZoom = zoom, onNavigationZoom = {
+                                ClusterMapCropSettings.saveZoom(compose.activity, it)
+                                zoom = it
+                            }, navigationCrop = value, onNavigationCrop = {
                                 ClusterMapCropSettings.save(compose.activity, it)
                                 value = it
                                 saves++
@@ -77,6 +81,15 @@ class NewUiNavigationCropTest {
             assertEquals(0, sourceSaves)
         }
         screenshot(name + "-reset")
+        compose.onNodeWithTag("navigation-zoom-slider").performScrollTo().assertIsDisplayed()
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(150f) }
+        compose.runOnIdle {
+            assertEquals(150, zoom)
+            assertEquals(150, ClusterMapCropSettings.loadZoom(compose.activity))
+        }
+        screenshot(name + "-zoom")
+        compose.onNodeWithTag("navigation-zoom-reset").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(100, zoom) }
     }
 
     private fun screenshot(name: String) {

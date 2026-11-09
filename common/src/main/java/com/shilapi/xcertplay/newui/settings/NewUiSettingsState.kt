@@ -24,6 +24,7 @@ data class NewUiSettingsState(
     val showHs5SteeringKeys: Boolean,
     val carPlayWheelMedia: Boolean,
     val carPlayWheelSiri: Boolean,
+    val callsInterruptMusic: Boolean = true,
 ) {
     /** Local stream routing applies only when CarPlay audio goes through the vehicle Bluetooth path. */
     val showLocalAudioRouting: Boolean get() = carBluetoothAudio
@@ -72,6 +73,7 @@ internal object NewUiSettingsStateReader {
             context.getString(R.string.new_ui_update_latest)
         }
         return NewUiSettingsState(
+            callsInterruptMusic = com.shilapi.xcertplay.media.CallInterruptionSettings.enabled(context),
             autoStartOnBoot = AirPlayPersistence.loadAutoStartOnBoot(context),
             carBluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(context),
             advancedAudioChannelMappingSupported =

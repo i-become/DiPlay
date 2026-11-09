@@ -56,6 +56,7 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
         color = Color.argb(224, 235, 235, 240); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     }
     private val rect = RectF()
+    private val laneStrip = ClusterLaneStrip()
     private var glyph: Drawable? = null
     private var glyphTag: Int = -1
 
@@ -130,6 +131,16 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
         val card = ClusterTurnCardOverlay.card(width, height, xPercent, yPercent, sizePercent)
         val h = card.height.toFloat()
         val w = card.width.toFloat()
+        if (next.icon == 0 && next.road.isEmpty() && next.lanes.isNotEmpty()) {
+            val laneWidth = maxOf(w, next.lanes.size * 28f + 24f).coerceAtMost(width.toFloat())
+            val left = (card.left + w / 2f - laneWidth / 2f).coerceIn(0f, width - laneWidth)
+            rect.set(left, card.top.toFloat(), left + laneWidth, card.top + 64f)
+            if (laneStrip.fits(next.lanes, laneWidth - 24f)) {
+                canvas.drawRoundRect(rect, 20f, 20f, glassPaint)
+                laneStrip.draw(canvas, RectF(rect.left + 12f, rect.top, rect.right - 12f, rect.bottom), next.lanes, accent)
+            }
+            return
+        }
 
         val radius = h * 0.30f
         rect.set(card.left.toFloat(), card.top.toFloat(), card.left + w, card.top + h)
@@ -161,7 +172,15 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
                 textLeft, card.top + h * 0.72f, roadPaint,
             )
         }
-        drawInfoStrip(canvas, next, card.left, (card.top + h).toInt(), w.toInt(), h.toInt())
+        var below = card.top + h
+        if (laneStrip.fits(next.lanes, w - 24f)) {
+            val laneHeight = 64f
+            rect.set(card.left.toFloat(), below + 4f, card.left + w, below + 4f + laneHeight)
+            canvas.drawRoundRect(rect, laneHeight / 3f, laneHeight / 3f, glassPaint)
+            laneStrip.draw(canvas, RectF(rect.left + 12f, rect.top, rect.right - 12f, rect.bottom), next.lanes, accent)
+            below = rect.bottom
+        }
+        drawInfoStrip(canvas, next, card.left, below.toInt(), w.toInt(), h.toInt())
     }
 
     /** The arrival/duration/distance pill that hangs under the card, like the stock nav bar. */

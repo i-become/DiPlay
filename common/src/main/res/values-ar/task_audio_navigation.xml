@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_zoom">تكبير خريطة لوحة العدادات</string>
+    <string name="settings_cluster_navigation_zoom_help">اضبط حجم الخريطة فورًا. تعيد نسبة 100% الحجم الأصلي.</string>
+    <string name="settings_calls_interrupt_music">المكالمات تقاطع الموسيقى</string>
+    <string name="settings_calls_interrupt_music_help">عند الإيقاف، يحافظ DiPlay على الصوت المحلي أثناء المكالمات. قد يوقف iPhone الموسيقى مؤقتًا.</string>
+</resources>

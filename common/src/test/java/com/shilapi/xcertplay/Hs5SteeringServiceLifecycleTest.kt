@@ -197,6 +197,7 @@ class Hs5SteeringServiceLifecycleTest {
     }
 
     @After fun tearDown() {
+        CarPlayMediaKeys::class.java.getDeclaredField("controller").apply { isAccessible = true }.set(null, null)
         Hs5SteeringKeys.detach(controller)
         CarPlayHostSettingsBridge.unregister(host)
         drain()
@@ -206,6 +207,24 @@ class Hs5SteeringServiceLifecycleTest {
     private fun start() {
         Hs5SteeringKeys.attach(context, controller)
         drain()
+    }
+
+    @Test fun rightLongPressTogglesOnceAndShortPressStillSkips() {
+        AirPlayPersistence.saveCarPlayWheelMedia(context, true)
+        com.shilapi.xcertplay.media.CarPlayTelephonyAudio.clear()
+        assertNull(com.shilapi.xcertplay.hud.Hs5NavigationOutputs.carPlayCall())
+        CarPlayMediaKeys::class.java.getDeclaredField("controller").apply { isAccessible = true }.set(null, controller)
+        start()
+        val callback = listener!!
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
+        drain()
+        verify(controller, times(1)).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.PLAY_PAUSE)
+        verify(controller, never()).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.NEXT)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 2)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        drain()
+        verify(controller, times(1)).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.NEXT)
     }
 
     private fun drain() {

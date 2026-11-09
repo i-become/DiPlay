@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_zoom">Zoom del mapa del cuadro</string>
+    <string name="settings_cluster_navigation_zoom_help">Ajusta al instante el tamaño del mapa. El 100% restaura el tamaño original.</string>
+    <string name="settings_calls_interrupt_music">Las llamadas interrumpen la música</string>
+    <string name="settings_calls_interrupt_music_help">Al desactivarlo, DiPlay mantiene el audio local durante las llamadas. El iPhone aún puede pausar su música.</string>
+</resources>

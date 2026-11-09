@@ -24,7 +24,7 @@ class ClusterLaneGuidanceRendererTest {
             setLocale(Locale.SIMPLIFIED_CHINESE); fontScale = 1.4f
         })
     private val lanes = listOf(CarPlayLane(0, -90, 0), CarPlayLane(1, 0, 0),
-        CarPlayLane(2, 0, 0), CarPlayLane(3, 0, 2, 90), CarPlayLane(4, 90, 2))
+        CarPlayLane(2, 0, 0), CarPlayLane(3, 0, 2, 90, listOf(0, 90)), CarPlayLane(4, 90, 2))
     private val guidance = CarPlayGlance.Snapshot(connected = true, navigating = true,
         maneuverType = 2, distanceMeters = 500, road = "进入 望京西路", lanes = lanes,
         remainingMeters = 12800, remainingSeconds = 1080)
@@ -104,7 +104,7 @@ class ClusterLaneGuidanceRendererTest {
         val image = Bitmap.createBitmap(160, 64, Bitmap.Config.ARGB_8888)
         val cyan = Color.CYAN
         try {
-            strip.draw(Canvas(image), RectF(0f, 0f, 160f, 64f), listOf(CarPlayLane(0, 0, 2, 90)), cyan)
+            strip.draw(Canvas(image), RectF(0f, 0f, 160f, 64f), listOf(CarPlayLane(0, 0, 2, 90, listOf(0, 90))), cyan)
             fun cyanPixels(x1: Int, y1: Int, x2: Int, y2: Int) = (y1..y2).sumOf { y ->
                 (x1..x2).count { x -> image.getPixel(x,y) == cyan }
             }
@@ -136,7 +136,8 @@ class ClusterLaneGuidanceRendererTest {
                     canvas.drawBitmap(reference,crop,map,Paint(Paint.FILTER_BITMAP_FLAG))
                     val nav = when (suffix) {
                         "eight-lanes" -> guidance.copy(road = "进入 红旗大街辅路向东行驶", lanes = List(8) {
-                            CarPlayLane(it, if (it == 0) -90 else 0, if (it >= 6) 2 else 0, if (it >= 6) 90 else null)
+                            CarPlayLane(it, if (it == 0) -90 else 0, if (it >= 6) 2 else 0,
+                                if (it >= 6) 90 else null, if (it >= 6) listOf(0, 90) else listOf(if (it == 0) -90 else 0))
                         })
                         "no-lanes" -> guidance.copy(lanes = emptyList())
                         "lanes-only" -> guidance.copy(maneuverType = null)
@@ -163,6 +164,33 @@ class ClusterLaneGuidanceRendererTest {
                     bitmap.recycle(); assertTrue(file.length()>10000)
                 }
             } finally { cover.recycle(); reference.recycle() }
+        }
+    }
+
+    @Test fun handoffLaneCountsDayNightAndNativeOverlayPreviews() {
+        val cases = listOf(
+            listOf(CarPlayLane(0, -180, 2)),
+            listOf(CarPlayLane(0, -90, 0), CarPlayLane(1, 0, 2),
+                CarPlayLane(2, 0, 2, 90, listOf(0, 90)), CarPlayLane(3, 180, 1)),
+            List(12) { CarPlayLane(it, if (it == 0) -180 else if (it == 11) 180 else 0, if (it in 5..6) 2 else 0) },
+        )
+        for (night in listOf(false, true)) for (width in listOf(640, 1280)) for (lanes in cases) {
+            val bitmap = Bitmap.createBitmap(width, 360, Bitmap.Config.ARGB_8888)
+            try {
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(if (night) Color.rgb(15, 20, 30) else Color.rgb(215, 220, 210))
+                val view = ClusterTurnCardView(context)
+                view.setLayout(50, 25, 70)
+                view.setNightMode(night)
+                view.setGuidance(com.shilapi.xcertplay.hud.ClusterTurnGuidance(0, 0, 0, "", lanes = lanes))
+                view.layout(0, 0, width, 360)
+                view.draw(canvas)
+                val file = File("build/reports/cluster-dashboard/native-lanes-${lanes.size}-${width}-${if (night) "night" else "day"}.png")
+                file.parentFile!!.mkdirs()
+                file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                assertTrue(file.length() > 1000)
+                assertTrue(ClusterLaneStrip().fits(lanes, width - 24f))
+            } finally { bitmap.recycle() }
         }
     }
 }

@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ClusterMapViewportTest {
+    @Test fun zoomPreservesCalibratedAnchorAndComposesWithCrop() {
+        val crop = ClusterMapViewport.navigation(true, 50, 45)
+        for (percent in listOf(50, 100, 150, 200)) {
+            val zoom = crop.zoom(percent, 45)
+            assertEquals(.5f, .75f * zoom.scale + zoom.x, .00001f)
+            assertEquals(.45f, .45f * zoom.scale + zoom.y, .00001f)
+            assertEquals(2f * percent / 100f, zoom.scale, .00001f)
+        }
+        assertEquals(crop, crop.zoom(100, 45))
+    }
     @Test fun browsingAndNeutralCalibrationPreserveTheFullSource() {
         assertEquals(ClusterMapViewport(), ClusterMapViewport.navigation(false, 60, 45))
         assertEquals(ClusterMapViewport(), ClusterMapViewport.navigation(true, 0, 45))

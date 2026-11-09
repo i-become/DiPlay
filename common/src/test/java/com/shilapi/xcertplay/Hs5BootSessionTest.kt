@@ -70,6 +70,9 @@ class Hs5BootSessionTest {
     }
 
     @After fun cleanup() {
+        ReflectionHelpers.setField(HongqiScreenStatus, "screenOff", false)
+        ReflectionHelpers.setField(HongqiScreenStatus, "connection", null)
+        ReflectionHelpers.setField(HongqiScreenStatus, "raw", null)
         Hs5BootSession.cancelPending()
         CarPlayMediaKeys.detach(CarPlayBackgroundSession.snapshot()?.controller)
         CarPlayBackgroundSession.clear()
@@ -126,6 +129,31 @@ class Hs5BootSessionTest {
         await { ReflectionHelpers.getField<AtomicBoolean>(Hs5BootSession, "scheduled").get() }
         assertFalse(CarPlayBackgroundSession.hasSession())
         assertTrue(controllers.constructed().isEmpty())
+    }
+
+    @Test fun vendorScreenOffStopsTheSessionAndRejectsStaleOrUnknownWakeups() {
+        Hs5BootSession.schedule(app)
+        await { CarPlayBackgroundSession.snapshot() != null }
+        val snapshot = CarPlayBackgroundSession.snapshot()!!
+        val type = Class.forName("com.shilapi.xcertplay.HongqiScreenStatus\$Connection")
+        val source = type.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+        ReflectionHelpers.setField(HongqiScreenStatus, "connection", source)
+        val accept = HongqiScreenStatus::class.java.getDeclaredMethod("accept", type, Int::class.javaPrimitiveType).apply { isAccessible = true }
+        accept.invoke(HongqiScreenStatus, source, 2)
+        await { !CarPlayBackgroundSession.hasSession() }
+        assertTrue(HongqiScreenStatus.screenOff)
+        assertTrue(ConnectionProgressUiState.disconnected())
+        verify(snapshot.controller).close()
+        verify(snapshot.sink).close()
+        accept.invoke(HongqiScreenStatus, source, 99)
+        assertTrue(HongqiScreenStatus.screenOff)
+        val stale = type.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+        accept.invoke(HongqiScreenStatus, stale, 1)
+        assertTrue(HongqiScreenStatus.screenOff)
+        accept.invoke(HongqiScreenStatus, source, 6)
+        assertFalse(HongqiScreenStatus.screenOff)
+        assertTrue(ConnectionProgressUiState.disconnected())
+        assertFalse(DiPlayLauncher.startAutomaticConnection(app, fromBoot = true))
     }
 
     @Test fun disabledBootOrMissingDisplayProfileDoesNotInventDimensionsOrStartAConnection() {

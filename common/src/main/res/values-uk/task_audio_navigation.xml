@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_zoom">Масштаб карти на панелі приладів</string>
+    <string name="settings_cluster_navigation_zoom_help">Розмір карти змінюється одразу. 100% відновлює початковий розмір.</string>
+    <string name="settings_calls_interrupt_music">Виклики переривають музику</string>
+    <string name="settings_calls_interrupt_music_help">Якщо вимкнено, DiPlay зберігає місцеве відтворення під час викликів. iPhone усе ще може призупинити музику.</string>
+</resources>

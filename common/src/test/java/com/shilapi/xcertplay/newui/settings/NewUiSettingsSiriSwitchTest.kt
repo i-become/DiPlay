@@ -54,6 +54,8 @@ class NewUiSettingsSiriSwitchTest {
         val context = RuntimeEnvironment.getApplication()
         val changes = mutableListOf<Boolean>()
         var enabled by mutableStateOf(true)
+        var interruptMusic by mutableStateOf(true)
+        val callChanges = mutableListOf<Boolean>()
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -74,6 +76,7 @@ class NewUiSettingsSiriSwitchTest {
                                 carPlayWheelSiri = enabled,
                                 // The Siri switch is also available with vehicle Bluetooth audio.
                                 carBluetoothAudio = true,
+                                callsInterruptMusic = interruptMusic,
                             ),
                             onAutoStartChanged = {},
                             onCarBluetoothAudioChanged = {},
@@ -88,6 +91,7 @@ class NewUiSettingsSiriSwitchTest {
                             onCheckUpdate = {},
                             onCarPlayWheelMediaChanged = {},
                             onCarPlayWheelSiriChanged = { enabled = it; changes += it },
+                            onCallsInterruptMusicChanged = { interruptMusic = it; callChanges += it },
                         )
                     }
                 }
@@ -104,6 +108,11 @@ class NewUiSettingsSiriSwitchTest {
         compose.runOnIdle { assertEquals(listOf(false), changes) }
         compose.onNodeWithText(title).performClick()
         compose.runOnIdle { assertEquals(listOf(false, true), changes) }
+        val callTitle = context.getString(R.string.settings_calls_interrupt_music)
+        compose.onNodeWithText(callTitle).performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(listOf(false), callChanges) }
+        compose.onNodeWithText(callTitle).performClick()
+        compose.runOnIdle { assertEquals(listOf(false, true), callChanges) }
         val output = File("build/reports/settings-wheel-siri/$name-font-140.png")
         output.parentFile.mkdirs()
         compose.runOnIdle {

@@ -77,6 +77,8 @@ fun NewUiDisplayNavMarkerScreen(
     onResetDefault: () -> Unit,
     navigationCrop: Int = 0,
     onNavigationCrop: (Int) -> Unit = {},
+    navigationZoom: Int = 100,
+    onNavigationZoom: (Int) -> Unit = {},
 ) {
     var editing by remember { mutableStateOf(false) }
     var draftX by remember { mutableIntStateOf(xPercent) }
@@ -204,6 +206,7 @@ fun NewUiDisplayNavMarkerScreen(
                 }
             }
             NavigationCropCard(navigationCrop, onNavigationCrop)
+            NavigationZoomCard(navigationZoom, onNavigationZoom)
             if (editing) {
                 NewUiSubpageBottomBar(
                     backLabel = stringResource(R.string.cancel),
@@ -250,8 +253,7 @@ private fun NavigationCropCard(value: Int, onSave: (Int) -> Unit) {
             style = NewUiTypography.ActionSubtitle, color = NewUiColors.TextPrimary)
         Slider(
             value = draft.toFloat(),
-            onValueChange = { draft = it.roundToInt() },
-            onValueChangeFinished = { onSave(draft) },
+            onValueChange = { draft = it.roundToInt(); onSave(draft) },
             valueRange = -60f..60f,
             steps = 119,
             modifier = Modifier.fillMaxWidth().testTag("navigation-crop-slider")
@@ -262,6 +264,27 @@ private fun NavigationCropCard(value: Int, onSave: (Int) -> Unit) {
             onClick = { draft = 0; onSave(0) },
             modifier = Modifier.fillMaxWidth().testTag("navigation-crop-reset"),
         )
+    }
+}
+
+@Composable
+private fun NavigationZoomCard(value: Int, onSave: (Int) -> Unit) {
+    val zoomTitle = stringResource(R.string.settings_cluster_navigation_zoom)
+    Column(Modifier.fillMaxWidth().padding(top = NewUiLayout.MainGap)
+        .newUiGlassTile(cornerRadius = NewUiLayout.PageCardRadius)
+        .padding(NewUiLayout.ClusterCardPadding),
+        verticalArrangement = Arrangement.spacedBy(NewUiLayout.MainGap)) {
+        Text(stringResource(R.string.settings_cluster_navigation_zoom),
+            style = NewUiTypography.CompactSettingTitle, color = NewUiColors.TextPrimary)
+        Text(stringResource(R.string.settings_cluster_navigation_zoom_help),
+            style = NewUiTypography.SettingSubtitle, color = NewUiColors.TextSecondary)
+        Text("${value}%", style = NewUiTypography.ActionSubtitle, color = NewUiColors.TextPrimary)
+        Slider(value = value.toFloat(), onValueChange = { onSave(it.roundToInt()) },
+            valueRange = 50f..200f, steps = 149,
+            modifier = Modifier.fillMaxWidth().testTag("navigation-zoom-slider")
+                .semantics { contentDescription = zoomTitle })
+        NewUiSecondaryActionButton(label = stringResource(R.string.settings_cluster_navigation_crop_reset),
+            onClick = { onSave(100) }, modifier = Modifier.fillMaxWidth().testTag("navigation-zoom-reset"))
     }
 }
 

@@ -20,8 +20,8 @@ internal class ClusterLaneStrip {
     private val path = Path()
 
     fun fits(lanes: List<CarPlayLane>, width: Float): Boolean =
-        lanes.isNotEmpty() && width / lanes.size >= 32f && lanes.any { lane ->
-            lane.directions.any { it in -180..180 } || lane.highlightedDirection in -180..180
+        lanes.size in 1..12 && width / lanes.size >= 24f && lanes.all { lane ->
+            lane.directions.isNotEmpty() && lane.directions.all { it in -180..180 }
         }
 
     fun draw(canvas: Canvas, bounds: RectF, lanes: List<CarPlayLane>, accent: Int) {
@@ -36,17 +36,14 @@ internal class ClusterLaneStrip {
                 canvas.drawLine(left + pitch * i, cy - 12f, left + pitch * i, cy + 14f, paint)
             }
             // Draw both branches of a split lane; highlight only the branch the phone selected.
-            paint.color = Color.rgb(151, 166, 183); paint.strokeWidth = 2.6f
-            lane.directions.filter { it in -180..180 }.forEach {
-                arrow(canvas, cx, cy, it, pitch)
-            }
-            lane.highlightedDirection?.takeIf { it in -180..180 && it !in lane.directions }?.let {
+            paint.color = if (lane.status == 0) Color.rgb(79, 87, 99) else Color.rgb(176, 184, 196)
+            paint.strokeWidth = 2.6f
+            lane.directions.distinct().forEach {
                 arrow(canvas, cx, cy, it, pitch)
             }
             if (lane.recommended) {
                 paint.color = accent; paint.strokeWidth = 4.2f
-                val selected = lane.highlightedDirection?.takeIf { it in -180..180 }
-                    ?: lane.directions.firstOrNull { it in -180..180 }
+                val selected = lane.selectedDirection
                 selected?.let {
                     arrow(canvas, cx, cy, it, pitch)
                     // Weight + underline preserve the distinction without relying on colour alone.

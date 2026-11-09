@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_cluster_navigation_zoom">Dashboard map zoom</string>
+    <string name="settings_cluster_navigation_zoom_help">Adjust the displayed map size immediately. 100% restores the original size.</string>
+    <string name="settings_calls_interrupt_music">Calls interrupt music</string>
+    <string name="settings_calls_interrupt_music_help">When off, DiPlay keeps local music audio running during calls. The iPhone may still pause its music.</string>
+</resources>
