@@ -94,8 +94,8 @@ class DiPlaySessionService : Service() {
     }
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (!sessionStarted) return
-        // BYD's recents force-stops the package ~10 ms after removing the task: end guidance first.
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.endNow()
+        // the car's recents force-stops the package ~10 ms after removing the task: end guidance first.
+        com.shilapi.xcertplay.hud.Hs5NavigationOutputs.endNow()
         CarPlayBackgroundSession.stop()
         stopSelf()
     }

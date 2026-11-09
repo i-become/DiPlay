@@ -1,7 +1,5 @@
 package com.shilapi.xcertplay.media
 
-import com.shilapi.xcertplay.hud.BydCarPlayCall
-
 /**
  * Whether the iPhone plays call-like CarPlay audio. Cellular calls use [TELEPHONY]; WeChat VoIP on
  * recent iOS often uses [SPEECH_RECOGNITION] playback and uplink instead, without iAP2 call state.
@@ -20,7 +18,7 @@ object CarPlayTelephonyAudio {
     @Volatile var changed: ((Boolean) -> Unit)? = null
 
     /**
-     * When call-like audio starts but iAP2 has not published [BydCarPlayCall] yet (common for WeChat
+     * When call-like audio starts before iAP2 publishes call state (common for WeChat
      * ringtone-only phases), the controller may re-send Communications subscriptions so the iPhone
      * promotes the CarPlay call UI.
      */
@@ -65,7 +63,7 @@ object CarPlayTelephonyAudio {
         }
         if (before != after) {
             changed?.invoke(after)
-            if (after && BydCarPlayCall.current() == null) {
+            if (after) {
                 communicationsRefreshRequest?.invoke()
             }
         }

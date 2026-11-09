@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
 import com.shilapi.xcertplay.airplay.ClusterSpeedometerOverlay
+import kotlin.math.roundToInt
 
 /**
  * Optional speedometer drawn by DiPlay over the dashboard map.
@@ -19,7 +20,11 @@ import com.shilapi.xcertplay.airplay.ClusterSpeedometerOverlay
 internal class ClusterSpeedometerView(
     context: Context,
     private val observeSpeed: ((Int?) -> Unit) -> (() -> Unit) = { changed ->
-        com.shilapi.xcertplay.hud.BydClusterSpeedReader.observe(context, changed)
+        var last: Int? = null
+        HongqiClusterVehicleData.subscribe(context, {
+            val next = HongqiClusterVehicleData.snapshot().speedKph?.roundToInt()
+            if (next != last) { last = next; changed(next) }
+        }).also { changed(HongqiClusterVehicleData.snapshot().speedKph?.roundToInt()) }
     },
 ) : View(context) {
 

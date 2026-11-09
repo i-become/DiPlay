@@ -2,7 +2,7 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
-import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.location.AndroidCarPlayLocationProvider
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.orchestration.CarPlayTransport
@@ -13,30 +13,13 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import com.shilapi.xcertplay.transport.Iap2LocationProvider
 import com.shilapi.xcertplay.transport.UsbDeviceId
-import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
 
 /** UI and boot use the same identity, transport and authentication settings. */
 internal object CarPlayRuntimeConfigFactory {
-    fun locationProvider(context: Context, config: CarPlayRuntimeConfig): Iap2LocationProvider? = when {
-        !config.locationReportingEnabled -> null
-        config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
-            AndroidCarPlayLocationProvider(context),
-            if (AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(context)) {
-                com.shilapi.xcertplay.transport.LocationVehicleSpeedSource(
-                    context,
-                    demoMetersPerSecondWhenStationary =
-                        com.shilapi.xcertplay.transport.DEBUG_CLUSTER_DEMO_SPEED_METERS_PER_SECOND,
-                    onSpeedSample = SimulatedClusterSpeedHub::publishMetersPerSecond,
-                )
-            } else com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(context.applicationContext),
-        )
-        else -> AndroidCarPlayLocationProvider(context)
-    }
+    fun locationProvider(context: Context, config: CarPlayRuntimeConfig): Iap2LocationProvider? =
+        if (config.locationReportingEnabled) AndroidCarPlayLocationProvider(context) else null
 
-    fun vehicleStatusProvider(context: Context): com.shilapi.xcertplay.transport.VehicleStatusProvider? =
-        if (BydOutputSettings.batteryToIphoneActive(context)) {
-            com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(context.applicationContext)
-        } else null
+    fun vehicleStatusProvider(context: Context): com.shilapi.xcertplay.transport.VehicleStatusProvider? = null
 
     fun create(
         context: Context,
@@ -72,10 +55,8 @@ internal object CarPlayRuntimeConfigFactory {
                 serialNumber = "DIPLAY-" + deviceId.replace(":", ""),
                 firmwareVersion = "0.1.0", hardwareVersion = "1.0", carPlayUsbInterfaceNumber = 3,
                 locationInformationEnabled = locationEnabled,
-                vehicleStatusEnabled = BydOutputSettings.batteryToIphoneActive(context),
-                chargingConnectors = BydOutputSettings.chargingConnectors(context),
-                vehicleSpeedEnabled = locationEnabled && (BydOutputSettings.wheelSpeedToIphoneActive(context) ||
-                    AirPlayPersistence.debugSimulatedClusterVehicleSpeedActive(context)),
+                vehicleStatusEnabled = false,
+                vehicleSpeedEnabled = false,
             ),
             label = "DiPlay",
             hostName = "diplay-" + deviceId.replace(":", "").lowercase(),

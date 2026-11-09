@@ -1,7 +1,6 @@
 package com.shilapi.xcertplay.glance
 
-import com.shilapi.xcertplay.hud.BydHudRouteState
-import com.shilapi.xcertplay.hud.ClusterSongState
+import com.shilapi.xcertplay.hud.Hs5RouteState
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.util.concurrent.CopyOnWriteArraySet
@@ -10,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  * What CarPlay is doing, at a glance, for widgets and other screens outside CarPlay: the next
  * maneuver and junction lanes from iAP2 route guidance (0x5201/0x5202/0x5204), and the song
  * from NowPlayingUpdate (0x5001).
- * Fed by every CarPlay session, whatever the BYD output settings.
+ * Fed by every CarPlay session, independently of vehicle output settings.
  */
 object CarPlayGlance {
     /** [maneuverType] is Apple's RouteGuidanceManeuverType; a route may have no next turn. */
@@ -29,8 +28,7 @@ object CarPlayGlance {
         val lanes: List<CarPlayLane> = emptyList(),
     )
 
-    private val route = BydHudRouteState()
-    private val song = ClusterSongState()
+    private val route = Hs5RouteState()
     private var connected = false
     private var last = Snapshot()
     private val laneState = CarPlayLaneState()
@@ -67,15 +65,14 @@ object CarPlayGlance {
         val changed = synchronized(this) {
             var lanesAccepted: Boolean? = null
             when (frame.messageId) {
-                BydHudRouteState.ROUTE_GUIDANCE_UPDATE, BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE -> {
+                Hs5RouteState.ROUTE_GUIDANCE_UPDATE, Hs5RouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE -> {
                     runCatching { route.accept(frame.messageId, frame.payload) }
-                    if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE) laneState.acceptRoute(frame.payload)
+                    if (frame.messageId == Hs5RouteState.ROUTE_GUIDANCE_UPDATE) laneState.acceptRoute(frame.payload)
                 }
                 CarPlayLaneGuidance.MESSAGE_ID -> {
                     if (!connected) return
                     lanesAccepted = laneState.acceptLanes(frame.payload)
                 }
-                ClusterSongState.NOW_PLAYING_UPDATE -> runCatching { song.accept(frame) }
                 else -> return
             }
             publishLocked().also {
@@ -130,7 +127,6 @@ object CarPlayGlance {
             connected = next
             if (!next) {
                 route.clear()
-                song.clear()
                 laneState.clear()
             }
             publishLocked()
@@ -143,7 +139,6 @@ object CarPlayGlance {
         val navigating = connected && route.isNavigating()
         val summary = if (navigating) route.currentSummary() else null
         if (last.navigating && !navigating) laneState.clear()
-        val current = song.current()
         val next = Snapshot(
             connected = connected,
             maneuverType = maneuver?.type,
@@ -154,8 +149,8 @@ object CarPlayGlance {
             arrivalEpochSeconds = summary?.arrivalEpochSeconds,
             remainingSeconds = summary?.remainingSeconds,
             remainingMeters = summary?.remainingMeters,
-            song = current?.text,
-            playing = current?.playing ?: false,
+            song = null,
+            playing = false,
             lanes = if (navigating) laneState.current() else emptyList(),
         )
         if (next == last) return null

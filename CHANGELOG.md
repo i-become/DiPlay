@@ -3,9 +3,9 @@
 - Keep wired sessions running when a USB read finishes as DiPlay stops waiting for it, start wired CarPlay on Android 7.1 head units, when a head-unit USB audio driver holds the iPhone, and without a VPN dialog over approved network ADB (#625, #614, #618).
 - Stop discarding music packets after a 10 ms wait, and log the /feedback position against the received audio (#618, #625).
 - Show the real connection stage in every app language, stop with a clear cause when a head unit's Bluetooth cannot reach the iPhone, and find the connected iPhone through sink-role Bluetooth profiles (#624, #590, #585).
-- Wheel next/previous on the CarPlay screen without the wheel-key service, Geely/Lynk `geely_fx11` wheel keys and Siri, wheel-key service restore retries, and next/previous to answer or decline with CarPlay call keys (#600, #626, #622, #625).
+- Wheel next/previous on the CarPlay screen without a separate wheel-key service, wheel-key service restore retries, and next/previous to answer or decline with CarPlay call keys (#600, #626, #622, #625).
 - Settings backup and restore from a phone, an installer choice for updates, and About inside Settings (#598, #593, #597).
-- Experimental, off-by-default options: Harman full screen with 32-bit x86 libraries, square corners, clearer navigation voice over USB, MediaTek low-latency decoding, a media-key audio focus opt-out, car phone audio for calls, a cluster speedometer and FCE cluster guidance (#613, #596, #622, #608, #615, #595, #607, #599).
+- Experimental, off-by-default options: clearer navigation voice over USB, low-latency decoding, a media-key audio focus opt-out and car phone audio for calls (#622, #608, #615, #595).
 
 See [0.2.18 release notes](docs/RELEASE-NOTES-0.2.18.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
 
@@ -15,8 +15,8 @@ See [0.2.18 release notes](docs/RELEASE-NOTES-0.2.18.md) for contribution links 
 - Add an iPhone charging choice for wired USB: Normal 2.4 A, Reduced 1.5 A or Low 0.5 A (#583).
 - Recommend the built-in car hotspot, and pause the car's Wi-Fi network search during Wi-Fi Direct on Android 7.1 and later when network ADB is approved (#570).
 - Record the head-unit microphone for app voice notes and clock Opus 16 kHz microphone packets at 16 kHz (#548, #547).
-- Check daily for updates with an Update available notice, recognize the DiLink generation from the controller version, and save Android 9 reports to Download/DiPlay (#488, #531, #541).
-- Add album-cover ambient lighting and fix saving ambient settings on hotfix firmware; add experimental BYD call popup hiding and external controller keys (#537, #550, #539, #549).
+- Check daily for updates with an Update available notice, recognize the HS5 generation from the controller version, and save Android 9 reports to Download/DiPlay (#488, #531, #541).
+- Add album-cover ambient lighting and fix saving ambient settings on hotfix firmware; add experimental Hongqi HS5 call popup hiding and external controller keys (#537, #550, #539, #549).
 
 See [0.2.17 release notes](docs/RELEASE-NOTES-0.2.17.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
 
@@ -27,7 +27,7 @@ See [0.2.17 release notes](docs/RELEASE-NOTES-0.2.17.md) for contribution links 
 - Refresh hotspot addresses after a first wireless timeout, request Android 17 local-network permission, handle missing VPN authorization screens and add WPA3 car-hotspot security (#474, #465, #517, #501).
 - Add experimental Low-latency decoding and Direct video output, an FPS counter, a hardware low-latency Smooth video decoder and bounded video backlog recovery (#496, #456, #347).
 - Add inline Settings search, confirm before the quick menu discards staged changes, allow turning off the swipe-down gesture, and refine Settings layout and reconnect prompts (#450, #500, #487, #486, #482, #490, #491).
-- Place the dashboard car marker with 1% sliders, give the small-window turn card its own placement, theme the cluster waiting screen, show the full DiLink 3 arrival time, declare initial appearance and add side-panel resizing (#494, #493, #481, #458, #346, #480).
+- Place the dashboard car marker with 1% sliders, give the small-window turn card its own placement, theme the cluster waiting screen, show the full HS5 3 arrival time, declare initial appearance and add side-panel resizing (#494, #493, #481, #458, #346, #480).
 - Add experimental, off-by-default car Bluetooth pause, music-following ambient lighting, navigation wheel volume and a Platform 21 instrument route; refine call echo alignment, buffered-audio pacing and audio diagnostics (#307, #345, #344, #348, #421, #484, #499).
 
 See [0.2.16 release notes](docs/RELEASE-NOTES-0.2.16.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
@@ -35,7 +35,7 @@ See [0.2.16 release notes](docs/RELEASE-NOTES-0.2.16.md) for contribution links 
 # DiPlay 0.2.15 — 2026-10-08
 
 - Lower the minimum to Android 7.1/API 25 with compatibility fallbacks; Android 7.1–8.1 vehicle validation remains pending (#407).
-- Add the first-launch DiLink setup guide and manual GitHub update checks in About (#416, #413).
+- Add the first-launch HS5 setup guide and manual GitHub update checks in About (#416, #413).
 - Add Light/Dark/Auto app appearance and refine compact layouts, fullscreen handling, Language and About navigation (#422, #420).
 - Recover the music prebuffer after underruns, including corrected retained-audio accounting, and supply a main-decoder operating-rate hint with fallback (#401, #417).
 - Add Wi-Fi Direct automatic band choices and optional selected-iPhone Bluetooth launch; experimental Bluetooth audio remains off by default (#432, #439).
@@ -55,8 +55,8 @@ See [0.2.15 release notes](docs/RELEASE-NOTES-0.2.15.md) for contribution links 
 - Add default-off experimental Smooth video pacing with explicit latency/picture-adjustment limits (#367).
 - Preserve usable hotspot interface addresses and authenticated Bluetooth control on the observed rendered-session handoff fallback (#394, #396).
 - Add configurable steering-wheel Siri, bounded microphone-source fallback and optional audio-focus handling (#360, #371, #339).
-- Repair BYD call-watcher/audio-status behavior and add opt-in, default-off experimental software call echo cancellation and voice filtering (#370).
-- Preserve artwork proportions, correct system-bar-aware split/rotation geometry and recognize the specifically observed 1280×480 DiLink 3 cluster surface (#375, #389, #388).
+- Repair Hongqi HS5 call-watcher/audio-status behavior and add opt-in, default-off experimental software call echo cancellation and voice filtering (#370).
+- Preserve artwork proportions, correct system-bar-aware split/rotation geometry and recognize the specifically observed 1280×480 HS5 3 cluster surface (#375, #389, #388).
 
 See [0.2.14 release notes](docs/RELEASE-NOTES-0.2.14.md) for all 20 contribution links, credits and limitations. Android 9/API 28 remains required. See [validation](docs/VALIDATION.md) for measured checks; complete-release vehicle acceptance is not claimed.
 
@@ -69,10 +69,10 @@ See [0.2.14 release notes](docs/RELEASE-NOTES-0.2.14.md) for all 20 contribution
 - Switch wireless to USB within the host activity, verify requested permissions independently, preserve other accessibility services and cancel stale permission work (#268).
 - Preserve validated USBMUX payload replies with narrow four-byte trailer recovery (#298).
 - Add optional live dock/split-screen areas, square-canvas screen rotation and the selected-decoder square check; add a default-off experimental side panel (#246, #277, #284, #245).
-- Preserve DiLink 4 native casting mode, offer pre-connection calibration and apply live cluster picture adjustments (#260, #265).
-- Retain a recent dashboard turn card only across wireless replacement within its stale window; add a Smaller map choice (125%) and the checked DiLink 3 full-then-half projection sequence with compensation (#304, #306, #296).
+- Preserve HS5 4 native casting mode, offer pre-connection calibration and apply live cluster picture adjustments (#260, #265).
+- Retain a recent dashboard turn card only across wireless replacement within its stale window; add a Smaller map choice (125%) and the checked HS5 3 full-then-half projection sequence with compensation (#304, #306, #296).
 - Restore battery reads when only sys.car.protocol is populated and recover eligible unbound wheel services using already-authorized ADB (#285, #297).
-- Add independent default-off experimental DiLink 3 call keys and dashboard calls, with initialized watcher readiness, unique ownership, pristine-safe cancellation and retryable dirty cleanup; target-car acceptance remains requested (#243).
+- Add independent default-off experimental HS5 3 call keys and dashboard calls, with initialized watcher readiness, unique ownership, pristine-safe cancellation and retryable dirty cleanup; target-car acceptance remains requested (#243).
 - Correct the observed 24 kHz Siri microphone RTP clock while retaining 48 kHz for telephony/unobserved formats; add bounded, default-off experimental AAC-LC buffered music and single-session renderer ownership (#295, #308).
 - Set TCP_NODELAY on the touch event channel; contributor latency observations remain device-specific (#311).
 - Improve full-size multi-window home/settings appearance, ambient-setting visibility and shared menu persistence; add main-settings car-button customization (#252, #239, #281, #302).
@@ -92,8 +92,8 @@ See [0.2.13 release notes](docs/RELEASE-NOTES-0.2.13.md) for all 35 contribution
 - Add independent system-bar controls and correct in-session save/cancel and Local/USB-CH341 authentication selection (#191, #194).
 - Add system, light-sensor, day and night CarPlay appearance modes, richer custom turn cards, and live main-video picture controls (#178, #193, #211).
 - Offer custom integer resolution from 30% to 160%, with shared limits, correct 30%/160% labels and decoder/canvas capability fallback; refresh connection settings on resume (#179, #230, #196).
-- Reconcile opt-in DiLink 4 cluster routing/calibration into one decoder owner, retain verified HUD gates, and journal exact stock-map holds and recovery (#213, #187).
-- Add DiLink 3 guidance text and projection-display support with committed recovery before mutation, partial-setup compensation and retryable stock restoration (#182).
+- Reconcile opt-in HS5 4 cluster routing/calibration into one decoder owner, retain verified HUD gates, and journal exact stock-map holds and recovery (#213, #187).
+- Add HS5 3 guidance text and projection-display support with committed recovery before mutation, partial-setup compensation and retryable stock restoration (#182).
 - Add opt-in wheel map zoom and main-screen joystick while preserving press/release and call behavior; reject stale queued work across phone/screen changes (#214, #231).
 - Switch supported dashboard contents live using actual delivery and safely retained paused choices; preserve selection across stream/phone replacement (#232).
 - Add a five-second dashboard-song-on-change window with timer invalidation, and retain album art while the next transfer is pending (#215, #228).
@@ -106,7 +106,7 @@ See [0.2.12 release notes](docs/RELEASE-NOTES-0.2.12.md) for the complete correc
 - Add preferred Wi-Fi Direct channel selection for the next connection; Auto remains the default, and manual channel rejection/mismatch reports an error (#175).
 - Add a movable custom dashboard turn card with 2% position steps; leave unknown arrows blank and clear expired guidance (#155).
 - Offer two-, three- or four-finger settings swipes, keeping three as the default (#156).
-- Add opt-in read-only legacy vehicle-data detection while preserving default DiLink 5.0 mode; reject unaccepted/stale probe publication and fix accepted-battery lock ordering (#158, integrated through #173).
+- Add opt-in read-only legacy vehicle-data detection while preserving default HS5 5.0 mode; reject unaccepted/stale probe publication and fix accepted-battery lock ordering (#158, integrated through #173).
 - Keep wireless location/vehicle data on its runtime Wi-Fi link and defer parked-video decisions until SETUP/event readiness (#157).
 - Add optional automatic car-hotspot startup, off by default, with verified own-package authorization and unified vehicle settings (#164/#173).
 - Support Android TV/remote controls while preserving head-unit touchscreen Back and absolute knob X/Y; keep its workflow source-only (#146).
@@ -123,7 +123,7 @@ See [0.2.11 release notes](docs/RELEASE-NOTES-0.2.11.md) for requirements, devic
 - Handle unknown reported Wi-Fi Direct security types, retry busy channels and allow bounded 5 GHz fallback (#121).
 - Select an available AirPlay port and advertise it over Bonjour and wired/wireless iAP2; close sockets on failed setup/notification (#143).
 - Enable available platform echo cancellation and noise suppression for calls, restoring the previous mode afterward (#116).
-- Detect BYD CAN/CANFD battery protocols and clear unsupported/stale readings (#123).
+- Detect Hongqi HS5 CAN/CANFD battery protocols and clear unsupported/stale readings (#123).
 - Add a saved show/hide setting for the home-screen dashboard-map mirror (#133).
 - Improve optional parked video with seeking and ten-second skip controls; validate media URLs and redirects (#129).
 - Extend Ukrainian translations, including the new map-mirror setting (#128 and release localization).
@@ -133,11 +133,11 @@ See [0.2.10 release notes](docs/RELEASE-NOTES-0.2.10.md) for contributor credits
 
 # DiPlay 0.2.9 — 2026-10-02
 
-- Follow BYD head-unit day/night changes while CarPlay is visible, including firmware that does not reliably deliver Android configuration callbacks.
+- Follow Hongqi HS5 head-unit day/night changes while CarPlay is visible, including firmware that does not reliably deliver Android configuration callbacks.
 - Restore media and navigation audio stream selection to 0–20 and inherit older saved navigation settings when no new selection exists. Vendor-specific outputs depend on head-unit support.
 - Keep CarPlay connected through normal surround-view window changes, preserving video proportions and touch alignment. A connection started in a narrow camera window reconnects once when the window grows to restore the full-screen canvas.
 - Add Ukrainian to the app language picker, Android app-language settings, and website. Correct its audio help to describe streams 1–20.
-- Add an optional CarPlay song title, artist, and play/pause display on the BYD instrument cluster, using the existing network ADB connection.
+- Add an optional CarPlay song title, artist, and play/pause display on the Hongqi HS5 instrument cluster, using the existing network ADB connection.
 - Add a CarPlay navigation widget for launchers that host standard Android widgets, with the next turn, road, distance, arrival information, and song. Clear expired guidance and explicitly cleared song titles.
 - Add an optional floating copy of the dashboard map on the centre screen, with drag, pinch-to-resize, and tap-to-open controls. Requires permission to draw over other apps; Usage Access restricts it to home screens.
 - Fix floating-map resizing on head units that ignore small pinch gestures.
@@ -160,17 +160,17 @@ See [0.2.9 release notes](docs/RELEASE-NOTES-0.2.9.md) for the merged changes an
 # DiPlay 0.2.7 — 2026-09-29
 
 - App interface in English, Simplified Chinese, Arabic, Russian and Spanish; synchronized Android app-language settings.
-- Steering-wheel media controls and long-press Siri on supported BYD firmware while CarPlay is on screen.
+- Steering-wheel media controls and long-press Siri on supported Hongqi HS5 firmware while CarPlay is on screen.
 - Dashboard display choices: map, turn card, or both; corrected dashboard keyframe recovery.
-- Optional ADB feature on supported DiLink 5.0: pause the dashboard map stream when its display mode hides the map.
+- Optional ADB feature on supported HS5 5.0: pause the dashboard map stream when its display mode hides the map.
 - Optional ADB battery reporting for Apple Maps, with warning threshold, charging-connector selection and a checked reconnect action.
 - Audio playback reliability fixes and clearer dashboard settings.
-- Clarify the BYD-only support scope on the README and all five website editions.
+- Clarify the Hongqi HS5-only support scope on the README and all five website editions.
 
-# 0.2.0 — BYD navigation and connection improvements
+# 0.2.0 — Hongqi HS5 navigation and connection improvements
 
-- Standalone windshield HUD arrows, distance and street names on the verified DiLink5.1 firmware; no ADB, root or computer helper.
-- Retain contributor cluster/SOME-IP navigation, route parsing, BYD CarPlay icon and display-size presets.
+- Standalone windshield HUD arrows, distance and street names on the verified HS55.1 firmware; no ADB, root or computer helper.
+- Retain contributor cluster/SOME-IP navigation, route parsing, Hongqi HS5 CarPlay icon and display-size presets.
 - Fix Car hotspot startup by using scoped IPv6 when available and binding discovery/probing to the AP interface. Physically confirmed on the development car.
 - Drain asynchronously decoded audio during packet gaps and rebuild the music buffer after starvation. Wi-Fi Direct is much better in the user retest; occasional audio cutouts remain for a later version.
 - Preserve bounded music-buffer choices, USB read improvements and decoder recovery; fix USB request/close races and keep vendor output outside phone callbacks.

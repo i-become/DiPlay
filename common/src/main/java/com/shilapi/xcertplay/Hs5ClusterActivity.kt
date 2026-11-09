@@ -191,9 +191,7 @@ internal object Hs5ClusterActivityOutput {
 
     fun enabled(context: Context): Boolean =
         Hs5HeadUnit.isHeadUnit(context) &&
-            AirPlayPersistence.loadHs5ClusterActivityWindow(context) &&
-            !DiLink51ClusterLayout.supported() &&
-            !AdbClusterRouter.enabled(context)
+            AirPlayPersistence.loadHs5ClusterActivityWindow(context)
 
     fun isOpen(): Boolean {
         if (token == null) return false

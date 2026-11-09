@@ -78,7 +78,7 @@ internal object NewUiDiagnosticReport {
         appendLine()
         appendLine("--- Cluster fly screen window ---")
         appendLine(Hs5ClusterActivityOutput.diagnosticReport())
-        appendLine(com.shilapi.xcertplay.hud.BydNavigationOutputs.hs5ClusterDiagnosticReport())
+        appendLine(com.shilapi.xcertplay.hud.Hs5NavigationOutputs.hs5ClusterDiagnosticReport())
         appendLine()
         appendLine("--- Steering keys ---")
         appendLine(WheelKeyService.report(context))

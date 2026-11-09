@@ -9,6 +9,7 @@ internal fun ComponentActivity.applyWithReconnectConfirm(
     title: String,
     message: String,
     onApplied: () -> Unit,
+    onCancelled: () -> Unit = {},
     save: () -> Unit,
 ) {
     if (!CarPlayBackgroundSession.hasSession()) {
@@ -23,6 +24,6 @@ internal fun ComponentActivity.applyWithReconnectConfirm(
             save()
             onApplied()
         }
-        .setNegativeButton(R.string.cancel, null)
+        .setNegativeButton(R.string.cancel) { _, _ -> onCancelled() }
         .show()
 }

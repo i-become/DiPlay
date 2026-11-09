@@ -251,7 +251,7 @@ internal class ClusterDashboardView(
         fun enabled(context: Context): Boolean = supported(context) &&
             AirPlayPersistence.loadClusterStyle(context).customDashboard
 
-        fun supported(context: Context): Boolean = !Hs5HeadUnit.isBydHeadUnit(context) &&
+        fun supported(context: Context): Boolean =
             !AirPlayPersistence.loadDebugSimulatedClusterPresentation(context) &&
             (Hs5HeadUnit.isHeadUnit(context) || Hs5HeadUnit.hasClusterPresentation(context) ||
                 Hs5HeadUnit.showsHs5NavigationBranding(context))

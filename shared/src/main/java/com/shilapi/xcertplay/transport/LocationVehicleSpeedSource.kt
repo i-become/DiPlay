@@ -17,7 +17,7 @@ import android.util.Log
 const val DEBUG_CLUSTER_DEMO_SPEED_METERS_PER_SECOND = 13.9
 
 /**
- * Wheel speed from Android location fixes for phones and head units without BYD ADB wheel data.
+ * Wheel speed from Android location fixes for phones and head units without the car ADB wheel data.
  * Used with simulated cluster debugging so Apple Maps can render instrument-cluster UI.
  */
 class LocationVehicleSpeedSource(

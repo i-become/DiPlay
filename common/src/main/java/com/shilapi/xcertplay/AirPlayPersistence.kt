@@ -90,7 +90,6 @@ object AirPlayPersistence {
     private const val KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT = "cluster_fly_screen_default_on_connect"
     private const val KEY_HS5_CLUSTER_ACTIVITY_WINDOW = "hs5_cluster_activity_window"
     private const val KEY_CLUSTER_MAP_HORIZONTAL_GESTURE = "cluster_map_horizontal_gesture_enabled"
-    private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
     private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
     private const val KEY_CENTER_MAP_AUTO_HIDE = "center_map_auto_hide"
     private const val KEY_LAUNCHER_MAP_SHARING = "launcher_map_sharing"
@@ -124,7 +123,6 @@ object AirPlayPersistence {
     private const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
     private const val KEY_DIAGNOSTIC_REPORT_DIRECTORY = "diagnostic_report_directory"
     private const val KEY_BT_SUSPEND_DURING_CARPLAY = "bt_suspend_during_carplay"
-    private const val KEY_HIDE_BYD_CALL_POPUP = "hide_byd_call_popup"
     private const val KEY_BT_SUSPEND_DELAY = "bt_suspend_delay_seconds"
     private const val KEY_LOCATION_REPORTING_ENABLED = "location_reporting_enabled"
     private const val KEY_EXTERNAL_CONTROLLER = "external_controller"
@@ -531,15 +529,6 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_BT_SUSPEND_DURING_CARPLAY, false)
 
-    fun loadHideBydCallPopup(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HIDE_BYD_CALL_POPUP, false)
-
-    fun saveHideBydCallPopup(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_HIDE_BYD_CALL_POPUP, enabled).apply()
-    }
-
     fun saveBtSuspendDuringCarplay(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_BT_SUSPEND_DURING_CARPLAY, enabled).apply()
@@ -912,24 +901,13 @@ object AirPlayPersistence {
         return prefs.getBoolean(KEY_CLUSTER_MAP, true)
     }
 
-    fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
-
-    fun saveAdbClusterEnabled(context: Context, enabled: Boolean) {
-        val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_ADB_CLUSTER_ACTIVITY, enabled)
-            .putBoolean("platform21_cluster_enabled", false)
-        if (enabled) edit.putBoolean(KEY_CLUSTER_MAP, true)
-        edit.apply()
-    }
-
     fun loadLegacyClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("platform21_cluster_enabled", false)
 
     fun saveLegacyClusterEnabled(context: Context, enabled: Boolean) {
         val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean("platform21_cluster_enabled", enabled)
-        if (enabled) edit.putBoolean(KEY_CLUSTER_MAP, true).putBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
+        if (enabled) edit.putBoolean(KEY_CLUSTER_MAP, true)
         edit.apply()
     }
 
@@ -1085,7 +1063,7 @@ object AirPlayPersistence {
     fun loadClusterContent(context: Context): CarPlayClusterDisplay.Content =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CLUSTER_CONTENT, null)
             ?.let { name -> CarPlayClusterDisplay.Content.entries.firstOrNull { it.name == name } }
-            ?: if (AdbClusterRouter.enabled(context) && !loadLegacyClusterEnabled(context)) CarPlayClusterDisplay.Content.INSTRUMENTS else CarPlayClusterDisplay.Content.MAP
+            ?: CarPlayClusterDisplay.Content.MAP
 
     /** Simulated-cluster debug uses Apple Maps instrument-cluster UI, not the full-map URL. */
     fun effectiveClusterContent(context: Context): CarPlayClusterDisplay.Content =

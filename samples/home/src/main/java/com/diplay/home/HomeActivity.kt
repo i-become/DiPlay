@@ -26,8 +26,8 @@ import androidx.activity.OnBackPressedCallback
 
 /**
  * DiPlay Home: the live CarPlay map, any Android widgets and the app list on one screen. An
- * ordinary app, so it can be the home screen without BYD's system privileges; BYD's own home
- * stays installed and one button away.
+ * ordinary app, so it can be the home screen without OEM system privileges; the system home
+ * remains installed and one button away.
  */
 class HomeActivity : ComponentActivity() {
     private lateinit var mapPanel: DiPlayMapPanel
@@ -53,7 +53,7 @@ class HomeActivity : ComponentActivity() {
             addView(LinearLayout(context).apply {
                 addView(pill("Apps") { showApps(true) }, weighted())
                 addView(pill("CarPlay") { mapPanel.openCarPlay() }, weighted())
-                addView(pill("BYD home") { openBydHome() }, weighted())
+                addView(pill("System home") { openSystemHome() }, weighted())
             }, LinearLayout.LayoutParams(-1, dp(72)).apply { topMargin = dp(16) })
         }
         editButton = pill("Edit") { setEditing(!board.editing) }
@@ -128,10 +128,11 @@ class HomeActivity : ComponentActivity() {
         editButton.text = if (editing) "Done" else "Edit"
     }
 
-    private fun openBydHome() {
-        val byd = Intent().setClassName(BYD_HOME_PACKAGE, BYD_HOME_ACTIVITY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (runCatching { startActivity(byd) }.isFailure) {
-            Toast.makeText(this, "BYD home is not available", Toast.LENGTH_LONG).show()
+    private fun openSystemHome() {
+        val systemHome = Intent().setClassName(SYSTEM_HOME_PACKAGE, SYSTEM_HOME_ACTIVITY)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { startActivity(systemHome) }.isFailure) {
+            Toast.makeText(this, "System home is not available", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -204,8 +205,8 @@ class HomeActivity : ComponentActivity() {
     private companion object {
         val BACKGROUND = Color.rgb(14, 19, 26)
         val MUTED = Color.rgb(150, 162, 178)
-        const val BYD_HOME_PACKAGE = "com.android.launcher3"
-        const val BYD_HOME_ACTIVITY = "com.android.launcher3.home.MainActivity"
+        const val SYSTEM_HOME_PACKAGE = "com.android.launcher3"
+        const val SYSTEM_HOME_ACTIVITY = "com.android.launcher3.home.MainActivity"
     }
 }
 

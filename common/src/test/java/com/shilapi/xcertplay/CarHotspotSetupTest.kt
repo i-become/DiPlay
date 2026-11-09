@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import com.shilapi.xcertplay.adb.LocalAdb
-import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.network.CarHotspotSettings
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import org.junit.Assert.*
@@ -32,33 +32,33 @@ class CarHotspotSetupTest {
         assertFalse(eligible())
     }
 
-    @Test fun qualcommBydWithoutNavigationServicesCanReachHotspotSetup() {
-        ShadowBuild.setManufacturer("QUALCOMM")
-        ShadowBuild.setBrand("qti")
-        installPackage("com.byd.carsettings", system = true)
-        assertFalse(BydOutputSettings.navigationAvailable(context))
-        assertTrue(CarHotspotSetup.isBydHeadUnit(context))
-        assertTrue(CarHotspotSettings.visible(CarHotspotSetup.isBydHeadUnit(context), LocalAdb.Access.NOT_APPROVED))
-        assertFalse(CarHotspotSettings.visible(CarHotspotSetup.isBydHeadUnit(context), LocalAdb.Access.UNREACHABLE))
+    @Test fun hongqiHeadUnitCanReachHotspotSetupBeforeAdbApproval() {
+        ShadowBuild.setManufacturer("FAW")
+        ShadowBuild.setBrand("Hongqi")
+        installPackage("com.faw.hongqi", system = true)
+        assertFalse(Hs5OutputSettings.navigationAvailable(context))
+        assertTrue(CarHotspotSetup.isHongqiHeadUnit(context))
+        assertTrue(CarHotspotSettings.visible(CarHotspotSetup.isHongqiHeadUnit(context), LocalAdb.Access.NOT_APPROVED))
+        assertFalse(CarHotspotSettings.visible(CarHotspotSetup.isHongqiHeadUnit(context), LocalAdb.Access.UNREACHABLE))
     }
 
-    @Test fun userInstalledLookalikeDoesNotIdentifyABydHeadUnit() {
-        installPackage("com.byd.carsettings", system = false)
-        assertFalse(CarHotspotSetup.isBydHeadUnit(context))
+    @Test fun userInstalledHongqiPackageIdentifiesTheTargetHeadUnit() {
+        installPackage("com.faw.hongqi", system = false)
+        assertTrue(CarHotspotSetup.isHongqiHeadUnit(context))
     }
 
     @Test fun genericHeadUnitRemainsHiddenEvenWithAdbReady() {
-        assertFalse(CarHotspotSetup.isBydHeadUnit(context))
-        assertFalse(CarHotspotSettings.visible(CarHotspotSetup.isBydHeadUnit(context), LocalAdb.Access.READY))
+        assertFalse(CarHotspotSetup.isHongqiHeadUnit(context))
+        assertFalse(CarHotspotSettings.visible(CarHotspotSetup.isHongqiHeadUnit(context), LocalAdb.Access.READY))
     }
 
     @Test fun existingNavigationBasedDetectionIsPreserved() {
-        installPackage("com.byd.amapservice", system = true)
-        assertTrue(BydOutputSettings.navigationAvailable(context))
-        assertTrue(CarHotspotSetup.isBydHeadUnit(context))
+        installPackage("com.faw.navi", system = true)
+        ShadowBuild.setManufacturer("FAW")
+        assertTrue(CarHotspotSetup.isHongqiHeadUnit(context))
     }
 
-    @Test fun onlyBydWithSupportedAdbSeesTheSettingIncludingBeforeApproval() {
+    @Test fun onlyHongqiWithSupportedAdbSeesTheSettingIncludingBeforeApproval() {
         for (access in LocalAdb.Access.entries) {
             assertFalse(CarHotspotSettings.visible(false, access))
         }

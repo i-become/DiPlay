@@ -28,17 +28,9 @@
         android:required="false" />
 
     <queries>
-        <package android:name="com.byd.carsettings" />
-        <package android:name="com.byd.appmgr" />
-        <package android:name="com.byd.deviceinfo" />
-        <package android:name="com.byd.service" />
         <intent>
             <action android:name="android.settings.WIFI_SETTINGS" />
         </intent>
-        <package android:name="com.byd.clusterdebug" />
-        <package android:name="com.ts.car.someip.service" />
-        <package android:name="com.byd.amapservice" />
-        <package android:name="com.byd.automap" />
         <!-- Hongqi OEM packages and stock Gaode (package visibility on API 30+). -->
         <package android:name="com.autonavi.amapauto" />
         <package android:name="com.autonavi.amapauto.custom" />

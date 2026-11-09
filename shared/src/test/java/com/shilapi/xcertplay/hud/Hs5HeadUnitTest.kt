@@ -24,15 +24,15 @@ class Hs5HeadUnitTest {
         assertTrue(Hs5HeadUnit.skipsBackgroundAdb(context))
     }
 
-    @Test fun bydSkipsBackgroundAdbOnlyOnHongqi() {
-        ShadowBuild.setFingerprint("BYD-AUTO/IVI/IVI:13/release-keys")
-        install("com.byd.carsettings", system = true)
+    @Test fun genericAndroidUnitDoesNotSkipBackgroundAdb() {
+        ShadowBuild.setFingerprint("generic/car/car:13/release-keys")
+        install("com.android.carsettings", system = true)
         assertFalse(Hs5HeadUnit.skipsBackgroundAdb(context))
     }
 
-    @Test fun bydFingerprintIsNotHongqi() {
-        ShadowBuild.setFingerprint("BYD-AUTO/IVI/IVI:13/release-keys")
-        install("com.byd.carsettings", system = true)
+    @Test fun genericFingerprintIsNotHongqi() {
+        ShadowBuild.setFingerprint("generic/car/car:13/release-keys")
+        install("com.android.carsettings", system = true)
         assertFalse(Hs5HeadUnit.isHeadUnit(context))
     }
 

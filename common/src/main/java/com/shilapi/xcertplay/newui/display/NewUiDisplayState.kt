@@ -9,7 +9,7 @@ import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.CarPlayNightMode
 import com.shilapi.xcertplay.ClusterStyle
 import com.shilapi.xcertplay.ClusterDashboardView
-import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.host.R
 
 data class NewUiDisplayState(
@@ -75,7 +75,7 @@ internal object NewUiDisplayStateReader {
                 R.string.settings_mtk_decoder_tuning_description,
                 videoCodecLabel,
             ),
-            hudNavigationEnabled = BydOutputSettings.enabled(context),
+            hudNavigationEnabled = Hs5OutputSettings.enabled(context),
             clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(context),
             clusterFlyScreenDefaultOnConnect = AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(context),
             clusterFlyScreenWindowEnabled = AirPlayPersistence.loadHs5ClusterActivityWindow(context),
@@ -129,7 +129,7 @@ internal object NewUiDisplayActions {
     }
 
     fun saveHudNavigation(context: Context, enabled: Boolean) {
-        BydOutputSettings.setEnabled(context, enabled)
+        Hs5OutputSettings.setEnabled(context, enabled)
     }
 
     fun saveClusterGesture(context: Context, enabled: Boolean) {

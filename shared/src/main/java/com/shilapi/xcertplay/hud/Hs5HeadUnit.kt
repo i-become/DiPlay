@@ -36,7 +36,7 @@ object Hs5HeadUnit {
             tags.contains("qisi") ||
             tags.contains("neusoft") ||
             tags.contains("cchq") ||
-            (tags.contains("faw") && !tags.contains("byd"))
+            tags.contains("faw")
     }
 
     private val oemPackageAllowlist = listOf(
@@ -73,8 +73,6 @@ object Hs5HeadUnit {
 
 
     fun isHeadUnit(context: Context): Boolean {
-
-        if (isBydHeadUnit(context)) return false
 
         val app = context.applicationContext
 
@@ -133,31 +131,9 @@ object Hs5HeadUnit {
         return "${display.name}#${display.displayId}"
     }
 
-
-
-    fun isBydHeadUnit(context: Context): Boolean {
-
-        val app = context.applicationContext
-
-        return installed(app, "com.byd.carsettings") ||
-
-            installed(app, "com.byd.appmgr") ||
-
-            Build.FINGERPRINT.contains("BYD", ignoreCase = true) ||
-
-            Build.BRAND.contains("BYD", ignoreCase = true) ||
-
-            Build.MANUFACTURER.contains("BYD", ignoreCase = true)
-
-    }
-
-
-
     /** True when settings should use Hongqi copy for HUD / cluster navigation. */
 
-    fun showsHs5NavigationBranding(context: Context): Boolean =
-
-        isHeadUnit(context) || (Hs5NavPackages.resolvedPackage(context) != null && !isBydHeadUnit(context))
+    fun showsHs5NavigationBranding(context: Context): Boolean = isHeadUnit(context)
 
 
 

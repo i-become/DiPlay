@@ -13,8 +13,7 @@ import android.util.Log
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
-import com.shilapi.xcertplay.hud.BydCarPlayCall
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.Hs5NavigationOutputs
 import com.shilapi.xcertplay.hud.CarPlayCallCard
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.media.CarPlayTelephonyAudio
@@ -116,7 +115,7 @@ internal object Hs5SteeringKeys {
         VoiceAssistantKeyController.reset()
         VoiceAssistantKeyController.applySettings(context)
         shuttingDown = false
-        BydCarPlayCall.callChanged = { card ->
+        Hs5NavigationOutputs.setCallListener { card ->
             // A long press that ended the call releases after it; the key goes back once that is in.
             if (card != null) mainHandler.post { scheduleRefresh(force = true) }
             else mainHandler.postDelayed({ scheduleRefresh(force = true) }, CALL_KEY_RETURN_DELAY_MS)
@@ -283,7 +282,7 @@ internal object Hs5SteeringKeys {
                     return
                 }
         }
-        val phoneCall = BydNavigationOutputs.carPlayCall() != null || CarPlayTelephonyAudio.active()
+        val phoneCall = Hs5NavigationOutputs.carPlayCall() != null || CarPlayTelephonyAudio.active()
         val flyScreen = CarPlayHostSettingsBridge.wheelBackTargetShown()
         val desiredKeys = if (claimKeys) {
             Hs5SteeringKeyPolicy.factoryKeyCodes(context, phoneCall, flyScreen)
@@ -546,7 +545,7 @@ internal object Hs5SteeringKeys {
 
     /** QiSi phone key: action 0 is a short press, 1 a long press starting and 2 its release. */
     private fun onPhoneKey(action: Int, active: CarPlayController) {
-        val call = BydNavigationOutputs.carPlayCall()
+        val call = Hs5NavigationOutputs.carPlayCall()
         val voip = CarPlayTelephonyAudio.active()
         val speechVoip = CarPlayTelephonyAudio.speechOnlyCallActive()
         val iapVoip = CarPlayTelephonyAudio.voipAcceptUsesIap()

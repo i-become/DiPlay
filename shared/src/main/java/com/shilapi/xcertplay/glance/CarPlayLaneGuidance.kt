@@ -66,6 +66,12 @@ internal object CarPlayLaneGuidance {
 
 /** Cache future junctions separately; only the phone's current, visible lane block may be shown. */
 internal class CarPlayLaneState {
+    internal data class Current(
+        val index: Int,
+        val showing: Boolean,
+        val lanes: List<CarPlayLane>,
+    )
+
     private val blocks = linkedMapOf<Int, List<CarPlayLane>>()
     private var currentIndex: Int? = null
     private var showing = false
@@ -102,6 +108,12 @@ internal class CarPlayLaneState {
     }
 
     fun current(): List<CarPlayLane> = if (showing) blocks[currentIndex].orEmpty() else emptyList()
+
+    /** Metadata and lanes for the route-referenced block, including an empty valid block. */
+    fun currentBlock(): Current? = currentIndex?.let { index ->
+        if (!showing || !blocks.containsKey(index)) null
+        else Current(index, true, blocks[index].orEmpty())
+    }
 
     fun diagnosticState(): String = "index=$currentIndex showing=$showing cached=${blocks.keys} " +
         "lanes=${current().map { "${it.index}:${it.status}:${it.directions}:${it.highlightedDirection}" }}"

@@ -130,7 +130,6 @@
     <string name="back_to_diplay">Повернутися до DiPlay</string>
     <string name="band">Діапазон</string>
     <string name="bluetooth_settings">Налаштування Bluetooth</string>
-    <string name="byd_navigation">Навігація BYD</string>
     <string name="cancel">Скасувати</string>
     <string name="car_home">Головний екран автомобіля</string>
     <string name="car_hotspot_details">Дані точки доступу автомобіля</string>
@@ -397,7 +396,6 @@
     <string name="share">Поділитися</string>
     <string name="show_on_screen_debug_logs">Показувати журнали налагодження на екрані</string>
     <string name="show_password">Показати пароль</string>
-    <string name="show_phone_navigation_arrows_distance_and_street_names_on">Показувати стрілки навігації, відстань і назви вулиць із телефона на підтримуваних екранах BYD. Сумісність залежить від автомобіля.</string>
     <string name="show_the_side_map_only_when_its_card_is_open_and_switch_to">Показувати карту збоку, лише коли відкрито її картку, та переходити до повної карти в темі «Карта». Зміна теми чи картки не перериває CarPlay.</string>
     <string name="shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c">Показує карту iPhone на панелі приладів. У меню панелі приладів на кермі виберіть «Мала навігація» або «Повноекранна навігація».</string>
     <string name="start_carplay_automatically_after_device_boot">Автоматично запускати CarPlay після завантаження пристрою</string>
@@ -405,7 +403,6 @@
     <string name="starting_airplay_service">Запуск служби AirPlay</string>
     <string name="starting_wireless_hotspot">Запуск бездротової точки доступу</string>
     <string name="still_waiting_for_usage_access_check_that_the_command_ran">Доступ до даних використання ще не надано. Перевірте, чи команда успішно виконалася для цього автомобіля, і спробуйте знову.</string>
-    <string name="tap_a_number_to_test_14_driver_speaker_on_byd">Торкніться числа для перевірки. 14 = динамік водія в BYD.</string>
     <string name="the_head_unit_couldn_t_start_carplay_wi_fi_check_wi_fi_and">Головний пристрій не зміг запустити Wi-Fi CarPlay. Перевірте Wi-Fi й закрийте інші застосунки проєкції. Повторна спроба…</string>
     <string name="this_ends_the_existing_wi_fi_direct_connection_including_o">Це розірве наявне з’єднання Wi-Fi Direct, зокрема те, що залишилося після перевстановлення. Спочатку закрийте інші застосунки проєкції. Звичайний Wi-Fi автомобіля для інтернету залишиться увімкненим.</string>
     <string name="this_head_unit_cannot_use_the_smaller_size_at_this_resolut">Цей головний пристрій не підтримує менший розмір за такої роздільної здатності. Використовується типовий.</string>
@@ -419,7 +416,6 @@
     <string name="turn_on_wi_fi_in_the_head_unit_s_settings_to_connect">Увімкніть Wi-Fi у налаштуваннях головного пристрою, щоб підключитися.</string>
     <string name="turn_the_car_s_wi_fi_switch_on_allow_location_nearby_devic">Увімкніть Wi-Fi автомобіля. Надайте доступ до місцезнаходження та пристроїв поблизу, якщо з’явиться запит, і ввімкніть геолокацію на запит Android. Якщо відтворення переривається, спробуйте вбудовану точку доступу автомобіля на частоті 5 ГГц.</string>
     <string name="usage_access_enabled">Доступ до даних використання: надано</string>
-    <string name="usage_access_lets_diplay_follow_the_instrument_theme_and_m">Доступ до даних використання дозволяє DiPlay стежити за темою панелі приладів та карткою карти. Локально обробляються лише події екрана панелі приладів BYD. У цьому автомобілі сторінка налаштування такого дозволу не працює.</string>
     <string name="usage_access_setup_needed_for_automatic_mode">Доступ до даних використання: потрібне налаштування для автоматичного режиму</string>
     <string name="usb_ch341">USB/CH341</string>
     <string name="use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo">Скористайтеся USB-кабелем для передавання даних і відповідним портом автомобіля. Розблокуйте iPhone та дозвольте CarPlay. Налаштовувати точку доступу не потрібно.</string>
@@ -522,17 +518,13 @@
     <string name="adb_vehicle_gear_unreadable">Не вдалося зчитати передачу на цій прошивці.</string>
     <string name="advanced_vehicle_data">Розширені дані автомобіля</string>
     <string name="hide_advanced_vehicle_data">Приховати розширені дані автомобіля</string>
-    <string name="advanced_vehicle_data_description">Виберіть типове зчитування даних DiLink 5.0 або визначте поля на старому головному пристрої. Нічого не записується в автомобіль.</string>
     <string name="vehicle_data_mode">Режим даних автомобіля</string>
-    <string name="vehicle_data_mode_default">Типовий режим · перевірено на головних пристроях DiLink 5.0</string>
-    <string name="vehicle_data_mode_legacy">Визначення старого головного пристрою · випробувано на контролері 13 / DiLink 3.0</string>
     <string name="adb_not_checked">ADB ще не перевірено.</string>
     <string name="vehicle_probe_saved_automatic">Можливості автомобіля збережено. Перевірка через ADB і за потреби повторне визначення виконуються автоматично.</string>
     <string name="request_adb_authorization">Запитати дозвіл ADB для DiPlay</string>
     <string name="adb_enabled_not_approved">ADB увімкнено, але цю тестову версію DiPlay ще не авторизовано.</string>
     <string name="probe_adb_and_vehicle_data">Визначити старий головний пристрій</string>
     <string name="probe_vehicle_data_again">Повторно визначити старий головний пристрій</string>
-    <string name="probing_vehicle_data">Зчитування каталогу полів BYD цієї прошивки й перевірка потрібних полів…</string>
     <string name="vehicle_probe_failed">Не вдалося перевірити дані автомобіля: %1$s</string>
     <string name="vehicle_probe_lost_saved_fields">Перевірка не підтвердила: %1$s. Збережену конфігурацію залишено.</string>
     <string name="replace_saved_vehicle_data_anyway">Усе одно замінити збережені дані автомобіля</string>
@@ -559,7 +551,6 @@
     <string name="video_pause">Пауза</string>
     <string name="video_cannot_play">Це відео не можна відтворити на екрані автомобіля. Для захищеного відео, зокрема Apple TV+, потрібен ліцензований приймач.</string>
     <string name="center_map_card">Карта панелі приладів на центральному екрані</string>
-    <string name="center_map_card_description">Поки DiPlay працює у фоні, карта панелі приладів також показується карткою на головному екрані: BYD, домашній екран із картою або ваш типовий лаунчер. Торкніться картки, щоб відкрити CarPlay, перетягніть її, щоб перемістити, і розведіть двома пальцями, щоб змінити розмір. Карта на панелі приладів залишається. Потрібен дозвіл на показ поверх інших застосунків.</string>
     <string name="center_map_follows_dashboard">Синхронізувати карту головного екрана з панеллю приладів</string>
     <string name="center_map_follows_dashboard_description">Увімкнено: картка головного екрана дублює карту панелі приладів, тому обидві показують однакове зображення. Вимкнено: картка головного екрана прихована, а карта відображається лише на панелі приладів.</string>
     <string name="center_map_no_permission_screen">На цьому головному пристрої немає екрана налаштувань для цього дозволу. Надайте його через ADB.</string>
@@ -568,7 +559,6 @@
     <string name="center_map_usage_allowed">Доступ до даних використання: дозволено, картка показується лише на головному екрані</string>
     <string name="center_map_usage_missing">Доступ до даних використання: не дозволено, тому картка показується поверх усіх застосунків. Через ADB: adb shell appops set %1$s GET_USAGE_STATS allow</string>
     <string name="cluster_song">Пісня на панелі приладів</string>
-    <string name="cluster_song_description">Назва й виконавець пісні з CarPlay показуються в музичній картці на панелі приладів, разом із відтворенням і паузою. Картка показується як джерело BYD «Інше», бо панель приладів не малює власне джерело CarPlay. Застосовується одразу. Потрібен ADB через мережу на головному пристрої.</string>
     <string name="launcher_map_sharing">Ділитися живою картою з іншими лаунчерами</string>
     <string name="launcher_map_sharing_description">Лаунчери з підтримкою DiPlay можуть показувати живу карту панелі приладів на своєму головному екрані. Типово вимкнено, бо тоді карту зможе запитати будь-який застосунок на головному пристрої. Див. docs/LAUNCHER_INTEGRATION.md.</string>
     <string name="location_reporting_reconnects">Зміна цього налаштування перепідключає активний сеанс CarPlay.</string>
@@ -606,7 +596,6 @@
     <string name="settings_gesture_fingers">Швидке меню · свайп %1$d пальцями (торкніться, щоб змінити)</string>
     <string name="settings_gesture_fingers_label">Швидке меню · кількість пальців</string>
     <string name="settings_gesture_fingers_option">%1$d пальців</string>
-    <string name="settings_gesture_fingers_hint">Виберіть кількість пальців, яку не використовує головний пристрій. BYD резервує свайп трьома пальцями вниз під панель кондиціонера.</string>
     <string name="settings_hongqi_navigation">Hongqi navigation (experimental)</string>
     <string name="settings_navigation_output">Head-unit navigation output (experimental)</string>
     <string name="settings_navigation_output_unrecognized_hint">Head unit not recognized; display depends on your car.</string>
@@ -626,7 +615,6 @@
     <string name="hotspot_control_unsupported">Прошивка не підтримує автоматичне ввімкнення точки доступу. Відкрийте налаштування авто.</string>
     <string name="hotspot_control_timeout">Час очікування ввімкнення точки доступу минув. Відкрийте налаштування авто.</string>
     <string name="hotspot_control_failed">Не вдалося ввімкнути точку доступу. Відкрийте налаштування авто.</string>
-    <string name="byd_adb_features">Функції BYD · потрібен ADB</string>
     <string name="diagnostic_report_saved_in_app">Звіт збережено приватно в DiPlay, оскільки загальнодоступне місце збереження недоступне. Поділіться ним або перегляньте його тут. Нічого не надсилається автоматично.</string>
     <string name="diagnostic_report_saved_to_path">Звіт збережено в:\n%1$s\n\nВи також можете поділитися ним або переглянути його тут. Нічого не надсилається автоматично.</string>
     <string name="view_diagnostic_report">Переглянути звіт</string>
@@ -635,7 +623,6 @@
     <string name="copied_report_to_clipboard">Звіт скопійовано в буфер обміну.</string>
     <string name="diagnostic_report_copy_hint">Прокручуйте, щоб прочитати весь звіт. «Копіювати звіт» або довге натискання для виділення частини тексту.</string>
     <string name="wheel_map_zoom">Масштаб карти на панелі приладів кнопками керма</string>
-    <string name="wheel_map_zoom_description">Кастомна кнопка BYD перемикає кнопки гучності між звуком і масштабом карти на панелі приладів, поки там карта CarPlay. Під час дзвінка кнопки завжди керують звуком. На деяких авто гучність на консолі надсилає ті самі кнопки, тож у режимі масштабу вона теж змінює масштаб. Працює через службу кнопок керма DiPlay; напис на панелі приладів потребує ADB.</string>
     <string name="wheel_keys_service_on">Служба кнопок керма: увімкнена</string>
     <string name="wheel_keys_service_starting">Служба кнопок керма: дозволена, запускається…</string>
     <string name="wheel_keys_service_off">Служба кнопок керма: вимкнена</string>
@@ -656,7 +643,6 @@
     <string name="wheel_zoom_note_zoom">Масштаб карти</string>
     <string name="wheel_zoom_note_volume">Гучність</string>
     <string name="wheel_joystick">Джойстик CarPlay на кермі</string>
-    <string name="wheel_joystick_description">Кнопка медіа BYD вмикає й вимикає джойстик для центрального екрана CarPlay, як крутилка в авто. Поки він увімкнений, колесо гучності або ⏮ ⏭ рухають вибір, ⏯ вибирає, а кастомна кнопка повертає назад; музикою й гучністю ці кнопки тоді не керують. Під час дзвінка кнопки працюють для дзвінка. На деяких авто вибір рухає й гучність на консолі.</string>
     <string name="settings_external_controller">Зовнішній контролер (експериментально)</string>
     <string name="settings_external_controller_description">Клавіші підключеної Bluetooth-клавіатури, пульта або поворотного контролера переміщують і підтверджують вибір у CarPlay, як поворотна ручка автомобіля. Сенсорний екран продовжує працювати. Застосовується одразу.</string>
     <string name="settings_usb_connection">USB-підключення</string>
@@ -685,7 +671,6 @@
     <string name="cluster_song_on_change">Пісня лише при зміні</string>
     <string name="cluster_song_on_change_description">Нова пісня видна на панелі приладів 5 секунд, потім картка порожніє. Пауза й продовження її не показують.</string>
     <string name="carplay_calls_on_dashboard">Дзвінки CarPlay на панелі приладів</string>
-    <string name="carplay_calls_on_dashboard_description">Вхідні та поточні дзвінки CarPlay показують абонента на панелі приладів, а тривалість — на панелі приладів і проєкційному дисплеї, як у штатному застосунку CarPlay від BYD. Під час дзвінка авто також знижує оберти вентилятора. Застосовується одразу. Потрібен ADB через мережу на головному пристрої.</string>
     <string name="carplay_dock">Панель програм CarPlay</string>
     <string name="carplay_dock_automatic">Автоматично</string>
     <string name="carplay_dock_driver_side">З боку водія</string>
@@ -699,7 +684,6 @@
     <string name="carplay_rotation_smoother">Плавніше (1920)</string>
     <string name="carplay_rotation_sharper">Чіткіше (розмір екрана)</string>
     <string name="carplay_call_controls_experimental">Кнопки викликів CarPlay (експериментально)</string>
-    <string name="carplay_call_controls_experimental_description">Увімкнення неперевірених кнопок викликів, голосового керування та відтворення/паузи DiLink 3. Потрібна перевірка в автомобілі. Поки дзвонить виклик CarPlay, кнопка наступного треку відповідає, а попереднього — відхиляє. Типово вимкнено; картки викликів на панелі приладів налаштовуються окремо.</string>
     <string name="side_panel">Бічна панель поруч із CarPlay (експериментально)</string>
     <string name="side_panel_description">CarPlay може переходити на дві третини екрана, а DiPlay показує в решті свою панель: з боку пасажира на горизонтальному екрані, знизу на вертикальному (годинник і заряд, якщо його зчитано). Показуйте й ховайте її з меню під час сесії. Застосовується з наступного підключення.</string>
     <string name="side_panel_show">Бічна панель</string>
@@ -778,27 +762,19 @@
     <string name="settings_background_update_checks">Перевіряти оновлення у фоні</string>
     <string name="settings_background_update_checks_description">Раз на добу DiPlay перевіряє GitHub на нову версію і показує її на головному екрані. Завантаження починається лише після вашого дотику.</string>
     <string name="setup_guide">Майстер налаштування</string>
-    <string name="setup_guide_description">Визначте версію DiLink, оберіть підключення та увімкніть функції, що підходять вашому авто.</string>
     <string name="setup_step_of">КРОК %1$d З %2$d</string>
     <string name="setup_skip">Пропустити налаштування</string>
     <string name="setup_next">Далі</string>
     <string name="setup_car_title">Ваше авто</string>
     <string name="setup_car_detected">У версії системи знайдено: %1$s. Змініть, якщо це неправильно.</string>
     <string name="setup_car_likely">Схоже на %1$s. Підтвердьте.</string>
-    <string name="setup_car_unknown">DiPlay не вдалося визначити версію DiLink. Оберіть її нижче або залиште «Не впевнений».</string>
-    <string name="setup_car_choose">Версія DiLink</string>
     <string name="setup_car_evidence">Версія системи: %1$s</string>
-    <string name="dilink_3">DiLink 3</string>
-    <string name="dilink_4">DiLink 4</string>
-    <string name="dilink_5">DiLink 5</string>
-    <string name="dilink_not_sure">Не впевнений</string>
     <string name="setup_connection_title">Підключення</string>
     <string name="setup_connection_description">Оберіть, як iPhone підключається до авто. Більшість авто найкраще працюють із власною точкою доступу на 5 ГГц. Wi-Fi Direct не потребує точки доступу, але може перейти на 2,4 ГГц.</string>
     <string name="setup_iphone_title">Під’єднайте iPhone</string>
     <string name="setup_iphone_none">iPhone ще не обрано</string>
     <string name="setup_features_title">Функції</string>
     <string name="setup_features_description">Рекомендовано для %1$s. Увімкніть потрібне зараз; усе залишається в налаштуваннях і може бути змінене пізніше.</string>
-    <string name="setup_cluster_route_conflict">Увімкнено маршрут панелі приладів DiLink 4. На DiLink 3 він заважає показу карти CarPlay на панелі приладів.</string>
     <string name="setup_cluster_route_turn_off">Вимкнути</string>
     <string name="setup_badge_tested">Перевірено на деяких авто</string>
     <string name="setup_badge_experimental">Експериментально</string>
@@ -823,8 +799,6 @@
     <string name="cluster_small_window_card_opacity">Картка маневру в міні-вікні · прозорість</string>
     <string name="turn_card_theme_day">Завжди день</string>
     <string name="turn_card_theme_night">Завжди ніч</string>
-
-    <!-- Optional BYD ambient lighting. -->
     <string name="settings_ambient_title">Атмосферне підсвічування (експериментально)</string>
     <string name="settings_ambient_configuration">Налаштування підсвічування</string>
     <string name="settings_ambient_static">Постійний</string>
@@ -855,7 +829,6 @@
     <string name="settings_ambient_front">Передня</string>
     <string name="settings_ambient_rear">Задня</string>
     <string name="settings_ambient_all">Усі</string>
-    <string name="settings_ambient_parked_notice">Налаштовуйте на стоянці. Експериментальна підтримка деяких інтерфейсів BYD; сумісність залежить від моделі та прошивки. Рівень 0 означає мінімум OEM, а не вимкнення.</string>
     <string name="settings_ambient_checking">Перевірка…</string>
     <string name="settings_ambient_unavailable">Перевірку без запису не пройдено: немає наявної авторизації ADB або відповідного інтерфейсу. Налаштування не збережено. Налаштуйте доступ окремо на стоянці; функція не вмикає ADB і не запитує авторизацію.</string>
     <string name="settings_disable_media_key_audio_focus">Вимкнути аудіофокус медіакнопок (експериментально)</string>
@@ -874,8 +847,6 @@
     <string name="settings_speech_without_low_rates">Чіткіший голос навігації через USB (експериментально)</string>
     <string name="settings_speech_without_low_rates_description">Через USB iPhone може передавати підказки навігації та відповіді Siri в телефонній якості 8 кГц. Цей параметр перестає пропонувати 8 і 16 кГц для такого звуку, і iPhone вибирає вищу частоту. Якщо підказки зникнуть, вимкніть його. Перепідключає CarPlay.</string>
     <string name="bluetooth_connections_not_real">Bluetooth Android на цьому головному пристрої повідомляє про з’єднання, але до iPhone нічого не доходить: «успішно» під’єднується навіть служба, якої не існує. Bluetooth тут обслуговує власний модуль виробника, недоступний застосункам, тому бездротовий CarPlay на цьому головному пристрої працювати не може. Спробуйте з’єднання через USB.</string>
-    <string name="settings_fce_cluster_guidance">Підказки на панелі приладів FCE (експериментально)</string>
-    <string name="settings_fce_cluster_guidance_description">Показує стрілки CarPlay і відстань до наступного маневру в навігаційному поданні панелі приладів на головних пристроях FCE, записуючи дані в сервіс автомобіля. Перевірено лише на одному автомобілі; вимкніть, якщо панель поводиться незвично.</string>
     <string name="new_ui_preview_open">Try the new home (experimental)</string>
     <string name="new_ui_preview_open_hint">Preview the redesigned connection screen. Classic settings stay available.</string>
     <string name="new_ui_open_classic">Classic UI</string>

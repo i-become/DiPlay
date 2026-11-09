@@ -3,12 +3,11 @@ package com.shilapi.xcertplay
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.provider.Settings
 import android.util.Log
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
-import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.network.CarHotspotSettings
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
@@ -17,10 +16,9 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** Each grant is requested explicitly from settings; startup never calls this authorization path. */
 internal object CarHotspotSetup {
-    // Older BYD units report QUALCOMM/qti and have no supported navigation-output service.
-    fun isBydHeadUnit(context: Context): Boolean = BydOutputSettings.navigationAvailable(context) || runCatching {
-        context.packageManager.getApplicationInfo("com.byd.carsettings", 0).flags and ApplicationInfo.FLAG_SYSTEM != 0
-    }.getOrDefault(false)
+    /** True when the current device exposes the verified Hongqi HS5/Qisi vehicle service. */
+    fun isHongqiHeadUnit(context: Context): Boolean =
+        Hs5HeadUnit.isHeadUnit(context) || Hs5OutputSettings.navigationAvailable(context)
 
     enum class Permission(val appOp: String) {
         HOTSPOT("WRITE_SETTINGS"), BOOT_LAUNCH("SYSTEM_ALERT_WINDOW");

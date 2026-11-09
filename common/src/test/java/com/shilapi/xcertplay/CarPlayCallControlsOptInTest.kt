@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay
 
-import com.shilapi.xcertplay.hud.BydCarPlayCall
-import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.hud.Hs5NavigationOutputs
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.hud.CarPlayCallState
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.orchestration.CarPlayController
@@ -20,8 +20,8 @@ class CarPlayCallControlsOptInTest {
     private val app get() = RuntimeEnvironment.getApplication()
 
     @After fun cleanup() {
-        BydOutputSettings.setCarPlayCallControls(app, false)
-        BydCarPlayCall.end()
+        Hs5OutputSettings.setEnabled(app, true)
+        Hs5NavigationOutputs.endNow()
     }
 
     @Test fun newCallKeysCannotConsumeOrSendAnythingWithoutOptIn() {
@@ -36,14 +36,14 @@ class CarPlayCallControlsOptInTest {
     @Test fun explicitOptInEnablesAnswerAndDisableRestoresPassThrough() {
         val controller = mock(CarPlayController::class.java)
         `when`(controller.activeAirPlaySessionToken()).thenReturn(Any())
-        BydCarPlayCall.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
+        Hs5NavigationOutputs.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
             u8(2, 2); string(4, "incoming-call")
         })
-        BydOutputSettings.setCarPlayCallControls(app, true)
+        Hs5OutputSettings.setEnabled(app, true)
         assertTrue(CarPlayCallKeys.onKey(app, 313, true, controller))
         assertTrue(CarPlayCallKeys.onKey(app, 313, false, controller))
         verify(controller).answerCall()
-        BydOutputSettings.setCarPlayCallControls(app, false)
+        Hs5OutputSettings.setEnabled(app, false)
         assertFalse(CarPlayCallKeys.onKey(app, 314, false, controller))
         verify(controller, never()).endCall()
     }

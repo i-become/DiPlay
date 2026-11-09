@@ -3,7 +3,6 @@ package com.shilapi.xcertplay.hud
 import android.view.KeyEvent
 import com.shilapi.xcertplay.hud.CarPlayCallKeyPolicy.Action
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -63,22 +62,13 @@ class CarPlayCallStateTest {
 
     @Test
     fun otherMessagesAndClearLeaveNoCall() {
-        assertFalse(state.accept(Iap2Messages.buildRaw(ClusterSongState.NOW_PLAYING_UPDATE) { u8(2, 2) }))
+        assertFalse(state.accept(Iap2Messages.buildRaw(0x7fff) { u8(2, 2) }))
         assertNull(state.current())
         state.accept(update("a", status = 2, name = "Mum"))
         state.clear()
         assertNull(state.current())
     }
 
-    @Test
-    fun theNameFitsBydsCallCard() {
-        assertArrayEquals("Mum".toByteArray(Charsets.UTF_16LE), CarPlayCallState.nameBytes("Mum"))
-        val long = CarPlayCallState.nameBytes("A".repeat(40))
-        assertEquals(CarPlayCallState.MAX_NAME_BYTES, long.size)
-        // An emoji is never cut in half.
-        val emoji = CarPlayCallState.nameBytes("A".repeat(29) + "😀")
-        assertEquals("A".repeat(29), String(emoji, Charsets.UTF_16LE))
-    }
 }
 
 class CarPlayCallKeyPolicyTest {
@@ -92,7 +82,7 @@ class CarPlayCallKeyPolicyTest {
     fun theCallKeyAnswersARingingCarPlayCall() {
         assertEquals(Action.CONSUME to Action.ANSWER, press(313, ringing))
         assertEquals(Action.CONSUME to Action.ANSWER, press(KeyEvent.KEYCODE_CALL, ringing))
-        // During the call it must not open BYD's phone app over CarPlay, and does not hang up.
+        // During the call it must not open the vehicle phone app over CarPlay, and does not hang up.
         assertEquals(Action.CONSUME to Action.CONSUME, press(313, active))
     }
 
@@ -100,13 +90,11 @@ class CarPlayCallKeyPolicyTest {
     fun theHangUpKeysEndOrDecline() {
         assertEquals(Action.CONSUME to Action.END, press(KeyEvent.KEYCODE_ENDCALL, ringing))
         assertEquals(Action.CONSUME to Action.END, press(314, active))
-        assertEquals(Action.END, CarPlayCallKeyPolicy.onHangUpBroadcast(314, active, session = true))
-        assertEquals(Action.END, CarPlayCallKeyPolicy.onHangUpBroadcast(309, ringing, session = true))
     }
 
     @Test
     fun trackKeysAnswerAndDeclineOnlyWhileACallRings() {
-        // #272: the Song Pro DM-i's wheel has only previous/next for calls.
+        // Some steering wheels expose only previous/next keys for call controls.
         assertEquals(Action.CONSUME to Action.ANSWER, press(KeyEvent.KEYCODE_MEDIA_NEXT, ringing))
         assertEquals(Action.CONSUME to Action.END, press(KeyEvent.KEYCODE_MEDIA_PREVIOUS, ringing))
         assertEquals(Action.PASS to Action.PASS, press(KeyEvent.KEYCODE_MEDIA_NEXT, active))
@@ -118,7 +106,5 @@ class CarPlayCallKeyPolicyTest {
         assertEquals(Action.PASS to Action.PASS, press(313, null))
         assertEquals(Action.PASS to Action.PASS, press(313, ringing, session = false))
         assertEquals(Action.PASS to Action.PASS, press(KeyEvent.KEYCODE_VOLUME_UP, ringing))
-        assertEquals(Action.PASS, CarPlayCallKeyPolicy.onHangUpBroadcast(314, null, session = true))
-        assertEquals(Action.PASS, CarPlayCallKeyPolicy.onHangUpBroadcast(305, active, session = true))
     }
 }

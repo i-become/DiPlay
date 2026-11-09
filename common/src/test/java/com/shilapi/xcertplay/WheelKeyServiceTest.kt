@@ -6,8 +6,8 @@ import android.media.AudioManager
 import android.os.Looper
 import android.view.KeyEvent
 import android.widget.Button
-import com.shilapi.xcertplay.hud.BydOutputSettings
-import com.shilapi.xcertplay.hud.BydCarPlayCall
+import com.shilapi.xcertplay.hud.Hs5OutputSettings
+import com.shilapi.xcertplay.hud.Hs5NavigationOutputs
 import com.shilapi.xcertplay.hud.CarPlayCallState
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.media.AndroidMediaSink
@@ -47,8 +47,8 @@ class WheelKeyServiceTest {
 
     @After fun tearDown() {
         service.onDestroy()
-        BydOutputSettings.setCarPlayCallControls(service, false)
-        BydCarPlayCall.end()
+        Hs5OutputSettings.setEnabled(service, true)
+        Hs5NavigationOutputs.endNow()
         CarPlayBackgroundSession.clear()
     }
 
@@ -221,20 +221,20 @@ class WheelKeyServiceTest {
 
     @Test fun experimentalVoiceKeysRemainWithTheCarUntilOptIn() {
         service.session = { "active-phone" }
-        BydOutputSettings.setCarPlayCallControls(service, false)
+        Hs5OutputSettings.setEnabled(service, false)
         assertEquals(false to false, press(327))
         assertEquals(false to false, press(328))
-        BydOutputSettings.setCarPlayCallControls(service, true)
+        Hs5OutputSettings.setEnabled(service, true)
         assertEquals(true to true, press(327))
         assertEquals(true to true, press(328))
-        BydOutputSettings.setCarPlayCallControls(service, false)
+        Hs5OutputSettings.setEnabled(service, false)
         assertEquals(false to false, press(327))
     }
 
     @Test
     fun theAllowedListKeepsOtherServicesAndRebindsAListedButStoppedService() {
         val ours = "com.shihab.diplay/com.shilapi.xcertplay.WheelKeyService"
-        val car = "com.byd.airconditioning/.gesture.AcGestureService:com.android.systemui/.custom.StatusBarAccessibilityService"
+        val car = "com.fawcar.systemui/.custom.StatusBarAccessibilityService:com.android.systemui/.custom.StatusBarAccessibilityService"
         assertEquals(null to "$car:$ours", WheelKeyService.allowedServices("$car\n", ours))
         assertEquals(car to "$car:$ours", WheelKeyService.allowedServices("$ours:$car", ours))
         assertEquals("" to ours, WheelKeyService.allowedServices(ours, ours))
@@ -354,11 +354,11 @@ class WheelKeyServiceTest {
         `when`(controller.activeAirPlaySessionToken()).thenReturn(Any())
         CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1, 1,
             this, mock(CarPlaySessionDisplay::class.java)) { it() }
-        BydOutputSettings.setCarPlayCallControls(service, true)
+        Hs5OutputSettings.setEnabled(service, true)
         WheelZoomSettings.assign(service, WheelZoomSettings.Role.SIRI, WheelKey(KeyEvent.KEYCODE_ENDCALL, 0, "?"))
         assertTrue(key(KeyEvent.KEYCODE_ENDCALL, true))
         assertEquals(1, siriRequests)
-        BydCarPlayCall.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
+        Hs5NavigationOutputs.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
             u8(2, 4); string(4, "new-call")
         })
         assertTrue(key(KeyEvent.KEYCODE_ENDCALL, false))

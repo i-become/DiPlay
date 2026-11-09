@@ -17,7 +17,7 @@ internal object CarPlayHostSettingsBridge {
     fun register(host: CarPlayHostActivity) {
         val reference = WeakReference(host)
         hostRef = reference
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.setHs5ClusterExitListener {
+        com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setHs5ClusterExitListener {
             val target = reference.get()
             if (target != null) closeFlyScreenFromVehicle(target)
         }
@@ -26,7 +26,7 @@ internal object CarPlayHostSettingsBridge {
     fun unregister(host: CarPlayHostActivity) {
         if (hostRef?.get() === host) {
             hostRef = null
-            com.shilapi.xcertplay.hud.BydNavigationOutputs.setHs5ClusterExitListener(null)
+            com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setHs5ClusterExitListener(null)
         }
     }
 

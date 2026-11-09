@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.DeadObjectException
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -30,14 +31,14 @@ internal object Hs5GuidanceBridge {
 
     private val lock = Any()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val route = BydHudRouteState()
+    private val route = Hs5RouteState()
     private var context: Context? = null
     private var adapter: Hs5NavPackages? = null
     private var amapTargetPackage: String? = null
     private var available = false
     private var useQisi = false
     private var senderStarted = false
-    private var lastSent: BydClusterFrame? = null
+    private var lastSent: Hs5GuidanceFrame? = null
     private var ticksSinceSend = 0
     private var guidanceLogged = false
 
@@ -54,6 +55,8 @@ internal object Hs5GuidanceBridge {
     private var clusterMapCloseRequest: (() -> Unit)? = null
     private var clusterMapShown = false
     private var lastInstrument: QisiInstrumentFrame? = null
+    private val unsupportedGuidanceCalls = mutableSetOf<Pair<IBinder, Int>>()
+    private val reportedGuidanceFailures = mutableSetOf<Pair<IBinder, Int>>()
 
     private val bindRetry = Runnable { bindAdapterLocked() }
 
@@ -67,8 +70,7 @@ internal object Hs5GuidanceBridge {
         val outputPackages = Hs5NavPackages.navigationOutputPackages(appContext)
         amapTargetPackage = packageName ?: outputPackages.firstOrNull()
         useQisi = Hs5NavPackages.isQisiStack(appContext)
-        available = !Hs5HeadUnit.isBydHeadUnit(appContext) &&
-            (useQisi || outputPackages.isNotEmpty())
+        available = useQisi || outputPackages.isNotEmpty()
         DiagnosticLogging.logcat { Log.i(
             TAG,
             "hs5 guidance available=$available qisi=$useQisi target=$amapTargetPackage outputs=$outputPackages",
@@ -108,9 +110,9 @@ internal object Hs5GuidanceBridge {
     fun onFrame(frame: Iap2Frame) = synchronized(lock) {
         if (!available) return@synchronized
         when (route.accept(frame.messageId, frame.payload)) {
-            BydHudRouteChange.GUIDANCE -> queueApplyLocked()
-            BydHudRouteChange.CLEAR -> if (lastSent != null || hudActive || instrumentNavActive) sendEndLocked()
-            BydHudRouteChange.NONE -> Unit
+            Hs5RouteChange.GUIDANCE -> queueApplyLocked()
+            Hs5RouteChange.CLEAR -> if (lastSent != null || hudActive || instrumentNavActive) sendEndLocked()
+            Hs5RouteChange.NONE -> Unit
         }
     }
 
@@ -133,11 +135,11 @@ internal object Hs5GuidanceBridge {
     }
 
     private fun applyGuidanceLocked(force: Boolean = false) = synchronized(lock) {
-        if (context?.let(BydOutputSettings::enabled) != true) {
+        if (context?.let(Hs5OutputSettings::enabled) != true) {
             if (lastSent != null || hudActive || instrumentNavActive) sendEndLocked()
             return@synchronized
         }
-        val frame = route.currentApple()?.let(BydClusterFrame::from)
+        val frame = route.currentApple()?.let(Hs5GuidanceFrame::from)
         if (frame == null) {
             if (lastSent != null || hudActive || instrumentNavActive) sendEndLocked()
             return@synchronized
@@ -162,7 +164,7 @@ internal object Hs5GuidanceBridge {
         lastInstrument = null
     }
 
-    private fun sendQisiLocked(frame: BydClusterFrame): Boolean {
+    private fun sendQisiLocked(frame: Hs5GuidanceFrame): Boolean {
         val hud = hudBinder ?: return false
         val instrument = instrumentBinder
         return try {
@@ -171,43 +173,135 @@ internal object Hs5GuidanceBridge {
                 sendInstrumentGuidanceLocked(instrument, frame)
             }
             true
-        } catch (error: Exception) {
-            DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable${error.message?.let { ": $it" }.orEmpty()}", error) }
+        } catch (error: DeadObjectException) {
+            DiagnosticLogging.logcat { Log.w(TAG, "adapter service died", error) }
             resetModulesLocked()
             scheduleBindRetryLocked()
             false
         }
     }
 
-    private fun sendHudLocked(hud: IBinder, frame: BydClusterFrame) {
+    private fun sendHudLocked(hud: IBinder, frame: Hs5GuidanceFrame) {
+        // Mark partial output active too, so ending navigation clears accepted fields.
+        hudActive = true
         val icon = frame.icon.coerceIn(0, 31)
-        QisiVehicleBinder.transactInts(hud, QisiVehicleBinder.TOKEN_HUD, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(icon))
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(icon))
         val distance = QisiVehicleBinder.hudDistanceUnits(frame.distanceMeters)
-        QisiVehicleBinder.transactInts(
-            hud,
-            QisiVehicleBinder.TOKEN_HUD,
-            QisiVehicleBinder.HUD_SET_DISTANCE,
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_DISTANCE,
             distance,
         )
         val roundabout = frame.roundaboutExit.coerceIn(0, 16)
-        QisiVehicleBinder.transactInts(
-            hud,
-            QisiVehicleBinder.TOKEN_HUD,
-            QisiVehicleBinder.HUD_SET_ROUNDABOUT,
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ROUNDABOUT,
             intArrayOf(roundabout),
         )
-        hudActive = true
+        sendHudMetadataLocked(hud, frame)
     }
 
-    private fun sendInstrumentGuidanceLocked(instrument: IBinder, frame: BydClusterFrame) {
+    /** Send route fields whose HS5 payload semantics are known. */
+    private fun sendHudMetadataLocked(hud: IBinder, frame: Hs5GuidanceFrame) {
+        val nextCrossDistance = frame.distanceMeters.coerceAtLeast(0)
+        val remainingMeters = frame.routeRemainingMeters.coerceAtLeast(0)
+        val remainingSeconds = frame.routeRemainingSeconds.coerceAtLeast(0)
+        val laneValues = hs5LaneValues(frame)
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NAV_STATUS, intArrayOf(1),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_DISTANCE,
+            intArrayOf(nextCrossDistance),
+        )
+        // The iAP2 route payload has one distance, but no distance range. Keep the range
+        // explicitly empty instead of treating the distance as a made-up range.
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_RANGE,
+            intArrayOf(0),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_INTERSECTION,
+            intArrayOf(frame.junctionType.coerceAtLeast(0)),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_LEFT_LANE_LINE,
+            intArrayOf(laneValues.leftLineType),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_RIGHT_LANE_LINE,
+            intArrayOf(laneValues.rightLineType),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_LANE_TYPE,
+            intArrayOf(laneValues.laneType),
+        )
+        // No road classification, camera, or complete route total is present in CarPlay's
+        // 0x5201-0x5204 messages. QiSi uses zero as the documented empty value.
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ROAD_TYPE, intArrayOf(0),
+        )
+        sendHudStringLocked(hud, QisiVehicleBinder.HUD_SET_DESTINATION_NAME,
+            frame.destination,
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_DESTINATION_DISTANCE,
+            intArrayOf(remainingMeters),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_REMAINING_TIME,
+            intArrayOf(remainingSeconds),
+        )
+        sendHudStringLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_ROAD, frame.road,
+        )
+        sendHudStringIntLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_ROAD_INFO,
+            frame.exitInfo.ifEmpty { frame.laneGuidanceDescription }, frame.junctionType.coerceAtLeast(0),
+        )
+        val exit = parseExitNumber(frame.exitInfo)
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_TARGET_EXIT, intArrayOf(exit),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_CURRENT_EXIT, intArrayOf(0),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_TOTAL_DISTANCE, intArrayOf(0),
+        )
+        sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_CAMERA_DISTANCE, intArrayOf(0),
+        )
+    }
+
+    /**
+     * CarPlay lane status is a colour/recommendation state, while QiSi exposes three scalar
+     * lane fields. Preserve the only shared meaning: recommended lanes are 2, available lanes
+     * are 1, and an unknown/absent lane is 0. The values are deliberately bounded because the
+     * phone protocol is untrusted input.
+     */
+    private fun hs5LaneValues(frame: Hs5GuidanceFrame): Hs5LaneValues {
+        val lanes = frame.lanes.sortedBy { it.position }
+        if (lanes.isEmpty()) return Hs5LaneValues()
+        val selected = lanes.indexOfFirst { it.status == 2 || it.highlightedAngle != null }
+            .takeIf { it >= 0 } ?: -1
+        val laneType = selected.takeIf { it >= 0 }?.let { laneLineType(lanes[it].status) } ?: 0
+        val left = selected.takeIf { it > 0 }?.let { laneLineType(lanes[it - 1].status) } ?: 0
+        val right = selected.takeIf { it >= 0 && it + 1 < lanes.size }
+            ?.let { laneLineType(lanes[it + 1].status) } ?: 0
+        return Hs5LaneValues(laneType, left, right)
+    }
+
+    private fun laneLineType(status: Int): Int = when (status) {
+        2 -> 2
+        1 -> 1
+        else -> 0
+    }
+
+    private data class Hs5LaneValues(
+        val laneType: Int = 0,
+        val leftLineType: Int = 0,
+        val rightLineType: Int = 0,
+    )
+
+    private fun parseExitNumber(text: String): Int {
+        var number = 0
+        var found = false
+        for (char in text) {
+            if (char in '0'..'9') {
+                found = true
+                number = (number * 10 + (char - '0')).coerceAtMost(99)
+            } else if (found) break
+        }
+        return if (found) number else 0
+    }
+
+    private fun sendInstrumentGuidanceLocked(instrument: IBinder, frame: Hs5GuidanceFrame) {
         if (!instrumentNavActive) {
-            QisiVehicleBinder.transactInts(
-                instrument,
-                QisiVehicleBinder.TOKEN_INSTRUMENT,
-                QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
-                intArrayOf(1),
-            )
-            instrumentNavActive = true
+            instrumentNavActive = guidanceCallLocked(instrument, QisiVehicleBinder.INSTRUMENT_SET_ACTIVE) {
+                QisiVehicleBinder.transactInts(instrument, QisiVehicleBinder.TOKEN_INSTRUMENT,
+                    QisiVehicleBinder.INSTRUMENT_SET_ACTIVE, intArrayOf(1))
+            }
         }
         val units = QisiVehicleBinder.hudDistanceUnits(frame.distanceMeters)
         val guidance = QisiInstrumentFrame(
@@ -224,25 +318,68 @@ internal object Hs5GuidanceBridge {
             roundaboutExit = if (frame.roundaboutExit in 1..16) frame.roundaboutExit - 1 else -1,
         )
         if (guidance == lastInstrument) return
-        QisiVehicleBinder.sendInstrumentGuidance(instrument, guidance)
-        lastInstrument = guidance
+        if (guidanceCallLocked(instrument, QisiVehicleBinder.INSTRUMENT_SEND_GUIDANCE) {
+            QisiVehicleBinder.sendInstrumentGuidance(instrument, guidance)
+        }) lastInstrument = guidance
     }
 
     private fun clearQisiLocked() {
         try {
             hudBinder?.let { hud ->
                 if (hudActive) {
-                    QisiVehicleBinder.transactInts(hud, QisiVehicleBinder.TOKEN_HUD, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(0))
-                    QisiVehicleBinder.transactInts(
-                        hud,
-                        QisiVehicleBinder.TOKEN_HUD,
-                        QisiVehicleBinder.HUD_SET_DISTANCE,
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ICON, intArrayOf(0))
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_DISTANCE,
                         intArrayOf(0, 0),
                     )
-                    QisiVehicleBinder.transactInts(
-                        hud,
-                        QisiVehicleBinder.TOKEN_HUD,
-                        QisiVehicleBinder.HUD_SET_ROUNDABOUT,
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ROUNDABOUT,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NAV_STATUS,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_DISTANCE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_RANGE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_INTERSECTION,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_LEFT_LANE_LINE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_RIGHT_LANE_LINE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_LANE_TYPE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_ROAD_TYPE,
+                        intArrayOf(0),
+                    )
+                    sendHudStringLocked(hud, QisiVehicleBinder.HUD_SET_DESTINATION_NAME, "",
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_DESTINATION_DISTANCE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_REMAINING_TIME,
+                        intArrayOf(0),
+                    )
+                    sendHudStringLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_ROAD, "",
+                    )
+                    sendHudStringIntLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_ROAD_INFO, "", 0,
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_TARGET_EXIT,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_CURRENT_EXIT,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_TOTAL_DISTANCE,
+                        intArrayOf(0),
+                    )
+                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_CAMERA_DISTANCE,
                         intArrayOf(0),
                     )
                     DiagnosticLogging.logcat { Log.i(TAG, "HUD guidance cleared") }
@@ -251,17 +388,17 @@ internal object Hs5GuidanceBridge {
             instrumentBinder?.let { instrument ->
                 if (instrumentNavActive) {
                     if (instrumentTbtEnabled()) {
-                        QisiVehicleBinder.sendInstrumentGuidance(instrument, QisiInstrumentFrame.cleared)
+                        guidanceCallLocked(instrument, QisiVehicleBinder.INSTRUMENT_SEND_GUIDANCE) {
+                            QisiVehicleBinder.sendInstrumentGuidance(instrument, QisiInstrumentFrame.cleared)
+                        }
                     }
-                    QisiVehicleBinder.transactInts(
-                        instrument,
-                        QisiVehicleBinder.TOKEN_INSTRUMENT,
-                        QisiVehicleBinder.INSTRUMENT_SET_ACTIVE,
-                        intArrayOf(0),
-                    )
+                    guidanceCallLocked(instrument, QisiVehicleBinder.INSTRUMENT_SET_ACTIVE) {
+                        QisiVehicleBinder.transactInts(instrument, QisiVehicleBinder.TOKEN_INSTRUMENT,
+                            QisiVehicleBinder.INSTRUMENT_SET_ACTIVE, intArrayOf(0))
+                    }
                 }
             }
-        } catch (error: Exception) {
+        } catch (error: DeadObjectException) {
             DiagnosticLogging.logcat { Log.w(TAG, "adapter service not reachable", error) }
             resetModulesLocked()
             scheduleBindRetryLocked()
@@ -272,11 +409,51 @@ internal object Hs5GuidanceBridge {
         }
     }
 
+    private fun sendHudIntsLocked(hud: IBinder, code: Int, values: IntArray) =
+        guidanceCallLocked(hud, code) {
+            QisiVehicleBinder.transactInts(hud, QisiVehicleBinder.TOKEN_HUD, code, values)
+        }
+
+    private fun sendHudStringLocked(hud: IBinder, code: Int, value: String) =
+        guidanceCallLocked(hud, code) {
+            QisiVehicleBinder.transactString(hud, QisiVehicleBinder.TOKEN_HUD, code, value)
+        }
+
+    private fun sendHudStringIntLocked(hud: IBinder, code: Int, value: String, number: Int) =
+        guidanceCallLocked(hud, code) {
+            QisiVehicleBinder.transactStringInt(hud, QisiVehicleBinder.TOKEN_HUD, code, value, number)
+        }
+
+    /** Guidance shares the adapter with map projection. Only service death may tear both down. */
+    private fun guidanceCallLocked(binder: IBinder, code: Int, send: () -> Unit): Boolean {
+        val key = binder to code
+        if (key in unsupportedGuidanceCalls) return false
+        return try {
+            send()
+            true
+        } catch (error: Exception) {
+            if (error is DeadObjectException) throw error
+            if (!binder.isBinderAlive || remoteBinder?.isBinderAlive == false) throw DeadObjectException()
+            // Cache absent methods only for this connection. A negative result or rejected value
+            // can be temporary, so it is retried on the next guidance update/keepalive.
+            if (error is QisiVehicleBinder.UnsupportedTransaction) unsupportedGuidanceCalls += key
+            if (reportedGuidanceFailures.add(key)) {
+                DiagnosticLogging.logcat { Log.w(TAG, "guidance field failed tx=$code", error) }
+                DiagnosticLogging.record {
+                    val module = if (binder === hudBinder) "hud" else "instrument"
+                    ConnectionDiagnosticTrace.record(
+                        "QISI_GUIDANCE field failed module=$module tx=$code: ${error.javaClass.simpleName}: ${error.message}")
+                }
+            }
+            false
+        }
+    }
+
     private fun applyInstrumentMapLocked() {
         val system = systemBinder ?: return
         val instrument = instrumentBinder ?: return
         val shouldShow = clusterMapShown && clusterMapCloseRequest != null &&
-            BydOutputSettings.hs5ClusterVisible(context ?: return)
+            Hs5OutputSettings.hs5ClusterVisible(context ?: return)
         try {
             if (shouldShow && !instrumentMapActive) {
                 val request = clusterMapCloseRequest ?: return
@@ -380,6 +557,9 @@ internal object Hs5GuidanceBridge {
         instrumentNavActive = false
         instrumentMapActive = false
         modulesReadyLogged = false
+        lastInstrument = null
+        unsupportedGuidanceCalls.clear()
+        reportedGuidanceFailures.clear()
         context?.let { app ->
             runCatching { app.unbindService(connection) }
         }
@@ -406,7 +586,7 @@ internal object Hs5GuidanceBridge {
         }
     }
 
-    private fun sendBroadcastLocked(frame: BydClusterFrame): Boolean {
+    private fun sendBroadcastLocked(frame: Hs5GuidanceFrame): Boolean {
         val intent = baseIntent(KEY_GUIDANCE).apply {
             putExtra("TYPE", 0)
             putExtra("EXTRA_STATE", 0)
@@ -418,6 +598,16 @@ internal object Hs5GuidanceBridge {
             putExtra("ROUTE_REMAIN_DIS", frame.routeRemainingMeters)
             putExtra("ROUTE_REMAIN_TIME", frame.routeRemainingSeconds)
             putExtra("CUR_ROAD_NAME", frame.road)
+            putExtra("DESTINATION_NAME", frame.destination)
+            putExtra("JUNCTION_TYPE", frame.junctionType)
+            putExtra("JUNCTION_ANGLES", frame.junctionAngles.toIntArray())
+            putExtra("EXIT_ANGLE", frame.exitAngle)
+            putExtra("EXIT_INFO", frame.exitInfo)
+            putExtra("LANE_GUIDANCE_INDEX", frame.laneGuidanceIndex)
+            putExtra("LANE_GUIDANCE_SHOWING", frame.laneGuidanceShowing)
+            putExtra("LANE_GUIDANCE_TOTAL", frame.laneGuidanceTotal)
+            putExtra("LANE_GUIDANCE_DESCRIPTION", frame.laneGuidanceDescription)
+            putLaneGuidanceExtras(frame)
         }
         return broadcastLocked(intent)
     }
@@ -431,6 +621,16 @@ internal object Hs5GuidanceBridge {
             putExtra("NEXT_ROAD_NAME", "")
             putExtra("ROUTE_REMAIN_DIS", -1)
             putExtra("ROUTE_REMAIN_TIME", -1)
+            putExtra("DESTINATION_NAME", "")
+            putExtra("JUNCTION_TYPE", -1)
+            putExtra("JUNCTION_ANGLES", intArrayOf())
+            putExtra("EXIT_ANGLE", 1000)
+            putExtra("EXIT_INFO", "")
+            putExtra("LANE_GUIDANCE_INDEX", -1)
+            putExtra("LANE_GUIDANCE_SHOWING", false)
+            putExtra("LANE_GUIDANCE_TOTAL", 0)
+            putExtra("LANE_GUIDANCE_DESCRIPTION", "")
+            putLaneGuidanceExtras(Hs5GuidanceFrame(0, 0, -1))
         }
         if (!broadcastLocked(intent)) return
         DiagnosticLogging.logcat { Log.i(TAG, "hongqi guidance ended") }

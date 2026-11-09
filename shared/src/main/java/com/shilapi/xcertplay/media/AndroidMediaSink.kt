@@ -20,13 +20,12 @@ import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.AudioStreamId
 import com.shilapi.xcertplay.airplay.MediaSink
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
-import com.shilapi.xcertplay.network.GeelyHeadUnit
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.VideoCodec
 import com.shilapi.xcertplay.airplay.toHexString
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
-import com.shilapi.xcertplay.hud.BydBluetoothSuspend
+import com.shilapi.xcertplay.hud.BluetoothSuspend
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -227,7 +226,6 @@ class AndroidMediaSink(
     // Each downlink publishes its own reference; a mic must match that stream and sample rate.
     private val callEchoReferences = ConcurrentHashMap<AudioStreamId, EchoReference>()
     private val appContext = context?.applicationContext
-    private val ambientSinkToken = AmbientMusicController.openSink(appContext)
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
     private val navigationAudioFocus = NavigationAudioFocusCoordinator(
         appContext,
@@ -553,7 +551,7 @@ class AndroidMediaSink(
                 CarPlayTelephonyAudio.started(id, config.audioType)
             }
             val speakerphoneCall = config.audioType == "telephony" &&
-                appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext)
+                appContext != null && BluetoothSuspend.isSuspendedByUs(appContext)
             if (!speakerphoneCall && needsCommunicationMode(config.audioType)) enterCommunicationMode(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
                 MicrophoneUplink(config, onAudioDiagnostic,
@@ -584,7 +582,7 @@ class AndroidMediaSink(
 
     private fun needsCommunicationMode(audioType: String): Boolean = when (audioType) {
         "telephony" -> true
-        "speechrecognition" -> Hs5HeadUnit.detected || GeelyHeadUnit.detected
+        "speechrecognition" -> Hs5HeadUnit.detected
         else -> false
     }
 
@@ -630,7 +628,6 @@ class AndroidMediaSink(
     }
 
     fun close() {
-        AmbientMusicController.closeSink(ambientSinkToken)
         synchronized(videoOwnershipLock) {
             videoClosed = true
             videoDecoders.entries.toList().forEach { (type, decoder) -> retire(type, decoder) }
@@ -725,9 +722,8 @@ class AndroidMediaSink(
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
-            ambientSinkToken,
             speakerphoneCall = format.audioType == "telephony" &&
-                appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext),
+                appContext != null && BluetoothSuspend.isSuspendedByUs(appContext),
             echoReference = echoReference,
             voiceFilter = callVoiceFilter && format.audioType == TELEPHONY_AUDIO_TYPE,
         ).also { audioRenderers[id] = it }
@@ -788,7 +784,7 @@ internal class ParkingOutput(width: Int, height: Int) {
 
 /**
  * The operating rate requested from a stream's decoder, 0 for none: the main screen asks for the frame
- * rate the iPhone is asked for ([frameRate], the frame-rate setting). At 60 fps on my Tang, the Qualcomm
+ * rate the iPhone is asked for ([frameRate], the frame-rate setting). At 60 fps on my vehicle, the Qualcomm
  * decoder's median time from queueing a frame to dequeueing its output was 8.5–9 ms lower with it.
  * Mirrors and the cluster stream keep the format they had.
  */
@@ -848,7 +844,7 @@ internal data class DecoderCandidate(val name: String, val hardware: Boolean, va
 
 /**
  * The decoder the main screen tries first with smooth video: the first hardware decoder (not an alias) that
- * advertises the low-latency feature, whose tuned format then asks for low latency. On my Tang this is
+ * advertises the low-latency feature, whose tuned format then asks for low latency. On my vehicle this is
  * c2.qti.avc.decoder.low_latency; the default c2.qti.avc.decoder does not advertise the feature.
  */
 internal fun lowLatencyDecoderName(candidates: List<DecoderCandidate>): String? =
@@ -859,7 +855,7 @@ internal fun nextLowLatencyDecoder(requested: String?, used: DecoderAttempt?): S
     if (requested != null && used != null && used.codecName != requested) null else requested
 
 /**
- * Qualcomm's decoder parameter for output in decoding order. Without it my Tang's decoders released a frame
+ * Qualcomm's decoder parameter for output in decoding order. Without it my vehicle's decoders released a frame
  * only once one or two later frames had been queued. Decoding order is the display order only for a stream
  * without reordered (B) frames; the iPhone's CarPlay H.264 had none. It is set only for the main screen's H.264
  * with smooth video, and only on a decoder that lists the parameter.
@@ -1746,7 +1742,6 @@ private class AudioRenderer(
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
-    private val ambientSinkToken: Long,
     private val speakerphoneCall: Boolean = false,
     /** Receives the played call audio so the call microphone can cancel its echo. */
     private val echoReference: EchoReference? = null,
@@ -1787,10 +1782,6 @@ private class AudioRenderer(
     private val maxArrivalGapMs = AtomicLong()
     private val frameBytes = if (format.channels >= 2) 4 else 2
     private var totalWrittenFrames = 0L
-    private val ambientMedia = AmbientMusicActivityPolicy.acceptsAudio(format.audioType, format.payloadType)
-    private val ambientEnvelope = AmbientMusicEnvelope()
-    private val ambientBass = AmbientMusicBassAnalyzer(format.sampleRate, pcmChannels)
-    private var ambientRendererToken = 0L
     private var writtenFramesThisWindow = 0L
     private var writeErrorsThisWindow = 0
     private var lastWriteErrorCode: Int? = null
@@ -1834,7 +1825,6 @@ private class AudioRenderer(
     }
 
     override fun close() {
-        AmbientMusicController.closeRenderer(ambientRendererToken)
         running = false
         NavigationPlayback.close(navigationPlaybackToken)
         navigationAudioFocus.release(navigationPlaybackToken)
@@ -1988,11 +1978,6 @@ private class AudioRenderer(
             )
         }
         track = built
-        if (ambientMedia) {
-            ambientRendererToken = AmbientMusicController.openRenderer(ambientSinkToken, ambientEnvelope) {
-                built.playbackHeadPosition to (running && built.playState == AudioTrack.PLAYSTATE_PLAYING)
-            }
-        }
         diagnosticStage = "track-attributes"
         trackAttributes = audioTrackAttributesForFocus(built, attributes)
         diagnosticStage = "track-capacity"
@@ -2048,7 +2033,7 @@ private class AudioRenderer(
             navigationAudioFocus.navigationAttributes?.let { return it }
         }
         if (streamOverride in AudioManager.STREAM_SYSTEM..AudioManager.STREAM_ACCESSIBILITY) {
-            // Android accepts only its defined legacy stream IDs here. BYD audio policy can
+            // Android accepts only its defined legacy stream IDs here. the car audio policy can
             // map these standard streams to vehicle outputs; arbitrary channel numbers are
             // not valid AudioAttributes legacy stream types.
             try {
@@ -2208,7 +2193,7 @@ private class AudioRenderer(
         diagnosticStage = "decoder-input"
         // While a blocking track write holds this thread, decoded output fills up and the decoder
         // stops taking input. Dropping the packet after one 10 ms wait cut ~21 ms of music every
-        // 10-20 s on DiLink 3.0 (#381); drain the output and keep waiting instead.
+        // 10-20 s on firmware 3.0 (#381); drain the output and keep waiting instead.
         val index = DecoderInputPump.acquire(
             running = { running }, drain = { drainCodec(codec) },
             dequeue = { codec.dequeueInputBuffer(INPUT_TIMEOUT_US) },
@@ -2339,11 +2324,6 @@ private class AudioRenderer(
             }
             if (count < writeLength) partialWritesThisWindow++
             val framesWritten = count / frameBytes
-            if (ambientMedia && AmbientMusicController.wantsPcm(ambientRendererToken)) {
-                ambientEnvelope.append(totalWrittenFrames, framesWritten.toLong(),
-                    AmbientMusicEnvelope.pcmRms(data, offset + written, count),
-                    ambientBass.rms(data, offset + written, count))
-            }
             written += count
             totalWrittenFrames += framesWritten
             writtenFramesThisWindow += framesWritten
@@ -2507,7 +2487,6 @@ private class AudioRenderer(
     private fun release() {
         NavigationPlayback.close(navigationPlaybackToken)
         navigationAudioFocus.release(navigationPlaybackToken)
-        AmbientMusicController.closeRenderer(ambientRendererToken)
         abandonAudioFocus()
         val codec = codec
         this.codec = null

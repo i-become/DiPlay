@@ -37,8 +37,8 @@ import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.PairingStore
 import com.shilapi.xcertplay.airplay.VideoInCar
 import com.shilapi.xcertplay.airplay.VideoPlaybackDelivery
-import com.shilapi.xcertplay.hud.BydBluetoothSuspend
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.BluetoothSuspend
+import com.shilapi.xcertplay.hud.Hs5NavigationOutputs
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.iap2.message.Iap2CommunicationsMessages
 import com.shilapi.xcertplay.iap2.session.Iap2Session
@@ -181,8 +181,7 @@ class CarPlayController(
             "A location provider is required when location reporting is enabled"
         }
         WifiScanPause.restoreIfNeeded(context.applicationContext)
-        BydNavigationOutputs.start(context.applicationContext)
-        BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
+        Hs5NavigationOutputs.start(context.applicationContext)
     }
 
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
@@ -326,8 +325,7 @@ class CarPlayController(
         override fun onSessionActive(session: AirPlaySession) {
             val replacement = activeSession !== session
             if (replacement) {
-                BydNavigationOutputs.start(appContext)
-                BydNavigationOutputs.carPlaySessionStarted()
+                Hs5NavigationOutputs.start(appContext)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                 // The gear may have changed since /info.
                 if (videoListener != null) {
@@ -344,7 +342,7 @@ class CarPlayController(
             if (btPrefs.getBoolean("bt_suspend_during_carplay", false)) {
                 // close() marks [closed], and a closing session marks itself before onSessionEnded
                 // clears it, ahead of each resume; the pause checks all three under resume's lock.
-                BydBluetoothSuspend.suspend(appContext, this@CarPlayController, btSuspendDelayMs(btPrefs)) {
+                BluetoothSuspend.suspend(appContext, this@CarPlayController, btSuspendDelayMs(btPrefs)) {
                     !closed && activeSession === session && !session.isClosed
                 }
             }
@@ -376,8 +374,8 @@ class CarPlayController(
                     bluetoothAudioHandoff = null
                 }
                 synchronized(albumReplayLock) { initialArtworkReplay = null }
-                BydNavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
-                BydBluetoothSuspend.resume(appContext, this@CarPlayController)
+                Hs5NavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
+                BluetoothSuspend.resume(appContext, this@CarPlayController)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
                 videoListener?.onVideoSessionEnded()
                 synchronized(playbackStatus) {
@@ -716,15 +714,14 @@ class CarPlayController(
             dashboardMapOutputVisible = false
         }
         firstTcpWatchdog?.terminate()
-        BydBluetoothSuspend.resume(appContext, this)
+        BluetoothSuspend.resume(appContext, this)
         startupTimer.shutdownNow()
         (hotspot as? ManualHotspotManager)?.close()
         val teardownStarted = System.nanoTime()
         DiagnosticLogging.record { connectionDiagnostic("teardown begin transport=${config.transport}") }
         videoGate?.close()
-        BydNavigationOutputs.endNow()
+        Hs5NavigationOutputs.endNow()
         com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
-        BydNavigationOutputs.clearClusterStreamControl(::applyClusterUi)
         closeReceivers()
         availabilityPollGeneration.incrementAndGet()
         permissionPollGeneration += 1
@@ -863,7 +860,7 @@ class CarPlayController(
 
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
-        BydNavigationOutputs.onFrame(frame)
+        Hs5NavigationOutputs.onFrame(frame)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         synchronized(playbackStatus) {
             val previousPlaying = playbackStatus.playing
@@ -1700,7 +1697,7 @@ class CarPlayController(
         DiagnosticLogging.record { connectionDiagnostic("Bluetooth preparation started state=${runCatching { adapter.state }.getOrNull()} " +
             "cachedAdapterId=${System.identityHashCode(adapter)} " +
             "bootPreconnectClaimed=${bootBluetoothPreconnect != null}") }
-        var recovered = BydBluetoothSuspend.resumeAndWait(appContext, adapter, timeoutMillis)
+        var recovered = BluetoothSuspend.resumeAndWait(appContext, adapter, timeoutMillis)
         DiagnosticLogging.record { connectionDiagnostic("Bluetooth suspend recovery completed recovered=$recovered elapsedMs=${elapsedMillis(started)}") }
         if (!adapter.isEnabled && Hs5HeadUnit.isHeadUnit(appContext)) {
             val allowBootWait = SystemClock.elapsedRealtime() < WirelessStartupPolicy.bootGraceMillis(appContext)
@@ -1723,7 +1720,7 @@ class CarPlayController(
             // The first recovery result also includes the then-current radio state. Recheck only
             // after the OEM has enabled it; resumeAndWait restores only our own suspend lease.
             if (adapter.isEnabled && !recovered) {
-                recovered = BydBluetoothSuspend.resumeAndWait(appContext, adapter, timeoutMillis)
+                recovered = BluetoothSuspend.resumeAndWait(appContext, adapter, timeoutMillis)
             }
         }
         if (Thread.currentThread().isInterrupted) throw InterruptedException("Bluetooth preparation cancelled")

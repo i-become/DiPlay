@@ -13,17 +13,14 @@ internal enum class SettingsSection {
     DIAGNOSTICS,
     AUTOMATIC_CONNECTION,
     USB_CONNECTION,
-    BYD_ADB,
     DISPLAY_AND_PERFORMANCE,
     EXPERIMENTAL_DISPLAY,
     ADVANCED_MEDIA,
-    AMBIENT_LIGHTING,
     CAR_BUTTON,
     AUDIO_ROUTING,
     NAVIGATION_WHEEL,
     LOCATION,
     CLUSTER_MAP,
-    BYD_NAVIGATION,
     PERMISSIONS_AND_HELP,
     LANGUAGE,
 }
@@ -37,14 +34,12 @@ internal object SettingsInformationArchitecture {
             SettingsSection.CONNECTION_SETUP,
             SettingsSection.AUTOMATIC_CONNECTION,
             SettingsSection.USB_CONNECTION,
-            SettingsSection.BYD_ADB,
             SettingsSection.PERMISSIONS_AND_HELP,
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
         SettingsCategory.NAVIGATION to setOf(
             SettingsSection.LOCATION,
-            SettingsSection.BYD_NAVIGATION,
             SettingsSection.CLUSTER_MAP,
         ),
         SettingsCategory.VEHICLE to setOf(
@@ -57,7 +52,6 @@ internal object SettingsInformationArchitecture {
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
-            SettingsSection.AMBIENT_LIGHTING,
         ),
     )
 }

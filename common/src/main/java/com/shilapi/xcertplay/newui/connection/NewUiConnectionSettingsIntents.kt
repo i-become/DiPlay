@@ -14,18 +14,12 @@ internal object NewUiConnectionSettingsIntents {
             openSystem(activity, Intent(Settings.ACTION_WIRELESS_SETTINGS))
             return
         }
-        if (target == "com.byd.carsettings") {
-            runCatching { activity.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
-        }
         if (runCatching { activity.startActivity(hotspot) }.isSuccess) return
         openSystem(activity, Intent(Settings.ACTION_WIRELESS_SETTINGS))
     }
 
     fun openCarWifiSettings(activity: ComponentActivity) {
         val wifi = Intent(Settings.ACTION_WIFI_SETTINGS)
-        if (activity.packageManager.resolveActivity(wifi, 0)?.activityInfo?.packageName == "com.byd.carsettings") {
-            runCatching { activity.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
-        }
         openSystem(activity, wifi)
     }
 

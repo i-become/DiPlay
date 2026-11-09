@@ -5,28 +5,16 @@ import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.app.Presentation
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.LinearGradient
-import android.graphics.Shader
-import android.graphics.Matrix
-import android.graphics.SurfaceTexture
-import android.graphics.drawable.ColorDrawable
-import android.view.WindowManager
 import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.util.Log
 import android.view.Display
-import android.view.Gravity
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
-import android.view.TextureView
-import android.content.res.ColorStateList
 import android.widget.FrameLayout
-import android.widget.ProgressBar
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
@@ -34,16 +22,11 @@ import com.shilapi.xcertplay.hud.Hs5ClusterDisplay
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 /**
- * Shows CarPlay's instrument-cluster stream on a BYD cluster projection display.
- *
- * BYD exposes the cluster's projection area as public presentation displays owned by
- * com.byd.containerservice (DiLink 5) or com.xdja.containerservice (DiLink 4). The
- * cluster only shows this display while its projection mode is on, which DiPlay cannot switch.
+ * Shows CarPlay's instrument-cluster stream on the Hongqi HS5 projection display.
  */
 internal class ClusterMapPresentation(
     context: Context,
     display: Display,
-    private val theme: DiLink51ClusterLayout.Theme = DiLink51ClusterLayout.theme(context),
     private val onSurface: (Surface?) -> Unit,
 ) : Presentation(context, display) {
     // The placeholder until the map arrives: a small spinner.
@@ -61,12 +44,8 @@ internal class ClusterMapPresentation(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val size = sizeOf(display)
-        val adaptive = DiLink51ClusterLayout.supported()
-        val plan = if (adaptive) DiLink51ClusterLayout.plan(size.x, size.y, theme) else null
-        // The adaptive DiLink 5.1 layout follows the cluster's own contrast; elsewhere the cluster follows DiPlay's theme.
-        val dark = if (plan != null) DiLink51ClusterLayout.dark(context, theme) else context.resolveAppNightNow()
-        if (plan == null && ClusterDashboardView.enabled(context)) {
+        val dark = context.resolveAppNightNow()
+        if (ClusterDashboardView.enabled(context)) {
             dashboard = ClusterDashboardView(context) { surface ->
                 outputSurface = surface
                 onSurface(surface)
@@ -87,82 +66,28 @@ internal class ClusterMapPresentation(
             DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("HS5 dashboard window=${dashboardForeground.mode}") }
             return
         }
-        val backdrop = if (dark) Color.rgb(15, 22, 30) else Color.rgb(207, 218, 229)
         val placeholder = if (dark) Color.BLACK else Color.rgb(233, 238, 246)
         val root = FrameLayout(context).apply {
-            setBackgroundColor(if (plan == null) placeholder else if (plan.fullMap) backdrop else Color.TRANSPARENT)
+            setBackgroundColor(placeholder)
         }
-        if (plan != null) {
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-        }
-        val videoParams = if (plan == null) FrameLayout.LayoutParams(-1, -1) else
-            FrameLayout.LayoutParams(plan.width, plan.height, Gravity.TOP or Gravity.LEFT).apply {
-                leftMargin = plan.left; topMargin = plan.top
+        val surfaceView = SurfaceView(context)
+        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface created") }
+                outputSurface = holder.surface
+                onSurface(holder.surface)
             }
-        if (plan != null) {
-            val textureView = TextureView(context)
-            fun transform() {
-                textureView.setTransform(Matrix().apply {
-                    setScale(DiLink51ClusterLayout.STREAM_WIDTH.toFloat() / plan.width,
-                        DiLink51ClusterLayout.STREAM_HEIGHT.toFloat() / plan.height)
-                    postTranslate(-plan.sourceLeft.toFloat(), -plan.sourceTop.toFloat())
-                })
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface ${width}x$height") }
             }
-            textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-                    texture.setDefaultBufferSize(DiLink51ClusterLayout.STREAM_WIDTH, DiLink51ClusterLayout.STREAM_HEIGHT)
-                    transform()
-                    outputSurface = Surface(texture).also(onSurface)
-                }
-                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = transform()
-                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
-                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-                    onSurface(null)
-                    outputSurface?.release()
-                    outputSurface = null
-                    return true
-                }
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface destroyed") }
+                onSurface(null)
+                outputSurface = null
             }
-            root.addView(textureView, videoParams)
-            videoView = textureView
-            if (plan.fullMap) root.addView(InstrumentContrastView(context, plan, backdrop), FrameLayout.LayoutParams(-1, -1))
-            DiagnosticLogging.logcat { Log.i(TAG, "layout=$theme viewport=$plan source=${plan.sourceLeft},${plan.sourceTop} dark=$dark") }
-        } else {
-            // Preserve the original PR renderer for DiLink 5 and unverified firmware.
-            val surfaceView = SurfaceView(context)
-            surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: SurfaceHolder) {
-                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface created") }
-                    outputSurface = holder.surface
-                    onSurface(holder.surface)
-                }
-
-                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface ${width}x$height") }
-                }
-
-                override fun surfaceDestroyed(holder: SurfaceHolder) {
-                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface destroyed") }
-                    onSurface(null)
-                    // SurfaceHolder owns this surface; do not release it ourselves.
-                    outputSurface = null
-                }
-            })
-            root.addView(surfaceView, videoParams)
-            videoView = surfaceView
-        }
-        val waitingColor = if (dark) Color.WHITE else Color.DKGRAY
-        val density = context.resources.displayMetrics.density
-        waitingLabel = FrameLayout(context).apply {
-            if (plan == null) setBackgroundColor(placeholder)
-            addView(ProgressBar(context).apply {
-                isIndeterminate = true
-                indeterminateTintList = ColorStateList.valueOf(waitingColor)
-                contentDescription = context.getString(R.string.cluster_waiting_for_map)
-            }, FrameLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt(), Gravity.CENTER))
-        }
-        root.addView(waitingLabel, FrameLayout.LayoutParams(videoParams))
+        })
+        root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
+        videoView = surfaceView
         if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(context) &&
             AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL) {
             root.addView(OriginalClusterOverlayView(context).also { originalOverlay = it }, FrameLayout.LayoutParams(-1, -1))
@@ -180,7 +105,7 @@ internal class ClusterMapPresentation(
         // backdrop with an empty black surface before the first stream notification.
         // SurfaceView ignores fractional alpha before API 34. Keep its decoder surface
         // visible and fade an opaque ordinary View over it instead.
-        if (videoView !is SurfaceView) videoView?.alpha = if (streamActive) 1f else 0f
+        videoView?.alpha = 1f
         waitingLabel?.apply {
             alpha = if (streamActive) 0f else 1f
             visibility = if (streamActive) View.GONE else View.VISIBLE
@@ -247,33 +172,13 @@ internal class ClusterMapPresentation(
     companion object {
         const val TAG = "DiPlay-Cluster"
 
-        /** Keep the 5/5.1 selection order, then try the measured DiLink 4 projection display. */
-        fun findDisplay(context: Context, theme: DiLink51ClusterLayout.Theme = DiLink51ClusterLayout.theme(context)): Display? {
+        fun findDisplay(context: Context): Display? {
             val displays = context.getSystemService(DisplayManager::class.java)
                 ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION) ?: return null
             if (AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)) {
                 val mainId = context.display?.displayId ?: Display.DEFAULT_DISPLAY
                 SimulatedClusterPresentationPick.pick(mainId, displays, ::sizeOf)?.let { return it }
             }
-            val name = DiLink51ClusterLayout.displayName(
-                displays.map { it.name }, android.os.Build.FINGERPRINT, theme,
-            )
-            if (name == null) {
-                // Never replace a missing 5.1 side layer with a full-screen display.
-                if (DiLink51ClusterLayout.supported()) return null
-                displays.firstOrNull { display ->
-                    val size = sizeOf(display)
-                    DiLink4ClusterDisplay.accepts(display.name, size.x, size.y)
-                }?.let { return it }
-                return pickHs5Cluster(context, displays)
-            }
-            val byd = displays.firstOrNull { it.name == name }?.takeIf {
-                if (!DiLink51ClusterLayout.supported()) true else {
-                    val size = sizeOf(it)
-                    DiLink51ClusterLayout.plan(size.x, size.y, theme) != null
-                }
-            }
-            if (byd != null) return byd
             return pickHs5Cluster(context, displays)
         }
 
@@ -301,8 +206,8 @@ internal class ClusterMapPresentation(
             appendLine(
                 "debugSimulatedCluster=${AirPlayPersistence.loadDebugSimulatedClusterPresentation(context)}",
             )
-            appendLine("navigationReceiverAvailable=${com.shilapi.xcertplay.hud.BydOutputSettings.navigationAvailable(context)}")
-            appendLine("gaodePackage=${com.shilapi.xcertplay.hud.BydOutputSettings.resolvedGaodePackage(context)}")
+            appendLine("navigationReceiverAvailable=${com.shilapi.xcertplay.hud.Hs5OutputSettings.navigationAvailable(context)}")
+            appendLine("gaodePackage=${com.shilapi.xcertplay.hud.Hs5OutputSettings.resolvedGaodePackage(context)}")
             appendLine("hs5ClusterPresentation=${Hs5HeadUnit.hasClusterPresentation(context)}")
             appendLine("allDisplays=${describeDisplays(context)}")
             val presentations = context.getSystemService(DisplayManager::class.java)
@@ -316,34 +221,5 @@ internal class ClusterMapPresentation(
             @Suppress("DEPRECATION")
             display.getRealSize(it)
         }
-    }
-}
-
-/** Shading belongs to DiPlay's map only; no stock cluster window is changed or covered outside the side card. */
-private class InstrumentContrastView(
-    context: Context,
-    private val plan: DiLink51ClusterLayout.Plan,
-    private val background: Int,
-) : View(context) {
-    private val paint = Paint()
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val left = plan.left.toFloat(); val top = plan.top.toFloat()
-        val right = left + plan.width; val bottom = top + plan.height
-        fun fade(x0: Float, y0: Float, x1: Float, y1: Float, start: Int, end: Int,
-                 l: Float, t: Float, r: Float, b: Float) {
-            paint.shader = LinearGradient(x0, y0, x1, y1, start, end, Shader.TileMode.CLAMP)
-            canvas.drawRect(l, t, r, b, paint)
-        }
-        val clear = background and 0x00ffffff
-        val soft = (background and 0x00ffffff) or (210 shl 24)
-        if (plan.fullMap) {
-            fade(left, top, left, top + 64, background, clear, left, top, right, top + 64)
-            fade(left, bottom - 48, left, bottom, clear, background, left, bottom - 48, right, bottom)
-            // The trip/menu readouts occupy the outer panels; keep the route and marker in the clear center.
-            fade(left, top, left + 460, top, soft, clear, left, top, left + 460, bottom)
-            fade(right - 460, top, right, top, clear, soft, right - 460, top, right, bottom)
-        }
-        paint.shader = null
     }
 }

@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.hud
 
 import android.os.Binder
+import android.os.DeadObjectException
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -18,6 +19,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.util.ReflectionHelpers
+import org.robolectric.shadows.ShadowBuild
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
@@ -28,6 +30,8 @@ class QisiClusterMapSessionTest {
     private var rejectRegistration = false
     private var rejectNavigation = false
     private var closes = 0
+    private val guidanceCalls = mutableListOf<Int>()
+    private var rejectInstrumentGuidance = false
 
     @After fun stopDiagnostics() {
         DiagnosticLogging.setEnabled(false)
@@ -62,8 +66,15 @@ class QisiClusterMapSessionTest {
     private val instrument = object : Binder() {
         init { attachInterface(null, "ltd.qisi.adapterproxy.ICarInstrumentRelatedManager") }
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
-            assertEquals(10, code)
             data.enforceInterface("ltd.qisi.adapterproxy.ICarInstrumentRelatedManager")
+            if (code == 5 || code == 6) {
+                guidanceCalls += code
+                if (code == 6 && rejectInstrumentGuidance) return false
+                reply!!.writeNoException()
+                reply.writeInt(1)
+                return true
+            }
+            assertEquals(10, code)
             assertEquals(1, data.readInt()) // Present parcelable.
             assertEquals(0, data.readInt()) // Full-map info type.
             calls += "map:${data.readInt()}"
@@ -256,7 +267,93 @@ class QisiClusterMapSessionTest {
         }
     }
 
+    @Test fun rejectedHudFieldDoesNotReleaseTheMapOrBlockLaterFields() {
+        verifyGuidanceFailureKeepsMap(expectedFailures = 1) { _, _ -> false }
+    }
+
+    @Test fun negativeHudResultDoesNotReleaseTheMapOrBlockLaterFields() {
+        verifyGuidanceFailureKeepsMap(expectedFailures = 4) { _, reply ->
+            reply!!.writeNoException()
+            reply.writeInt(-1)
+            true
+        }
+    }
+
+    @Test fun remoteHudExceptionDoesNotReleaseTheMapOrBlockLaterFields() {
+        verifyGuidanceFailureKeepsMap(expectedFailures = 4) { _, reply ->
+            reply!!.writeException(IllegalArgumentException("unsupported field value"))
+            true
+        }
+    }
+
+    private fun verifyGuidanceFailureKeepsMap(expectedFailures: Int, reject: (Parcel, Parcel?) -> Boolean) {
+        val hudCalls = mutableListOf<Int>()
+        val hud = hudBinder { code, data, reply ->
+            hudCalls += code
+            if (code == QisiVehicleBinder.HUD_SET_NAV_STATUS) reject(data, reply) else {
+                reply!!.writeNoException()
+                reply.writeInt(1)
+                true
+            }
+        }
+        withBridge {
+            ReflectionHelpers.setStaticField(Hs5GuidanceBridge::class.java, "hudBinder", hud)
+            Hs5GuidanceBridge.setClusterMapCloseRequest { closes++ }
+            Hs5GuidanceBridge.setClusterMapShown(true)
+            repeat(3) { assertTrue(sendGuidance()) }
+            ReflectionHelpers.callInstanceMethod<Unit>(Hs5GuidanceBridge, "clearQisiLocked")
+            assertTrue(Hs5GuidanceBridge.clusterMapDiagnosticReport().contains("active=true"))
+            assertEquals(listOf("register", "map:4", "navigation:1:1"), calls)
+            assertEquals(4, hudCalls.count { it == QisiVehicleBinder.HUD_SET_CAMERA_DISTANCE })
+            assertEquals(expectedFailures, hudCalls.count { it == QisiVehicleBinder.HUD_SET_NAV_STATUS })
+            assertEquals(listOf(5, 6, 6, 5), guidanceCalls)
+            sendRequest("HardKeyQuit")
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(1, closes)
+        }
+    }
+
+    @Test fun rejectedInstrumentGuidanceDoesNotReleaseTheMapAndStillDeactivatesTbt() {
+        rejectInstrumentGuidance = true
+        withBridge {
+            ReflectionHelpers.setStaticField(Hs5GuidanceBridge::class.java, "hudBinder",
+                hudBinder { _, _, reply -> reply!!.writeNoException(); reply.writeInt(1); true })
+            Hs5GuidanceBridge.setClusterMapCloseRequest { closes++ }
+            Hs5GuidanceBridge.setClusterMapShown(true)
+            repeat(3) { assertTrue(sendGuidance()) }
+            ReflectionHelpers.callInstanceMethod<Unit>(Hs5GuidanceBridge, "clearQisiLocked")
+            assertEquals(listOf(5, 6, 5), guidanceCalls)
+            assertTrue(Hs5GuidanceBridge.clusterMapDiagnosticReport().contains("active=true"))
+            assertEquals(listOf("register", "map:4", "navigation:1:1"), calls)
+        }
+    }
+
+    @Test fun deadGuidanceBinderStillReleasesAndReconnectsTheService() {
+        withBridge {
+            ReflectionHelpers.setStaticField(Hs5GuidanceBridge::class.java, "hudBinder",
+                hudBinder { _, _, _ -> throw DeadObjectException() })
+            Hs5GuidanceBridge.setClusterMapCloseRequest { closes++ }
+            Hs5GuidanceBridge.setClusterMapShown(true)
+            assertFalse(sendGuidance())
+            assertTrue(Hs5GuidanceBridge.clusterMapDiagnosticReport().contains("active=false"))
+            assertEquals("unregister", calls.last())
+        }
+    }
+
+    private fun sendGuidance(): Boolean = ReflectionHelpers.callInstanceMethod(
+        Hs5GuidanceBridge, "sendQisiLocked", ReflectionHelpers.ClassParameter.from(
+            Hs5GuidanceFrame::class.java, Hs5GuidanceFrame(2, 0, 500, road = "next road")))
+
+    private fun hudBinder(handle: (Int, Parcel, Parcel?) -> Boolean): IBinder = object : Binder() {
+        init { attachInterface(null, QisiVehicleBinder.TOKEN_HUD) }
+        override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+            data.enforceInterface(QisiVehicleBinder.TOKEN_HUD)
+            return handle(code, data, reply)
+        }
+    }
+
     private fun withBridge(test: () -> Unit) {
+        ShadowBuild.setModel("HONG QI")
         val bridgeClass = Hs5GuidanceBridge::class.java
         val context = object : android.content.ContextWrapper(RuntimeEnvironment.getApplication()) {
             // These fake binders have no Android service binding to release. Robolectric otherwise
@@ -267,6 +364,7 @@ class QisiClusterMapSessionTest {
         ReflectionHelpers.setStaticField(bridgeClass, "useQisi", true)
         ReflectionHelpers.setStaticField(bridgeClass, "instrumentBinder", instrument)
         ReflectionHelpers.setStaticField(bridgeClass, "systemBinder", system)
+        ReflectionHelpers.setStaticField(bridgeClass, "remoteBinder", Binder())
         try { test() } finally {
             Hs5GuidanceBridge.setClusterMapShown(false)
             Hs5GuidanceBridge.setClusterMapCloseRequest(null)

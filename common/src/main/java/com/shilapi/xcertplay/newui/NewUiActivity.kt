@@ -40,7 +40,7 @@ import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.PhoneBluetoothReceiver
 import com.shilapi.xcertplay.WirelessRecovery
 import com.shilapi.xcertplay.appDialogBuilder
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.Hs5NavigationOutputs
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 import com.shilapi.xcertplay.AudioChannelPreview
 import com.shilapi.xcertplay.DiagnosticExportStore
@@ -215,7 +215,7 @@ class NewUiActivity : ComponentActivity() {
         DiPlayWindowFullscreen.apply(this)
         Hs5HongqiStartupWarmup.schedule(applicationContext)
         runCatching { BackgroundUpdateScheduler.schedule(applicationContext) }
-        BydNavigationOutputs.onAppOpened(applicationContext)
+        Hs5NavigationOutputs.onAppOpened(applicationContext)
         PhoneAudioRoute.attach(applicationContext)
         connectionActions = NewUiConnectionActions(
             activity = this,

@@ -6,6 +6,8 @@ import android.os.RemoteException
 
 /** Binder client for ltd.qisi.adapterservice vehicle modules (HUD, instrument, system). */
 internal object QisiVehicleBinder {
+    /** An absent transaction is a firmware capability mismatch, not a dead service. */
+    class UnsupportedTransaction(code: Int) : RemoteException("unsupported navigation transaction $code")
     const val ADAPTER_PACKAGE = "ltd.qisi.adapterservice"
     const val ADAPTER_SERVICE = "ltd.qisi.adapterservice.QISIAdapterService"
 
@@ -22,6 +24,23 @@ internal object QisiVehicleBinder {
 
     const val HUD_SET_ICON = 5
     const val HUD_SET_ROUNDABOUT = 6
+    const val HUD_SET_NEXT_CROSS_DISTANCE = 7
+    const val HUD_SET_NEXT_CROSS_RANGE = 9
+    const val HUD_SET_INTERSECTION = 24
+    const val HUD_SET_LEFT_LANE_LINE = 33
+    const val HUD_SET_RIGHT_LANE_LINE = 34
+    const val HUD_SET_ROAD_TYPE = 35
+    const val HUD_SET_NAV_STATUS = 36
+    const val HUD_SET_DESTINATION_NAME = 37
+    const val HUD_SET_DESTINATION_DISTANCE = 38
+    const val HUD_SET_TARGET_EXIT = 44
+    const val HUD_SET_CURRENT_EXIT = 45
+    const val HUD_SET_REMAINING_TIME = 46
+    const val HUD_SET_TOTAL_DISTANCE = 47
+    const val HUD_SET_CAMERA_DISTANCE = 48
+    const val HUD_SET_NEXT_ROAD = 49
+    const val HUD_SET_LANE_TYPE = 57
+    const val HUD_SET_NEXT_ROAD_INFO = 58
     const val HUD_SET_DISTANCE = 70
 
     const val INSTRUMENT_SET_ACTIVE = 5
@@ -60,7 +79,42 @@ internal object QisiVehicleBinder {
             data.writeInterfaceToken(token)
             for (value in values) data.writeInt(value)
             if (!binder.transact(code, data, reply, 0)) {
-                throw RemoteException("navigation transaction rejected")
+                throw UnsupportedTransaction(code)
+            }
+            reply.readException()
+            ensureSuccess(reply.readInt())
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    fun transactString(binder: IBinder, token: String, code: Int, value: String) {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken(token)
+            data.writeString(value)
+            if (!binder.transact(code, data, reply, 0)) {
+                throw UnsupportedTransaction(code)
+            }
+            reply.readException()
+            ensureSuccess(reply.readInt())
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    fun transactStringInt(binder: IBinder, token: String, code: Int, value: String, number: Int) {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken(token)
+            data.writeString(value)
+            data.writeInt(number)
+            if (!binder.transact(code, data, reply, 0)) {
+                throw UnsupportedTransaction(code)
             }
             reply.readException()
             ensureSuccess(reply.readInt())
@@ -78,7 +132,7 @@ internal object QisiVehicleBinder {
             data.writeInt(1)
             guidance.writeToParcel(data)
             if (!binder.transact(INSTRUMENT_SEND_GUIDANCE, data, reply, 0)) {
-                throw RemoteException("instrument guidance rejected")
+                throw UnsupportedTransaction(INSTRUMENT_SEND_GUIDANCE)
             }
             reply.readException()
             ensureSuccess(reply.readInt())
