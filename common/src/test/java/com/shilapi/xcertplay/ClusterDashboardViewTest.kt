@@ -45,10 +45,25 @@ class ClusterDashboardViewTest {
         }
     }
 
+    @Test fun copiedMapIsVisibleWithoutCarPlayConnectionOrNavigationMetadata() {
+        for (style in listOf(ClusterStyle.BASIC, ClusterStyle.SPORT)) {
+            val view = ClusterDashboardView(context, style = style, readState = { ClusterDashboardState() })
+            val frame = android.graphics.Bitmap.createBitmap(640, 360, android.graphics.Bitmap.Config.RGB_565)
+            view.setCopiedMap(frame)
+            assertEquals(View.GONE, view.getChildAt(1).visibility)
+            view.refreshState()
+            assertEquals(View.GONE, view.getChildAt(1).visibility)
+            view.setCopiedMap(null)
+            assertEquals(View.VISIBLE, view.getChildAt(1).visibility)
+            frame.recycle()
+        }
+    }
+
     @Test fun instrumentForegroundIsAboveBothVideoAndDisconnectPlaceholder() {
         val view = ClusterDashboardView(context)
         assertEquals(4, view.childCount)
-        assertSame(view.mapSurface, view.getChildAt(0))
+        assertSame(view.mapViewport, view.getChildAt(0))
+        assertSame(view.mapViewport, view.mapSurface.parent)
         assertEquals(View.VISIBLE, view.getChildAt(1).visibility)
         val foreground = view.getChildAt(2)
         assertFalse(foreground.isOpaque)
@@ -60,8 +75,41 @@ class ClusterDashboardViewTest {
         assertEquals(1920, view.getChildAt(3).width)
         assertEquals(720, view.getChildAt(3).height)
         val expected = ClusterDashboardView.mapBounds(1920, 720, OemClusterGeometry.MAP_ASPECT)
-        assertEquals(Math.round(expected.top), view.mapSurface.top)
-        assertEquals(Math.round(expected.top) + Math.round(expected.height()), view.mapSurface.bottom)
+        assertEquals(Math.round(expected.top), view.mapViewport.top)
+        assertEquals(Math.round(expected.top) + Math.round(expected.height()), view.mapViewport.bottom)
+        assertEquals(0, view.mapSurface.top)
+        assertEquals(view.mapViewport.height, view.mapSurface.height)
+    }
+
+    @Test fun zoomNeverMovesOrResizesAnyInstrumentMapAperture() {
+        for (style in listOf(ClusterStyle.BASIC, ClusterStyle.SPORT)) {
+            val view = ClusterDashboardView(context, style = style, readState = { liveState() })
+            view.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, 1920, 720)
+            val aperture = view.mapViewport
+            val bounds = android.graphics.Rect(aperture.left, aperture.top, aperture.right, aperture.bottom)
+            val surface = view.decoderSurface
+            for (zoom in listOf(50, 100, 200, 150, 200, 100)) {
+                ClusterMapCropSettings.saveZoom(context, zoom)
+                view.refreshState()
+                assertEquals(bounds, android.graphics.Rect(aperture.left, aperture.top, aperture.right, aperture.bottom))
+                assertTrue(aperture.clipChildren)
+                assertTrue(aperture.clipToPadding)
+                assertEquals(1f, aperture.scaleX, 0f)
+                assertEquals(1f, view.mapSurface.scaleX, 0f)
+                val matrix = view.mapSurface.getTransform(android.graphics.Matrix())
+                val points = floatArrayOf(0f, 0f, view.mapSurface.width.toFloat(), view.mapSurface.height.toFloat())
+                matrix.mapPoints(points)
+                assertTrue(points[0] <= 0f && points[1] <= 0f)
+                assertTrue(points[2] >= aperture.width && points[3] >= aperture.height)
+                val values = FloatArray(9)
+                matrix.getValues(values)
+                assertEquals((zoom / 100f).coerceAtLeast(1f), values[0], .001f)
+                assertSame(surface, view.decoderSurface)
+            }
+        }
+        ClusterMapCropSettings.saveZoom(context, 100)
     }
 
     @Test fun liveCardsDoNotDependOnMapVideoOrLegacyOverlayPreference() {
@@ -129,20 +177,20 @@ class ClusterDashboardViewTest {
         view.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, 1920, 720)
-        val surface = view.mapSurface.holder.surface
+        val surface = view.decoderSurface
         val bounds = android.graphics.Rect(view.mapSurface.left, view.mapSurface.top,
             view.mapSurface.right, view.mapSurface.bottom)
         for (state in listOf(liveState(), liveState().copy(guidance = liveState().guidance.copy(
             maneuverType = null, remainingMeters = 10000)), snapshot)) {
             snapshot = state
             view.refreshState()
-            assertSame(surface, view.mapSurface.holder.surface)
+            assertSame(surface, view.decoderSurface)
             assertEquals(bounds, android.graphics.Rect(view.mapSurface.left, view.mapSurface.top,
                 view.mapSurface.right, view.mapSurface.bottom))
         }
     }
 
-    @Test fun navigationCropAppliesLiveAndRestoresOnlyWhenTheRouteEnds() {
+    @Test fun navigationCropNeverMovesTheSurfaceOutsideItsFixedViewport() {
         var state = ClusterDashboardState(guidance = CarPlayGlance.Snapshot(connected = true))
         val activity = Robolectric.buildActivity(Activity::class.java).create()
         ClusterMapCropSettings.save(activity.get(), 50)
@@ -155,25 +203,25 @@ class ClusterDashboardViewTest {
         view.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, 1920, 720)
-        val surface = view.mapSurface.holder.surface
+        val surface = view.decoderSurface
         val size = view.mapSurface.width to view.mapSurface.height
-        assertEquals(1f, view.mapSurface.scaleX, .001f)
+        assertEquals(1f, view.mapSurface.scaleX, 0f)
         state = state.copy(guidance = state.guidance.copy(navigating = true, maneuverType = null))
         view.refreshState()
-        assertEquals(2f, view.mapSurface.scaleX, .001f)
-        assertEquals(view.mapSurface.scaleX, view.mapSurface.scaleY, 0f)
-        assertEquals(-view.mapSurface.width.toFloat(), view.mapSurface.translationX, .01f)
+        assertEquals(1f, view.mapSurface.scaleX, 0f)
+        assertEquals(1f, view.mapSurface.scaleY, 0f)
+        assertEquals(0f, view.mapSurface.translationX, 0f)
         ClusterMapCropSettings.save(activity.get(), 40)
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(1f / .6f, view.mapSurface.scaleX, .001f)
-        assertSame(surface, view.mapSurface.holder.surface)
+        assertEquals(1f, view.mapSurface.scaleX, 0f)
+        assertSame(surface, view.decoderSurface)
         assertEquals(size, view.mapSurface.width to view.mapSurface.height)
         state = state.copy(guidance = state.guidance.copy(navigating = false))
         view.refreshState()
         assertEquals(1f, view.mapSurface.scaleX, 0f)
         assertEquals(0f, view.mapSurface.translationX, 0f)
         assertEquals(0f, view.mapSurface.translationY, 0f)
-        assertSame(surface, view.mapSurface.holder.surface)
+        assertSame(surface, view.decoderSurface)
         activity.pause().stop().destroy()
         ClusterMapCropSettings.save(context, 0)
     }
@@ -206,16 +254,18 @@ class ClusterDashboardViewTest {
             dashboard.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
             dashboard.layout(0, 0, 1920, 720)
-            val holder = dashboard.mapSurface.holder as org.robolectric.shadows.ShadowSurfaceView.FakeSurfaceHolder
-            holder.callbacks.forEach { it.surfaceCreated(holder) }
-            assertSame(dashboard.mapSurface.holder.surface, presentation.outputSurface)
+            val texture = android.graphics.SurfaceTexture(0)
+            val listener = requireNotNull(dashboard.mapSurface.surfaceTextureListener)
+            listener.onSurfaceTextureAvailable(texture, dashboard.mapSurface.width, dashboard.mapSurface.height)
+            assertSame(dashboard.decoderSurface, presentation.outputSurface)
             assertSame(presentation.outputSurface, surfaces.last())
             assertTrue(dashboard.mapSurface.width < 1920)
             presentation.setStreamActive(true)
             presentation.setMapVisible(false)
             assertFalse(presentation.mapVisible)
             presentation.dismiss()
-            holder.callbacks.forEach { it.surfaceDestroyed(holder) }
+            listener.onSurfaceTextureDestroyed(texture)
+            texture.release()
             assertNull(presentation.outputSurface)
             assertNull(surfaces.last())
         } finally {

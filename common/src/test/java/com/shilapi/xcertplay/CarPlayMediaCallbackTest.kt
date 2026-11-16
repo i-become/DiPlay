@@ -53,6 +53,33 @@ class CarPlayMediaCallbackTest {
         assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
     }
 
+    @Test fun longNextTogglesOnceAndDoesNotSkipOnRelease() {
+        fun event(action: Int, at: Long, repeat: Int = 0) =
+            callback.onMediaButtonEvent(button(KeyEvent(100, at, action, KeyEvent.KEYCODE_MEDIA_NEXT, repeat)))
+        event(KeyEvent.ACTION_DOWN, 100)
+        event(KeyEvent.ACTION_DOWN, 800, 1)
+        event(KeyEvent.ACTION_DOWN, 1200, 2)
+        event(KeyEvent.ACTION_UP, 1300)
+        assertEquals(listOf(CarPlayMediaButton.PLAY_PAUSE), sent)
+        event(KeyEvent.ACTION_DOWN, 100)
+        event(KeyEvent.ACTION_UP, 200)
+        assertEquals(listOf(CarPlayMediaButton.PLAY_PAUSE, CarPlayMediaButton.NEXT), sent)
+    }
+
+    @Test fun canceledOrUnmatchedNextReleaseDoesNotSkipOrToggle() {
+        callback.onMediaButtonEvent(button(KeyEvent(100, 200, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0)))
+        callback.onMediaButtonEvent(button(KeyEvent(100, 100, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0)))
+        callback.onMediaButtonEvent(button(KeyEvent(100, 900, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT,
+            0, 0, 0, 0, KeyEvent.FLAG_CANCELED)))
+        assertEquals(emptyList<Int>(), sent)
+    }
+
+    @Test fun longNextWithoutRepeatEventsIsRecognizedOnRelease() {
+        callback.onMediaButtonEvent(button(KeyEvent(100, 100, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0)))
+        callback.onMediaButtonEvent(button(KeyEvent(100, 900, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0)))
+        assertEquals(listOf(CarPlayMediaButton.PLAY_PAUSE), sent)
+    }
+
     @Test
     fun nowPlayingFieldsBecomeAndroidMediaMetadata() {
         val artwork = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

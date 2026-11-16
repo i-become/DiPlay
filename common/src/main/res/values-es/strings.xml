@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="new_ui_cluster_copy_region_fullscreen">Pantalla completa</string>
+    <string name="new_ui_cluster_copy_region_center">Centrar</string>
+    <string name="new_ui_cluster_only_title">Solo cuadro de instrumentos</string>
+    <string name="new_ui_cluster_only_sub">Mantén el cuadro activo sin conectar un teléfono; los datos multimedia dependen de la sesión multimedia del vehículo.</string>
+    <string name="new_ui_phone_protocol">Protocolo</string>
+    <string name="new_ui_cluster_copy_region">Copiar una zona de la pantalla central como mapa</string>
+    <string name="new_ui_cluster_copy_region_sub">Arrastra el marco para moverlo y la esquina inferior derecha para cambiar su tamaño. Se aplica al vídeo activo de Carlink; el modo solo instrumentos necesita captura de pantalla del vehículo.</string>
+    <string name="new_ui_cluster_copy_region_placeholder">Arrastra dentro del marco para moverlo y sus esquinas para cambiar el tamaño. Cada cuadro guarda su región y la ajusta al área fija del mapa.</string>
     <string name="existing_wifi_title">Wi-Fi existente / Misma LAN</string>
     <string name="existing_wifi_description">Usa un router o Wi-Fi portátil existente. Mantén el iPhone y el coche en la misma red con acceso a Internet.</string>
     <string name="existing_wifi_hint">Wi-Fi existente · Mantén ambos dispositivos en la misma Wi-Fi y el Bluetooth activado. No necesitas el punto de acceso del coche.</string>
@@ -882,4 +890,29 @@
     <string name="new_ui_about_sec5_title">5. Agradecimientos</string>
     <string name="new_ui_about_sec5_body">Gracias a Douyin @YiMeng谁的梦还没醒 (1768868288) por proporcionar la interfaz de las luces de posición del vehículo.</string>
     <string name="new_ui_diag_log_record_sub">Activa para registrar datos de diagnóstico y crear informes. Al desactivar, se detienen los registros y el muestreo de diagnóstico en segundo plano.</string>
+    <string name="new_ui_carlink_pairing_code">Código de emparejamiento de Carlink</string>
+    <string name="new_ui_carlink_step_sdk_ready">Carlink está listo</string>
+    <string name="new_ui_carlink_step_sdk_ready_sub">Preparando la conexión Carlink</string>
+    <string name="new_ui_carlink_step_waiting">Esperando el teléfono</string>
+    <string name="new_ui_carlink_step_waiting_sub">Mantén el teléfono cerca y abre Carlink</string>
+    <string name="new_ui_carlink_step_pairing">Emparejando el teléfono</string>
+    <string name="new_ui_carlink_step_phone_connected">Teléfono conectado</string>
+    <string name="new_ui_carlink_step_phone_connected_sub">Preparando la pantalla</string>
+    <string name="new_ui_carlink_step_projection_ready">Proyección lista</string>
+    <string name="new_ui_carlink_step_projection_ready_sub">Iniciando la proyección Carlink</string>
+    <string name="new_ui_carlink_step_projecting">Carlink está proyectando</string>
+    <string name="new_ui_carlink_step_projecting_sub">Proyección activa</string>
+    <string name="new_ui_carlink_step_failed">Error de conexión Carlink</string>
+    <string name="new_ui_carlink_step_failed_sub">Reintenta la conexión Carlink</string>
+    <string name="new_ui_carlink_name">Carlink</string>
+    <string name="new_ui_carlink_pairing">Emparejando Carlink</string>
+    <string name="new_ui_carlink_waiting_phone">Esperando el teléfono Carlink…</string>
+    <string name="new_ui_carlink_ready">Carlink listo</string>
+    <string name="new_ui_carlink_failure_detail">Error de conexión Carlink (%1$s)</string>
+    <string name="new_ui_carlink_connecting">Conectando Carlink…</string>
+    <string name="new_ui_carlink_open">Abrir Carlink</string>
+    <string name="new_ui_carlink_retry">Reintentar conexión Carlink</string>
+    <string name="new_ui_carlink_connect">Conectar Carlink</string>
+    <string name="new_ui_carlink_switch_phone">Cambiar teléfono Carlink · %1$s</string>
+    <string name="new_ui_carlink_pair_phone">Emparejar y elegir un teléfono Carlink</string>
 </resources>

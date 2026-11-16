@@ -37,7 +37,7 @@ class ClusterLaneGuidanceRendererTest {
             finally { renderer.release() }
         }
     private fun pixel(bitmap: Bitmap, sport: Boolean, x: Int, y: Int): Int = if (sport) bitmap.getPixel(
-        (SportClusterGeometry.offsetX(2048,768) + x * SportClusterGeometry.CONTENT_SCALE).toInt(),
+        (SportClusterGeometry.offsetX(2048,768) + x * SportClusterGeometry.horizontalScale(2048,768)).toInt(),
         (SportClusterGeometry.CONTENT_TOP + y * SportClusterGeometry.CONTENT_SCALE).toInt())
         else bitmap.getPixel(x, y)
 
@@ -50,14 +50,14 @@ class ClusterLaneGuidanceRendererTest {
             val noRoute = draw(sport, guidance.copy(navigating = false))
             val disconnected = draw(sport, guidance.copy(connected = false))
             try {
-                val x = if (sport) 1620 else 997
-                val top = if (sport) 156 else 112
+                val x = if (sport) 1840 else 997
+                val top = if (sport) 72 else 112
                 val y = top + 120
                 assertTrue(Color.alpha(pixel(with, sport, x, y)) >= 245)
                 assertEquals(0, Color.alpha(pixel(without, sport, x, y)))
                 assertTrue(Color.alpha(pixel(lanesOnly, sport, x, top + 20)) >= 245)
                 assertEquals(0, Color.alpha(pixel(lanesOnly, sport, x, top + 64)))
-                assertEquals(0, Color.alpha(pixel(noCard, sport, x, top + 20)))
+                assertEquals(pixel(noRoute, sport, x, top + 20), pixel(noCard, sport, x, top + 20))
                 assertEquals(0, Color.alpha(pixel(noRoute, sport, x, y)))
                 assertEquals(0, Color.alpha(pixel(disconnected, sport, x, y)))
                 // Summary is near the map's lower edge, not appended below the lane row.
@@ -76,8 +76,8 @@ class ClusterLaneGuidanceRendererTest {
             val short = draw(sport, guidance.copy(road = "向右", lanes = emptyList()))
             val long = draw(sport, guidance.copy(road = "进入红旗大道辅路向东行驶", lanes = emptyList()))
             try {
-                val x = if (sport) 1780 else 1160
-                val y = if (sport) 170 else 125
+                val x = if (sport) 1740 else 1160
+                val y = if (sport) 130 else 125
                 assertEquals(0, Color.alpha(pixel(short, sport, x, y)))
                 assertTrue(Color.alpha(pixel(long, sport, x, y)) >= 245)
             } finally { short.recycle(); long.recycle() }

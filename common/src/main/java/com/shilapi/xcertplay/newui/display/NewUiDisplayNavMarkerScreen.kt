@@ -159,7 +159,7 @@ fun NewUiDisplayNavMarkerScreen(
                     Text(
                         stringResource(R.string.new_ui_display_nav_marker_editing),
                         style = NewUiTypography.SettingSubtitle,
-                        color = NewUiColors.PrimaryBlue,
+                        color = NewUiColors.Accent,
                         modifier = Modifier
                             .padding(start = 12.dp)
                             .clip(RoundedCornerShape(8.dp))
@@ -328,7 +328,7 @@ private fun NavMarkerStatRow(
             Text(
                 value,
                 style = NewUiTypography.ActionSubtitle,
-                color = if (highlight) NewUiColors.PrimaryBlue else NewUiColors.TextSecondary,
+                color = if (highlight) NewUiColors.Accent else NewUiColors.TextSecondary,
             )
         }
         if (showDivider) {

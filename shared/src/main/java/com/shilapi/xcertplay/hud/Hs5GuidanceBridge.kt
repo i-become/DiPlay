@@ -39,6 +39,7 @@ internal object Hs5GuidanceBridge {
     private var useQisi = false
     private var senderStarted = false
     private var lastSent: Hs5GuidanceFrame? = null
+    private var externalFrame: Hs5GuidanceFrame? = null
     private var ticksSinceSend = 0
     private var guidanceLogged = false
 
@@ -101,6 +102,10 @@ internal object Hs5GuidanceBridge {
         if (useQisi) applyInstrumentMapLocked()
     }
 
+    fun clearClusterMapCloseRequest(expected: () -> Unit) = synchronized(lock) {
+        if (clusterMapCloseRequest === expected) setClusterMapCloseRequest(null)
+    }
+
     fun clusterMapDiagnosticReport(): String = synchronized(lock) {
         "Qisi cluster navigation: qisi=$useQisi bound=${systemBinder != null} " +
             "instrument=${instrumentBinder != null} hud=${hudBinder != null} " +
@@ -108,6 +113,7 @@ internal object Hs5GuidanceBridge {
     }
 
     fun onFrame(frame: Iap2Frame) = synchronized(lock) {
+        externalFrame = null
         if (!available) return@synchronized
         when (route.accept(frame.messageId, frame.payload)) {
             Hs5RouteChange.GUIDANCE -> queueApplyLocked()
@@ -116,7 +122,23 @@ internal object Hs5GuidanceBridge {
         }
     }
 
+    fun onExternalFrame(frame: Hs5GuidanceFrame) = synchronized(lock) {
+        if (!available) return@synchronized
+        if (context?.let(Hs5OutputSettings::enabled) != true) return@synchronized
+        externalFrame = frame
+        val sent = if (useQisi && hudBinder != null) sendQisiLocked(frame) else sendBroadcastLocked(frame)
+        if (sent) {
+            lastSent = frame
+            ticksSinceSend = 0
+            if (!guidanceLogged) {
+                guidanceLogged = true
+                DiagnosticLogging.logcat { Log.i(TAG, "external guidance frame sent $frame qisi=$useQisi") }
+            }
+        }
+    }
+
     fun clear() = synchronized(lock) {
+        externalFrame = null
         route.clear()
         if (available) sendEndLocked()
     }
@@ -125,6 +147,14 @@ internal object Hs5GuidanceBridge {
         if (useQisi && remoteBinder == null && !binding) mainHandler.post { bindAdapterLocked() }
         if (useQisi && clusterMapShown && !instrumentMapActive) {
             mainHandler.post { synchronized(lock) { applyInstrumentMapLocked() } }
+        }
+        if (externalFrame != null) {
+            if (++ticksSinceSend >= KEEPALIVE_TICKS) {
+                val frame = externalFrame!!
+                val sent = if (useQisi && hudBinder != null) sendQisiLocked(frame) else sendBroadcastLocked(frame)
+                if (sent) { lastSent = frame; ticksSinceSend = 0 }
+            }
+            return@synchronized
         }
         if (lastSent != null && route.currentApple() == null) sendEndLocked()
         else if (++ticksSinceSend >= KEEPALIVE_TICKS) queueApplyLocked(force = true)

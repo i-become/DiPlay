@@ -1521,6 +1521,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     // Hardware navigation belongs to the iPhone-rendered CarPlay UI, not Android View focus.
+    private val nextTrackPress = NextTrackPress()
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val physicalKey = Triple(event.deviceId, event.keyCode, event.scanCode)
         val downOrUp = event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP
@@ -1581,6 +1583,9 @@ class CarPlayHostActivity : ComponentActivity() {
             inCall = inCall(this),
         )
         if (downOrUp && mediaPress != null) {
+            if (nextTrackPress.dispatch(event,
+                next = { controller?.sendMediaButton(CarPlayMediaButton.NEXT) },
+                toggle = { controller?.sendMediaButton(CarPlayMediaButton.PLAY_PAUSE) })) return true
             // A media button is a tap, and the car sends each tap as an instant down/up pair: send once,
             // on the press. The release is swallowed rather than passed on, or the car's own player would
             // receive an unpaired key.
@@ -5139,6 +5144,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun startCarPlay(size: DisplaySize) {
+        if (HongqiScreenStatus.screenOff) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
         resetConnectionProgress()
@@ -5507,6 +5513,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun maybeStartCarPlay() {
+        if (HongqiScreenStatus.screenOff) return
         if (shuttingDown.get() || startupRetryStopped) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
             val retryMs = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) 150L else 500L
@@ -5620,6 +5627,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     /** Full-stack fallback when an AirPlay-only reconnect is unavailable. */
     private fun restartCarPlay(reason: String) {
+        if (HongqiScreenStatus.screenOff) return
         if (!CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
         val size = activeDisplaySize ?: return

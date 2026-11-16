@@ -1,6 +1,8 @@
 package com.shilapi.xcertplay
 
 import android.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.shilapi.xcertplay.newui.NewUiColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -15,27 +17,27 @@ import kotlin.math.pow
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], manifest = Config.NONE)
 class DiPlayPaletteTest {
-    @Test fun darkPalettePreservesTheExistingProductionColors() {
+    @Test fun darkPaletteUsesHs5NightConnectionColors() {
         val palette = DiPlayPalette.DARK
-        assertEquals(Color.rgb(12, 17, 27), palette.background)
-        assertEquals(Color.rgb(21, 30, 44), palette.surface)
-        assertEquals(Color.rgb(31, 43, 61), palette.button)
-        assertEquals(Color.rgb(42, 56, 75), palette.outline)
-        assertEquals(Color.rgb(24, 54, 92), palette.railSelected)
-        assertEquals(Color.rgb(42, 82, 130), palette.railSelectedOutline)
-        assertEquals(Color.rgb(241, 245, 252), palette.primaryText)
-        assertEquals(Color.rgb(168, 182, 202), palette.secondaryText)
-        assertEquals(Color.rgb(166, 200, 255), palette.accent)
+        assertEquals(Color.rgb(5, 3, 7), palette.background)
+        assertEquals(Color.rgb(41, 38, 53), palette.surface)
+        assertEquals(Color.rgb(52, 49, 65), palette.button)
+        assertEquals(Color.rgb(70, 66, 82), palette.outline)
+        assertEquals(Color.rgb(64, 59, 83), palette.railSelected)
+        assertEquals(Color.rgb(109, 105, 134), palette.railSelectedOutline)
+        assertEquals(Color.rgb(226, 228, 230), palette.primaryText)
+        assertEquals(Color.rgb(175, 177, 189), palette.secondaryText)
+        assertEquals(Color.rgb(196, 193, 216), palette.accent)
         assertEquals(Color.rgb(255, 196, 128), palette.warning)
-        assertEquals(Color.rgb(127, 205, 154), palette.success)
+        assertEquals(Color.rgb(196, 204, 208), palette.success)
         assertEquals(Color.rgb(190, 45, 45), palette.danger)
-        assertEquals(0x336F9FD9, palette.ripple)
+        assertEquals(0x336D6986, palette.ripple)
         assertFalse(palette.systemBarIconsAreDark)
     }
 
     @Test fun waitingScreenDelegationKeepsItsExactLightAndDarkColors() {
         assertEquals(
-            WaitingScreenColors(Color.rgb(12, 17, 27), Color.rgb(241, 245, 252), Color.rgb(168, 182, 202)),
+            WaitingScreenColors(Color.rgb(5, 3, 7), Color.rgb(226, 228, 230), Color.rgb(175, 177, 189)),
             WaitingScreenColors.of(night = true),
         )
         assertEquals(
@@ -67,6 +69,25 @@ class DiPlayPaletteTest {
             3.0,
         )
         assertTrue(DiPlayPalette.LIGHT.systemBarIconsAreDark)
+    }
+
+    @Test fun newUiButtonAndCardForegroundsRemainReadable() {
+        val previous = NewUiColors.night
+        try {
+            for (night in listOf(true, false)) {
+                NewUiColors.night = night
+                assertEquals(NewUiColors.DropdownBorder, com.shilapi.xcertplay.newui.NewUiSurfaces.glassBorder)
+                assertEquals(NewUiColors.Divider, com.shilapi.xcertplay.newui.NewUiSurfaces.innerDivider)
+                assertContrastAtLeast(NewUiColors.OnAccent.toArgb(), NewUiColors.Accent.toArgb(), 4.5)
+                for (background in listOf(NewUiColors.Canvas, NewUiColors.CanvasBottom,
+                    NewUiColors.PrimaryButtonFill, NewUiColors.MenuSelected, NewUiColors.ButtonNormal,
+                    NewUiColors.DropdownBackground, NewUiColors.CardNormal, NewUiColors.CardSecondary)) {
+                    assertContrastAtLeast(NewUiColors.TextPrimary.toArgb(), background.toArgb(), 4.5)
+                    assertContrastAtLeast(NewUiColors.TextSecondary.toArgb(), background.toArgb(), 4.5)
+                    assertContrastAtLeast(NewUiColors.DangerText.toArgb(), background.toArgb(), 4.5)
+                }
+            }
+        } finally { NewUiColors.night = previous }
     }
 
     private fun assertContrastAtLeast(foreground: Int, background: Int, minimum: Double) {

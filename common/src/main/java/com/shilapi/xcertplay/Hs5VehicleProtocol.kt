@@ -367,7 +367,8 @@ internal data class Hs5VehicleSample(
             tirePressureBar = tires.map { reading ->
                 // Adapter getter/push values are already scaled to kPa by Qisi.
                 // Applying the CAN factor 2.75 again turns 2.3 bar into 6.3 bar.
-                pushed(reading)?.takeIf { it in 1..700 && it != 254 && it != 255 }?.div(100f)
+                // 254/255 are valid kPa (2.54/2.55 bar), not CAN byte sentinels.
+                pushed(reading)?.takeIf { it in 1..700 }?.div(100f)
             },
             tireWarning = tireWarnings.map { reading ->
                 pushed(reading)?.takeIf { it == 0 || it == 1 }?.let { it == 1 }

@@ -11,6 +11,7 @@ data class CarPlayNowPlaying(
     val artist: String? = null,
     val artworkTransferId: Int? = null,
     val sourceApp: String? = null,
+    val lyrics: String? = null,
     val durationMillis: Long? = null,
     val elapsedMillis: Long? = null,
     val playing: Boolean = false,

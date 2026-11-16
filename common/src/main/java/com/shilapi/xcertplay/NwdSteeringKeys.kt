@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.carlink.CarlinkBridge
 
 /** NWD bus values have their own namespace; they are not Android KeyEvent codes. */
 internal object NwdSteeringKeyMappings {
@@ -72,6 +73,7 @@ class NwdSteeringKeyReceiver internal constructor(private val dynamic: Boolean) 
 internal object SteeringWheelEvents {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var controller: CarPlayController? = null
+    @Volatile private var carlink: CarlinkBridge? = null
     @Volatile private var appContext: Context? = null
     @Volatile private var generation = 0L
     private var receiver: NwdSteeringKeyReceiver? = null
@@ -91,6 +93,18 @@ internal object SteeringWheelEvents {
         }
     }
 
+    fun attachCarlink(context: Context, bridge: CarlinkBridge) {
+        appContext = context.applicationContext
+        carlink = bridge
+        controller = null
+        if (receiver == null) {
+            val ingress = NwdSteeringKeyReceiver(true)
+            val filter = IntentFilter(NwdSteeringKeyMappings.ACTION).apply { priority = Int.MAX_VALUE }
+            runCatching { ContextCompat.registerReceiver(appContext!!, ingress, filter, ContextCompat.RECEIVER_EXPORTED) }
+                .onSuccess { receiver = ingress }
+        }
+    }
+
     fun detach(expected: CarPlayController) {
         if (controller !== expected) return
         generation++
@@ -100,8 +114,28 @@ internal object SteeringWheelEvents {
         appContext = null
     }
 
+    fun detachCarlink(bridge: CarlinkBridge) {
+        if (carlink !== bridge) return
+        carlink = null
+        if (controller == null) {
+            receiver?.let { runCatching { appContext?.unregisterReceiver(it) } }
+            receiver = null
+            appContext = null
+        }
+    }
+
     fun postNwd(code: Int) {
         val context = appContext ?: return
+        val carlinkSession = carlink
+        if (carlinkSession != null && controller == null) {
+            when (NwdSteeringKeyMappings.resolve(context, code)) {
+                NwdSteeringKeyMappings.Command.PREVIOUS -> if (AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context)) carlinkSession.sendKey(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS, android.view.KeyEvent.ACTION_DOWN)
+                NwdSteeringKeyMappings.Command.NEXT -> if (AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context)) carlinkSession.sendKey(android.view.KeyEvent.KEYCODE_MEDIA_NEXT, android.view.KeyEvent.ACTION_DOWN)
+                else -> Unit
+            }
+            Hs5SteeringKeys.recordEvent { "NWD Carlink key=$code" }
+            return
+        }
         val expected = controller ?: return
         val revision = generation
         val session = expected.activeAirPlaySessionToken() ?: return

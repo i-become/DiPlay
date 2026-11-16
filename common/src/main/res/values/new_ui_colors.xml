@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- DiPlay native config UI — fixed palette (#AARRGGBB). Keep in sync with NewUiColors.kt -->
 <resources>
-    <color name="new_ui_background_overlay">#CC071426</color>
-    <color name="new_ui_card_normal">#CC101F33</color>
-    <color name="new_ui_card_secondary">#E6142D4C</color>
-    <color name="new_ui_button_normal">#FF142D4C</color>
-    <color name="new_ui_primary_blue">#FF087BFF</color>
-    <color name="new_ui_menu_selected">#FF123D7C</color>
-    <color name="new_ui_text_primary">#FFF2F7FF</color>
-    <color name="new_ui_text_secondary">#FF8FAED5</color>
-    <color name="new_ui_divider">#FF263C5A</color>
-    <color name="new_ui_switch_track_off">#FF34445B</color>
-    <color name="new_ui_switch_thumb">#FFFFFFFF</color>
-    <color name="new_ui_dropdown_background">#FF17345A</color>
-    <color name="new_ui_dropdown_border">#FF365578</color>
+    <color name="new_ui_background_overlay">#CC100E23</color>
+    <color name="new_ui_card_normal">#FF1C1B29</color>
+    <color name="new_ui_card_secondary">#FF242230</color>
+    <color name="new_ui_button_normal">#FF343141</color>
+    <color name="new_ui_primary_blue">#FF6D6986</color>
+    <color name="new_ui_menu_selected">#FF403B53</color>
+    <color name="new_ui_text_primary">#FFE2E4E6</color>
+    <color name="new_ui_text_secondary">#FFAFB1BD</color>
+    <color name="new_ui_divider">#FF464252</color>
+    <color name="new_ui_switch_track_off">#FF35333E</color>
+    <color name="new_ui_switch_thumb">#FFE2E4E6</color>
+    <color name="new_ui_dropdown_background">#FF292635</color>
+    <color name="new_ui_dropdown_border">#FF4B465A</color>
+    <color name="new_ui_background_top">#FF100E23</color>
+    <color name="new_ui_background_bottom">#FF050307</color>
+    <color name="new_ui_loading_overlay">#FFE2E4E6</color>
 </resources>

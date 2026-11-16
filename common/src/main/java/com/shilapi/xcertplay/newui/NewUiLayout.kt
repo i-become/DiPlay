@@ -57,6 +57,13 @@ object NewUiLayout {
     val ClusterSelectionBorder = 2.dp
     val ClusterCardBorder = 1.dp
     val ClusterEditorGap = 20.dp
+    val ClusterEditorToolbarMaxWidth = 560.dp
+    val ClusterEditorButtonMinHeight = 48.dp
+    val ClusterEditorButtonPadding = 10.dp
+    val PairingCodeMaxWidth = 300.dp
+    val PairingCodeSideBySideMinWidth = 520.dp
+    val PairingCodeCellHeight = 56.dp
+    val PairingCodeCellGap = 6.dp
     const val ClusterEditorPreviewWeight = 1.7f
     const val TopBarHongqiBadgeAspectRatio = 1700f / 500f
 }

@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.shilapi.xcertplay.glance.CarPlayGlance
 import com.shilapi.xcertplay.glance.CarPlayLane
+import com.shilapi.xcertplay.CarPlayMediaKeys
 
 /** A transparent, event-driven overlay. Preview instances never bind the vehicle service. */
 internal class OriginalClusterOverlayView(context: Context, private val preview: Boolean = false) : View(context) {
@@ -29,6 +30,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
         nav = CarPlayGlance.snapshot()
         invalidate()
     }
+    private val musicRefresh = Runnable { invalidate() }
     private val background by lazy { com.shilapi.xcertplay.newui.display.ClusterStylePreview.create(context, ClusterStyle.ORIGINAL) }
     private var dragging: OriginalClusterComponent? = null
     private var candidate: OriginalClusterComponent? = null
@@ -47,7 +49,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
     })
 
     override fun onAttachedToWindow() { super.onAttachedToWindow(); updateObservation() }
-    override fun onDetachedFromWindow() { stopObservation(); super.onDetachedFromWindow() }
+    override fun onDetachedFromWindow() { stopObservation(); renderer.releaseNavigationIcon(); super.onDetachedFromWindow() }
     override fun onWindowVisibilityChanged(visibility: Int) { super.onWindowVisibilityChanged(visibility); updateObservation() }
     override fun onVisibilityAggregated(isVisible: Boolean) { super.onVisibilityAggregated(isVisible); updateObservation() }
 
@@ -69,6 +71,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
             invalidate()
         }
         subscriptions += CarPlayGlance.subscribe { scheduleRefresh() }
+        subscriptions += CarPlayMediaKeys.subscribeDashboard { scheduleMusicRefresh() }
         subscribeVehicle()
         scheduleRefresh()
     }
@@ -89,10 +92,12 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
         stopVehicle?.invoke(); stopVehicle = null
         vehicleDemand = null
         main.removeCallbacks(refresh)
+        main.removeCallbacks(musicRefresh)
         nav = CarPlayGlance.Snapshot(); vehicle = OemClusterVehicleState()
     }
 
     private fun scheduleRefresh() { main.removeCallbacks(refresh); if (observing) main.post(refresh) }
+    private fun scheduleMusicRefresh() { main.removeCallbacks(musicRefresh); if (observing) main.post(musicRefresh) }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -101,6 +106,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
             canvas.drawBitmap(background, null, android.graphics.Rect(0, 0, width, height), null)
             renderer.draw(canvas, width, height, layout, previewVehicle, previewNav, editing = dragging)
         } else renderer.draw(canvas, width, height, layout, vehicle, nav)
+        if (observing && layout[OriginalClusterComponent.MUSIC].visible && renderer.lyricAnimating) postInvalidateDelayed(33L)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

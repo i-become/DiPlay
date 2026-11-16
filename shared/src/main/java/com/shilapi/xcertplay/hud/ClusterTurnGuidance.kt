@@ -11,6 +11,8 @@ data class ClusterTurnGuidance(
     val remainingSeconds: Long? = null,
     val remainingMeters: Long? = null,
     val lanes: List<com.shilapi.xcertplay.glance.CarPlayLane> = emptyList(),
+    val directionIcon: ByteArray? = null,
+    val routeSummary: String = "",
 ) {
     companion object {
         internal fun from(frame: Hs5GuidanceFrame): ClusterTurnGuidance {

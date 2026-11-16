@@ -24,6 +24,7 @@ internal object Hs5BootBluetoothWarmup {
 
     fun scheduleIfNeeded(context: Context) {
         val app = context.applicationContext
+        if (DiPlayPreferences.phoneLinkMode(app) == DiPlayPreferences.PhoneLinkMode.CARLINK) return
         if (!Hs5HeadUnit.isHeadUnit(app)) return
         if (!DiPlayPreferences.autoConnectWireless(app)) { record("skip=wireless_disabled"); return }
         if (!DiPlayPreferences.autoConnect(app)) { record("skip=auto_connect_disabled"); return }

@@ -179,6 +179,8 @@ internal object OemClusterGeometry {
  * The map remains a decoder-owned SurfaceView behind a cached, transparent foreground.
  */
 internal class OemClusterRenderer(private val context: Context) : ClusterInstrumentRenderer {
+    private val lyricScroll = ClusterLyricScroll()
+    override val lyricAnimating: Boolean get() = lyricScroll.animating
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val path = Path()
     private val rect = RectF()
@@ -281,7 +283,7 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
             i.toString(), false, 26f)
     }
 
-    override fun release() { images.values.forEach { it.recycle() }; images.clear() }
+    override fun release() { guidanceCard.release(); images.values.forEach { it.recycle() }; images.clear() }
 
     private fun image(id: Int): Bitmap = images.getOrPut(id) {
         val source = BitmapFactory.decodeResource(context.resources, id, BitmapFactory.Options().apply { inScaled = false })
@@ -345,8 +347,9 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
 
     private fun music(canvas: Canvas, state: ClusterDashboardState) {
         val song = state.music.metadata
+        val content = ClusterMusicText.from(song)
         val cover = state.music.artwork?.takeUnless { it.isRecycled }
-        val bounds = RectF(1534f, 225f, 1641f, 325f)
+        val bounds = RectF(1538f, 248f, 1638f, 348f)
         reset(navy); canvas.drawRoundRect(bounds, 7f, 7f, paint)
         if (cover != null) {
             canvas.save(); path.reset(); path.addRoundRect(bounds, 7f, 7f, Path.Direction.CW); canvas.clipPath(path)
@@ -354,13 +357,15 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
             val src = android.graphics.Rect((cover.width-side)/2, (cover.height-side)/2,
                 (cover.width+side)/2, (cover.height+side)/2)
             reset(); canvas.drawBitmap(cover, src, bounds, paint); canvas.restore()
-        } else text(canvas, "♪", 1588f, 302f, 68f, 95f, muted, true)
+        } else text(canvas, "♪", 1588f, 325f, 68f, 95f, muted, true)
         outline(canvas, bounds, 7f, Color.rgb(65, 111, 179), 1f)
-        text(canvas, song.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.cluster_dashboard_waiting_music),
-            1591f, 357f, 23f, 290f, white, true)
-        text(canvas, song.artist.orEmpty(), 1591f, 386f, 20f, 290f, muted, true)
-        // iAP2 supplies album/source metadata, not timed lyrics. Never render the sample lyrics.
-        text(canvas, song.album.orEmpty(), 1591f, 417f, 21f, 290f, cyan, true)
+        text(canvas, listOfNotNull(content.title, content.artist).joinToString(" · ")
+            .ifBlank { context.getString(R.string.cluster_dashboard_waiting_music) },
+            1591f, 377f, 18f, 290f, muted, true)
+        reset(white); paint.textSize = 32f
+        lyricScroll.draw(canvas, content.lyric ?: song.album.orEmpty(),
+            listOf(content.title, content.artist, song.album), paint,
+            1431.0f, 422f, 320f, centered = true, remainingMillis = content.lyricRemainingMillis)
         text(canvas, song.sourceApp.orEmpty(), 1591f, 444f, 19f, 280f, muted, true)
         line(canvas, 1485f, 466f, 1703f, 466f, Color.rgb(29, 64, 106), 6f)
         state.progress()?.let {
@@ -395,9 +400,13 @@ internal class OemClusterRenderer(private val context: Context) : ClusterInstrum
         val arrival = nav.arrivalEpochSeconds?.takeIf { it > 0 && it <= Long.MAX_VALUE / 1000 }
             ?.let { date.format(java.util.Date(it * 1000)) }
         val seconds = nav.remainingSeconds?.takeIf { it >= 0 }
-        if (meters == null && arrival == null && seconds == null) return
+        if (meters == null && arrival == null && seconds == null && nav.routeSummary.isBlank()) return
         reset(Color.argb(247, 0, 19, 41)); canvas.drawRoundRect(RectF(680f, 535f, 1363f, 584f), 20f, 20f, paint)
         outline(canvas, RectF(680f, 535f, 1363f, 584f), 20f, Color.rgb(45, 113, 161), 1f)
+        if (nav.routeSummary.isNotBlank()) {
+            text(canvas, nav.routeSummary, 1021.5f, 569f, 23f, 635f, white, true)
+            return
+        }
         // The next road is not the destination name; this slot is remaining route distance.
         if (meters != null) {
             reset(Color.rgb(107, 246, 133)); path.reset(); path.moveTo(712f, 549f); path.lineTo(732f, 550f)

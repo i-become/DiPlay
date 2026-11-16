@@ -63,14 +63,25 @@ internal object HongqiScreenStatus {
         if (connection !== source || raw == status) return
         raw = status
         record("status=$status")
-        when (status) {
-            1, 6 -> screenOff = false
-            2 -> {
+        when (offState(status)) {
+            false -> screenOff = false
+            true -> {
                 screenOff = true
                 ConnectionProgressUiState.markDisconnected()
+                CarPlayHostSettingsBridge.closeFlyScreen("head unit screen/power off status=$status")
+                com.shilapi.xcertplay.carlink.CarlinkBridge.stopIfStarted()
                 CarPlayBackgroundSession.stop()
             }
+            null -> Unit
         }
+    }
+
+    /** Legacy PowerController ABI: SCREEN_OFF=2, POWER_OFF=3, ACC_OFF=4.
+     * Unknown/boot/error states must not release a previously observed power-off gate. */
+    internal fun offState(status: Int): Boolean? = when (status) {
+        2, 3, 4 -> true
+        1, 5, 6, 12 -> false
+        else -> null
     }
 
     private class Connection : ServiceConnection {

@@ -24,6 +24,7 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
+import com.shilapi.xcertplay.carlink.CarlinkDashboardState
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.util.concurrent.Executors
 import java.util.concurrent.Executor
@@ -84,10 +85,14 @@ internal object CarPlayMediaKeys {
         mainHandler.post(dashboardChanged)
     }
 
+    internal fun notifyExternalDashboardChanged() {
+        if (controller == null) notifyDashboard()
+    }
+
     /** Read the existing metadata/artwork cache without taking over the controller's callbacks. */
     @Synchronized
     internal fun dashboardMusic(): ClusterDashboardMusic =
-        if (controller == null) ClusterDashboardMusic()
+        if (controller == null) CarlinkDashboardState.music()
         else ClusterDashboardMusic(nowPlaying, artwork?.takeUnless { it.isRecycled })
 
     @Synchronized
@@ -429,11 +434,16 @@ internal object CarPlayMediaKeys {
 internal class CarPlayMediaCallback(
     private val send: (index: Int, source: String) -> Unit,
 ) : MediaSession.Callback() {
+    private val nextPress = NextTrackPress()
+
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
         @Suppress("DEPRECATION")
         val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return false
         val index = CarPlayMediaButton.forKeyCode(event.keyCode)
             ?: return super.onMediaButtonEvent(mediaButtonIntent)
+        if (nextPress.dispatch(event,
+            next = { send(CarPlayMediaButton.NEXT, "next-short-press") },
+            toggle = { send(CarPlayMediaButton.PLAY_PAUSE, "next-long-press") })) return true
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             send(index, KeyEvent.keyCodeToString(event.keyCode))
         }

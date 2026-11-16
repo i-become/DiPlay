@@ -14,12 +14,14 @@ import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiLayout
 import com.shilapi.xcertplay.newui.NewUiSubpageBottomBar
 import com.shilapi.xcertplay.newui.NewUiTypography
+import com.shilapi.xcertplay.DiPlayPreferences
 
 @Composable
-fun NewUiSwitchPhoneScreen(
+internal fun NewUiSwitchPhoneScreen(
     state: NewUiPhoneSelectionState,
     onBack: () -> Unit,
     onSelectPhone: (NewUiBondedPhone) -> Unit,
+    onModeChange: (String, DiPlayPreferences.PhoneLinkMode) -> Unit = { _, _ -> },
     onAddPhone: () -> Unit,
     onRequestBluetoothPermission: () -> Unit,
 ) {
@@ -60,7 +62,9 @@ fun NewUiSwitchPhoneScreen(
                     NewUiPhoneDeviceList(
                         phones = state.bondedPhones,
                         selectedAddress = state.selectedAddress,
+                        linkModes = state.linkModes,
                         onSelect = onSelectPhone,
+                        onModeChange = { phone, mode -> onModeChange(phone.address, mode) },
                     )
                 }
             }

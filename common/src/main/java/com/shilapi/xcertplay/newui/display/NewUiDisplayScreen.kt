@@ -46,6 +46,8 @@ fun NewUiDisplayScreen(
     onClusterFlyScreenDefaultOnConnectChanged: (Boolean) -> Unit,
     onClusterGestureChanged: (Boolean) -> Unit,
     onNightModeSelected: (Int) -> Unit,
+    clusterOnlyMode: Boolean = false,
+    onClusterOnlyModeChanged: (Boolean) -> Unit = {},
     onPickIconSize: () -> Unit = {},
     onReconnect: () -> Unit = {},
 ) {
@@ -93,14 +95,19 @@ fun NewUiDisplayScreen(
                 )
             },
             right = {
-                if (state.clusterManagerAvailable) {
-                    NewUiCompactValueRow(
-                        title = stringResource(R.string.settings_cluster_manager),
-                        subtitle = stringResource(R.string.settings_cluster_manager_entry_description),
-                        value = stringResource(state.clusterStyle.titleRes),
-                        onClick = onOpenClusterManager,
-                    )
-                }
+                // Style selection and static previews are available without vehicle hardware.
+                NewUiCompactValueRow(
+                    title = stringResource(R.string.settings_cluster_manager),
+                    subtitle = stringResource(R.string.settings_cluster_manager_entry_description),
+                    value = stringResource(state.clusterStyle.titleRes),
+                    onClick = onOpenClusterManager,
+                )
+                NewUiCompactValueRow(
+                    title = stringResource(R.string.new_ui_display_nav_marker),
+                    subtitle = stringResource(R.string.new_ui_display_nav_marker_sub),
+                    value = navMarkerSummary,
+                    onClick = onPickNavMarker,
+                )
                 NewUiCompactToggleRow(
                     title = stringResource(R.string.new_ui_shell_display_hud_title),
                     subtitle = stringResource(R.string.new_ui_shell_display_hud_sub),
@@ -126,12 +133,6 @@ fun NewUiDisplayScreen(
                     checked = state.clusterMapEnabled && state.clusterHorizontalGestureEnabled,
                     enabled = state.clusterMapEnabled,
                     onCheckedChange = onClusterGestureChanged,
-                )
-                NewUiCompactValueRow(
-                    title = stringResource(R.string.new_ui_display_nav_marker),
-                    subtitle = stringResource(R.string.new_ui_display_nav_marker_sub),
-                    value = navMarkerSummary,
-                    onClick = onPickNavMarker,
                 )
                 CarPlayThemeSegmentedRow(
                     selectedIndex = state.nightModeIndex,
@@ -199,7 +200,7 @@ private fun CarPlayThemeSegmentedRow(
                     Text(
                         label,
                         style = NewUiTypography.ActionSubtitle,
-                        color = if (selected) NewUiColors.TextPrimary else NewUiColors.TextSecondary,
+                        color = if (selected) NewUiColors.OnAccent else NewUiColors.TextPrimary,
                     )
                 }
             }

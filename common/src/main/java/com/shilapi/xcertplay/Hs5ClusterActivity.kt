@@ -54,7 +54,7 @@ class Hs5ClusterActivity : Activity() {
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         val content: View = if (AirPlayPersistence.loadClusterStyle(this).customDashboard) {
-            ClusterDashboardView(this) {
+            ClusterDashboardView(this, externalNavigation = Hs5ClusterActivityOutput.externalNavigation) {
                 Hs5ClusterActivityOutput.surfaceChanged(this, it)
             }.also { dashboard = it }
         } else {
@@ -157,7 +157,10 @@ class Hs5ClusterActivity : Activity() {
 
 /** Main-thread handoff between [CarPlayHostActivity] and the current [Hs5ClusterActivity]. */
 internal object Hs5ClusterActivityOutput {
+    val externalNavigation get() = host.get()?.externalNavigation
+
     interface Host {
+        val externalNavigation: (() -> ClusterTurnGuidance?)? get() = null
         fun onClusterWindowSurface(surface: Surface?)
         fun onClusterWindowClosed(reason: String)
     }

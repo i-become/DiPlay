@@ -119,7 +119,7 @@ fun NewUiDiagnosticsScreen(
                             stringResource(R.string.save_diagnostic_report)
                         },
                         style = NewUiTypography.SecondaryActionTitle,
-                        color = NewUiColors.TextPrimary,
+                        color = NewUiColors.OnAccent,
                     )
                 }
                 NewUiCompactNavRow(
@@ -249,7 +249,7 @@ private fun DiagnosticFileRow(
                 R.drawable.new_ui_ic_trash,
                 stringResource(R.string.new_ui_diag_delete),
                 onDelete,
-                tint = Color(0xFFF87171),
+                tint = NewUiColors.Danger,
             )
         }
     }

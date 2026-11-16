@@ -90,4 +90,5 @@ private fun componentTitle(component: OriginalClusterComponent) = when (componen
     OriginalClusterComponent.DRIVING -> R.string.settings_original_cluster_driving
     OriginalClusterComponent.TURN -> R.string.settings_original_cluster_turn
     OriginalClusterComponent.TIME -> R.string.settings_original_cluster_time
+    OriginalClusterComponent.MUSIC -> R.string.settings_original_cluster_music
 }

@@ -1,4 +1,11 @@
 import java.util.Properties
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
+import java.io.BufferedOutputStream
+import java.io.FileOutputStream
+import java.io.File
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.android.application)
@@ -27,8 +34,8 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 1306
-        versionName = "1.3.6"
+        versionCode = 1400
+        versionName = "1.4.0"
 
     }
 
@@ -77,6 +84,7 @@ android {
         )
     }
     packaging {
+        jniLibs.useLegacyPackaging = true
         resources {
             // Only lightweight Bouncy Castle primitives are used; R8 removes all Picnic
             // classes, but cannot remove their unreferenced algorithm lookup tables.
@@ -92,6 +100,13 @@ android {
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(project(":common"))
+    // Keep the injected ICCOA SDK visible to R8 as a compile-time library. The real SDK dex is
+    // appended after R8, so these stubs must not be packaged as application classes.
+    compileOnly(files("../common/libs/icar-sdk-stubs.jar"))
+    implementation("androidx.room:room-runtime:2.4.3")
+    // The injected Carlink dex parses its handshake with this donor runtime.
+    // compileOnly SDK stubs cannot contribute transitive dependencies.
+    implementation("com.google.protobuf:protobuf-java:3.25.1")
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -99,6 +114,91 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// AGP does not package a raw SDK dex dependency. Append the verified ICCOA dex to the
+// final application APK so CarPlay remains a normal library path and Carlink stays optional.
+val carlinkDex = file("libs/icar-sdk-corrected.dex")
+fun sha256(file: File): ByteArray = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+
+listOf("debug", "release").forEach { buildType ->
+    val injectTask = tasks.register("injectCarlinkDex${buildType.replaceFirstChar(Char::uppercase)}") {
+        notCompatibleWithConfigurationCache("APK post-processing uses Android build tools")
+        doLast {
+            check(carlinkDex.isFile) { "Missing Carlink SDK dex: $carlinkDex" }
+            val apkRoot = layout.buildDirectory.dir("outputs/apk/$buildType").get().asFile
+            val apks = apkRoot.walkTopDown().filter { it.isFile && it.extension == "apk" }.toList()
+            check(apks.isNotEmpty()) { "No $buildType APK found under $apkRoot" }
+            val sdkPath = providers.environmentVariable("ANDROID_HOME").orNull
+                ?: providers.environmentVariable("ANDROID_SDK_ROOT").orNull
+                ?: localProperties.getProperty("sdk.dir")
+                ?: error("Set ANDROID_HOME or local.properties sdk.dir")
+            val buildTools = file(sdkPath).resolve("build-tools").listFiles()
+                ?.filter { it.isDirectory && it.resolve("zipalign${if (org.gradle.internal.os.OperatingSystem.current().isWindows) ".exe" else ""}").isFile }
+                ?.maxByOrNull { it.name }
+                ?: error("Android build tools with zipalign are unavailable")
+            val windows = org.gradle.internal.os.OperatingSystem.current().isWindows
+            val zipalign = buildTools.resolve("zipalign${if (windows) ".exe" else ""}")
+            val apksigner = buildTools.resolve("apksigner${if (windows) ".bat" else ""}")
+            check(apksigner.isFile) { "apksigner is missing from $buildTools" }
+            val signing = android.signingConfigs.getByName(buildType)
+            val keystore = signing.storeFile?.takeIf(File::isFile)
+                ?: error("A valid $buildType signing keystore is required after Carlink dex injection")
+            check(!signing.storePassword.isNullOrBlank() && !signing.keyAlias.isNullOrBlank() && !signing.keyPassword.isNullOrBlank()) {
+                "Complete $buildType signing credentials are required after Carlink dex injection"
+            }
+            val storePassword = signing.storePassword!!
+            val keyAlias = signing.keyAlias!!
+            val keyPassword = signing.keyPassword!!
+            val python = if (windows) "python" else "python3"
+            val dexTool = rootProject.file("scripts/carlink_dex.py")
+            fun runTool(vararg args: String) {
+                val process = ProcessBuilder(*args).redirectErrorStream(true).start()
+                process.inputStream.bufferedReader().useLines { lines -> lines.forEach(::println) }
+                check(process.waitFor() == 0) { "Tool failed: ${args.first()}" }
+            }
+            for (apk in apks) {
+                val preparedDex = layout.buildDirectory.file("carlink/$buildType/prepared.dex").get().asFile
+                // Keep DiPlay's Guava implementation. Remove only the donor's duplicate
+                // third-party definitions, then serialize with the SDK's dexlib2 tool.
+                runTool(python, dexTool.absolutePath, apk.absolutePath, carlinkDex.absolutePath, preparedDex.absolutePath,
+                    "--sdk-dir", sdkPath, "--java", File(System.getProperty("java.home"), "bin/java${if (windows) ".exe" else ""}").absolutePath)
+                val previousSdkEntries = preparedDex.resolveSibling("prepared.entries").readLines().toSet()
+                val raw = File(apk.parentFile, apk.nameWithoutExtension + "-unsigned-injected.apk")
+                val aligned = File(apk.parentFile, apk.nameWithoutExtension + "-aligned-injected.apk")
+                val signed = File(apk.parentFile, apk.nameWithoutExtension + "-signed-injected.apk")
+                ZipFile(apk).use { zin ->
+                    val entries = zin.entries().asSequence().toList()
+                    val originalDex = entries.filter { it.name.matches(Regex("classes\\d*\\.dex")) }
+                    val duplicateRuntime = previousSdkEntries
+                    val dexNames = originalDex.map { it.name }.filterNot { it in duplicateRuntime }.toSet()
+                    val dexName = (2..99).map { "classes${it}.dex" }.first { it !in dexNames }
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(raw))).use { zout ->
+                        entries.filter { !it.name.startsWith("META-INF/") && it.name !in duplicateRuntime }.forEach { entry ->
+                            val out = ZipEntry(entry.name)
+                            out.method = entry.method
+                            if (entry.method == ZipEntry.STORED) { out.size = entry.size; out.crc = entry.crc }
+                            zout.putNextEntry(out); zin.getInputStream(entry).use { it.copyTo(zout) }; zout.closeEntry()
+                        }
+                        zout.putNextEntry(ZipEntry(dexName)); preparedDex.inputStream().use { it.copyTo(zout) }; zout.closeEntry()
+                    }
+                }
+                runTool(zipalign.absolutePath, "-f", "4", raw.absolutePath, aligned.absolutePath)
+                runTool(apksigner.absolutePath, "sign", "--ks", keystore.absolutePath,
+                        "--ks-pass", "pass:$storePassword", "--ks-key-alias", keyAlias,
+                        "--key-pass", "pass:$keyPassword", "--out", signed.absolutePath, aligned.absolutePath)
+                runTool(apksigner.absolutePath, "verify", "--verbose", signed.absolutePath)
+                check(apk.delete() && signed.renameTo(apk)) { "Could not replace APK with signed Carlink build: $apk" }
+                raw.delete(); aligned.delete(); signed.delete()
+                runTool(python, dexTool.absolutePath, apk.absolutePath, carlinkDex.absolutePath, "--verify", "--audit-members",
+                    "--sdk-dir", sdkPath, "--java", File(System.getProperty("java.home"), "bin/java${if (windows) ".exe" else ""}").absolutePath)
+            }
+        }
+    }
+    afterEvaluate {
+        tasks.matching { it.name == "assemble${buildType.replaceFirstChar(Char::uppercase)}" }
+            .configureEach { finalizedBy(injectTask) }
+    }
 }
 
 // No implicit import. Only the two explicitly selected local runtime assets are allowed.

@@ -67,10 +67,12 @@ fun NewUiConnectionScreen(
     onEnterCarPlay: () -> Unit,
     onLocationReportingChanged: (Boolean) -> Unit,
 ) {
-    val progressVisual = when (snapshot.phase) {
-        NewUiConnectionPhase.CONNECTED -> NewUiProgressVisual.COMPLETE
-        NewUiConnectionPhase.CONNECTING -> NewUiProgressVisual.ACTIVE
-        NewUiConnectionPhase.FAILED -> NewUiProgressVisual.FAILED
+    val progressVisual = when {
+        snapshot.carlink && snapshot.phase != NewUiConnectionPhase.FAILED && snapshot.progressLitCount > 0 && snapshot.progressLitCount < snapshot.progressStepCount -> NewUiProgressVisual.ACTIVE
+        snapshot.carlink && snapshot.phase == NewUiConnectionPhase.CONNECTED && snapshot.progressLitCount < snapshot.progressStepCount -> NewUiProgressVisual.ACTIVE
+        snapshot.phase == NewUiConnectionPhase.CONNECTED -> NewUiProgressVisual.COMPLETE
+        snapshot.phase == NewUiConnectionPhase.CONNECTING -> NewUiProgressVisual.ACTIVE
+        snapshot.phase == NewUiConnectionPhase.FAILED -> NewUiProgressVisual.FAILED
         else -> NewUiProgressVisual.IDLE
     }
     Row(
@@ -107,6 +109,9 @@ private fun ConnectionInfoPanel(
     modifier: Modifier = Modifier,
 ) {
     val panelShape = RoundedCornerShape(NewUiLayout.HeroPanelRadius)
+    val pairingCode = snapshot.linkSummary?.takeIf {
+        snapshot.carlink && it.length == 6 && it.all(Char::isDigit)
+    }
     Column(
         modifier = modifier
             .clip(panelShape)
@@ -131,7 +136,7 @@ private fun ConnectionInfoPanel(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
-        } ?: snapshot.linkSummary?.let { link ->
+        } ?: snapshot.linkSummary?.takeIf { pairingCode == null }?.let { link ->
             Text(
                 text = link,
                 style = NewUiTypography.LinkDetail.copy(fontSize = NewUiTypography.LinkDetail.fontSize),
@@ -149,8 +154,10 @@ private fun ConnectionInfoPanel(
         NewUiConnectionProgressBlock(
             litCount = snapshot.progressLitCount,
             stepTitle = snapshot.progressStepTitle,
-            stepSubtitle = snapshot.progressStepSubtitle,
+            stepSubtitle = snapshot.progressStepSubtitle?.takeUnless { pairingCode != null && it == pairingCode },
             visual = progressVisual,
+            stepCount = snapshot.progressStepCount,
+            pairingCode = pairingCode,
         )
         Spacer(Modifier.weight(1f))
         LocationReportingRow(
@@ -319,14 +326,20 @@ private fun ConnectionActionsPanel(
             .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        val connecting = snapshot.sessionRunning && !snapshot.isConnected && !snapshot.isFailed
+        val connecting = snapshot.sessionRunning && !snapshot.isConnected && !snapshot.isFailed &&
+            (!snapshot.carlink || snapshot.phase == NewUiConnectionPhase.CONNECTING)
         val enterTitle = when {
+            snapshot.carlink && connecting -> stringResource(R.string.new_ui_carlink_connecting)
+            snapshot.carlink && snapshot.isConnected -> stringResource(R.string.new_ui_carlink_open)
+            snapshot.carlink && snapshot.isFailed -> stringResource(R.string.new_ui_carlink_retry)
+            snapshot.carlink -> stringResource(R.string.new_ui_carlink_connect)
             connecting -> stringResource(R.string.connecting_to_your_iphone)
             snapshot.isConnected -> stringResource(R.string.open_carplay)
             snapshot.isFailed -> stringResource(R.string.retry_carplay_connection)
             else -> stringResource(R.string.new_ui_enter_carplay)
         }
         val enterIcon = when {
+            snapshot.carlink -> R.drawable.new_ui_ic_carlink
             snapshot.isFailed -> R.drawable.new_ui_ic_update
             else -> R.drawable.new_ui_ic_apple
         }
@@ -353,9 +366,11 @@ private fun ConnectionActionsPanel(
                 stringResource(R.string.connect_phone)
             },
             subtitle = if (snapshot.hasSelectedPhone) {
-                stringResource(R.string.new_ui_action_switch_phone_sub, snapshot.phoneName)
+                if (snapshot.carlink) stringResource(R.string.new_ui_carlink_switch_phone, snapshot.phoneName)
+                else stringResource(R.string.new_ui_action_switch_phone_sub, snapshot.phoneName)
             } else {
-                stringResource(R.string.new_ui_connect_phone_sub)
+                if (snapshot.carlink) stringResource(R.string.new_ui_carlink_pair_phone)
+                else stringResource(R.string.new_ui_connect_phone_sub)
             },
             primary = false,
             enabled = !connecting,
@@ -445,7 +460,7 @@ private fun VerticalActionButton(
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(
                     when {
-                        destructive -> Color(0xFFF87171)
+                        destructive -> NewUiColors.Danger
                         primary -> NewUiColors.TextPrimary
                         else -> NewUiColors.Accent
                     },
@@ -467,7 +482,7 @@ private fun VerticalActionButton(
                     Text(
                         title,
                         style = NewUiTypography.SecondaryActionTitle,
-                        color = if (destructive) Color(0xFFFECACA) else NewUiColors.TextPrimary,
+                        color = if (destructive) NewUiColors.DangerText else NewUiColors.TextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

@@ -87,6 +87,7 @@ object AirPlayPersistence {
     private const val KEY_LOW_LATENCY_DECODER = "low_latency_decoder"
     private const val KEY_FPS_COUNTER = "fps_counter"
     private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
+    private const val KEY_CLUSTER_ONLY = "cluster_only_mode"
     private const val KEY_CLUSTER_FLY_SCREEN_DEFAULT_ON_CONNECT = "cluster_fly_screen_default_on_connect"
     private const val KEY_HS5_CLUSTER_ACTIVITY_WINDOW = "hs5_cluster_activity_window"
     private const val KEY_CLUSTER_MAP_HORIZONTAL_GESTURE = "cluster_map_horizontal_gesture_enabled"
@@ -918,6 +919,15 @@ object AirPlayPersistence {
             edit.putBoolean(KEY_CLUSTER_MAP_HORIZONTAL_GESTURE, false)
         }
         edit.apply()
+    }
+
+    /** Runs the instrument dashboard without starting a phone projection session. */
+    fun loadClusterOnlyMode(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .getBoolean(KEY_CLUSTER_ONLY, false)
+
+    fun saveClusterOnlyMode(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_CLUSTER_ONLY, enabled).apply()
     }
 
     /** When true, 仪表飞屏 turns on again each time CarPlay connects (unless cluster map is off). */

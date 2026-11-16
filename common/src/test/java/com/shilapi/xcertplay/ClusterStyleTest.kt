@@ -93,6 +93,13 @@ class ClusterStyleTest {
                         val params = video.layoutParams as ViewGroup.LayoutParams
                         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.width)
                         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.height)
+                        val copied: android.widget.ImageView = ReflectionHelpers.getField(presentation, "copiedMap")
+                        val copyParams = copied.layoutParams as FrameLayout.LayoutParams
+                        assertEquals(1920, copyParams.width)
+                        assertEquals(720, copyParams.height)
+                        assertEquals(0, copyParams.leftMargin)
+                        assertEquals(0, copyParams.topMargin)
+                        assertEquals(android.widget.ImageView.ScaleType.FIT_XY, copied.scaleType)
                     }
                 } finally { presentation.dismiss() }
             }

@@ -7,4 +7,5 @@ enum class NewUiDisplaySubpage {
     NAV_MARKER,
     CLUSTER_MANAGER,
     ORIGINAL_CLUSTER_CONFIG,
+    CLUSTER_COPY_REGION,
 }

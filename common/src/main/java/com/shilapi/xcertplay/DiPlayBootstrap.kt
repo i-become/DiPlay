@@ -68,7 +68,35 @@ internal object DiPlayPreferences {
     fun phoneAddress(context: Context): String? = prefs(context).getString("phone_address", null)
     fun phoneName(context: Context): String = prefs(context).getString("phone_name", null) ?: "Your iPhone"
     fun savePhone(context: Context, address: String, name: String) {
-        prefs(context).edit().putString("phone_address", address).putString("phone_name", name).apply()
+        val preferences = prefs(context)
+        preferences.edit().putString("phone_address", address).putString("phone_name", name)
+            .also { if (!preferences.contains("phone_link_mode_$address")) it.putString("phone_link_mode_$address", inferredPhoneLinkMode(name).key) }
+            .apply()
+    }
+    enum class PhoneLinkMode(val key: String, val label: String) {
+        CARPLAY("carplay", "CarPlay"), CARLINK("carlink", "Carlink");
+        companion object {
+            fun fromKey(key: String?): PhoneLinkMode = entries.firstOrNull { it.key == key } ?: CARPLAY
+        }
+    }
+    fun phoneLinkMode(context: Context, address: String? = phoneAddress(context)): PhoneLinkMode {
+        if (address.isNullOrBlank()) return PhoneLinkMode.CARPLAY
+        return PhoneLinkMode.fromKey(prefs(context).getString("phone_link_mode_$address", null))
+    }
+    fun inferredPhoneLinkMode(name: String): PhoneLinkMode {
+        val normalized = name.lowercase()
+        val androidBrands = listOf("android", "pixel", "samsung", "galaxy", "xiaomi", "redmi", "huawei", "honor", "oppo", "vivo", "oneplus", "realme", "motorola")
+        return if (androidBrands.any(normalized::contains)) PhoneLinkMode.CARLINK else PhoneLinkMode.CARPLAY
+    }
+    fun phoneLinkMode(context: Context, address: String, deviceName: String): PhoneLinkMode =
+        if (prefs(context).contains("phone_link_mode_$address")) phoneLinkMode(context, address) else inferredPhoneLinkMode(deviceName)
+    fun savePhoneLinkMode(context: Context, address: String, mode: PhoneLinkMode) {
+        prefs(context).edit().putString("phone_link_mode_$address", mode.key).apply()
+    }
+    fun carlinkPhonePaired(context: Context, address: String?): Boolean =
+        !address.isNullOrBlank() && prefs(context).getBoolean("carlink_paired_$address", false)
+    fun markCarlinkPhonePaired(context: Context, address: String?) {
+        if (!address.isNullOrBlank()) prefs(context).edit().putBoolean("carlink_paired_$address", true).apply()
     }
     fun defaultConnectionMode(context: Context) =
         DefaultConnectionMode.fromKey(prefs(context).getString("default_connection_mode", null))
@@ -89,4 +117,5 @@ internal object DiPlayPreferences {
     fun saveConnectOnPhoneBluetooth(context: Context, value: Boolean) {
         prefs(context).edit().putBoolean("connect_on_phone_bluetooth", value).apply()
     }
+
 }

@@ -5,6 +5,7 @@ import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.app.Presentation
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Bitmap
 import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.Bundle
@@ -14,6 +15,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
+import android.widget.ImageView
 import android.widget.FrameLayout
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
@@ -27,6 +29,7 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 internal class ClusterMapPresentation(
     context: Context,
     display: Display,
+    private val externalNavigation: (() -> ClusterTurnGuidance?)? = null,
     private val onSurface: (Surface?) -> Unit,
 ) : Presentation(context, display) {
     // The placeholder until the map arrives: a small spinner.
@@ -36,6 +39,7 @@ internal class ClusterMapPresentation(
     private var streamActive = false
     private var dashboard: ClusterDashboardView? = null
     private var originalOverlay: OriginalClusterOverlayView? = null
+    private var copiedMap: ImageView? = null
     private val dashboardForeground = Hs5ClusterForeground()
     var outputSurface: Surface? = null
         private set
@@ -46,7 +50,7 @@ internal class ClusterMapPresentation(
         super.onCreate(savedInstanceState)
         val dark = context.resolveAppNightNow()
         if (ClusterDashboardView.enabled(context)) {
-            dashboard = ClusterDashboardView(context) { surface ->
+            dashboard = ClusterDashboardView(context, externalNavigation = externalNavigation) { surface ->
                 outputSurface = surface
                 onSurface(surface)
             }.apply {
@@ -88,6 +92,19 @@ internal class ClusterMapPresentation(
         })
         root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
         videoView = surfaceView
+        copiedMap = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.FIT_XY
+            visibility = View.GONE
+        }
+        // Original uses the full display for its native map, with OEM cards overlaid.
+        // The copied stream must occupy that same space, not the custom dashboard's slot.
+        val displaySize = sizeOf(display)
+        val mapBounds = if (AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL)
+            android.graphics.RectF(0f, 0f, displaySize.x.toFloat(), displaySize.y.toFloat())
+        else AirPlayPersistence.loadClusterStyle(context).mapBounds(displaySize.x, displaySize.y)
+        root.addView(copiedMap, FrameLayout.LayoutParams(mapBounds.width().toInt(), mapBounds.height().toInt()).apply {
+            leftMargin = mapBounds.left.toInt(); topMargin = mapBounds.top.toInt()
+        })
         if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(context) &&
             AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL) {
             root.addView(OriginalClusterOverlayView(context).also { originalOverlay = it }, FrameLayout.LayoutParams(-1, -1))
@@ -133,6 +150,15 @@ internal class ClusterMapPresentation(
         label.animate().alpha(if (active) 0f else 1f).setDuration(300).withEndAction {
             if (streamActive == active) label.visibility = if (active) View.GONE else View.VISIBLE
         }.start()
+    }
+
+    fun setCopiedMap(bitmap: Bitmap?) {
+        dashboard?.setCopiedMap(bitmap)
+        copiedMap?.apply {
+            setImageBitmap(bitmap)
+            visibility = if (bitmap == null) View.GONE else View.VISIBLE
+        }
+        if (bitmap != null) setStreamActive(true)
     }
 
     /** Window alpha hides the pixels without destroying the TextureView/decoder surface. */

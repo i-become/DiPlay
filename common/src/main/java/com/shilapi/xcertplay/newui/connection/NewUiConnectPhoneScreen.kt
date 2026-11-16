@@ -16,13 +16,15 @@ import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiLayout
 import com.shilapi.xcertplay.newui.NewUiSubpageBottomBar
+import com.shilapi.xcertplay.DiPlayPreferences
 
 @Composable
-fun NewUiConnectPhoneScreen(
+internal fun NewUiConnectPhoneScreen(
     state: NewUiPhoneSelectionState,
     connectAfterSave: Boolean,
     onBack: () -> Unit,
     onConfirm: (NewUiBondedPhone) -> Unit,
+    onModeChange: (String, DiPlayPreferences.PhoneLinkMode) -> Unit = { _, _ -> },
     onRequestBluetoothPermission: () -> Unit,
     onOpenBluetoothSettings: () -> Unit,
 ) {
@@ -65,7 +67,9 @@ fun NewUiConnectPhoneScreen(
                     NewUiPhoneDeviceList(
                         phones = state.bondedPhones,
                         selectedAddress = pickedAddress,
+                        linkModes = state.linkModes,
                         onSelect = { pickedAddress = it.address },
+                        onModeChange = { phone, mode -> onModeChange(phone.address, mode) },
                     )
                     NewUiPhoneSecondaryLink(
                         label = stringResource(R.string.new_ui_phone_pair_another),

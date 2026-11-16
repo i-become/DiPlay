@@ -24,6 +24,32 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
 class ClusterDashboardScreenshotTest {
+    @Test fun copiedMapPixelsReachEveryCustomInstrumentWithoutNavigationMetadata() {
+        val context = RuntimeEnvironment.getApplication()
+        for (style in listOf(ClusterStyle.BASIC, ClusterStyle.SPORT)) {
+            val view = ClusterDashboardView(context, style = style, readState = { ClusterDashboardState() })
+            view.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, 1920, 720)
+            val source = Bitmap.createBitmap(640, 360, Bitmap.Config.RGB_565)
+            source.eraseColor(Color.MAGENTA)
+            val output = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
+            try {
+                view.setCopiedMap(source)
+                view.refreshState()
+                view.draw(Canvas(output))
+                val aperture = view.mapViewport
+                var copiedPixels = 0
+                for (y in aperture.top until aperture.bottom) {
+                    for (x in aperture.left until aperture.right) {
+                        if (output.getPixel(x, y) == Color.MAGENTA) copiedPixels++
+                    }
+                }
+                assertTrue("$style must show the copied frame without phone navigation metadata", copiedPixels > 1000)
+            } finally { output.recycle(); source.recycle() }
+        }
+    }
+
     @Test fun fullAndCompactLargeFontLightDarkAndWaiting() {
         val context = RuntimeEnvironment.getApplication()
         context.resources.configuration.fontScale = 1.4f
@@ -31,11 +57,12 @@ class ClusterDashboardScreenshotTest {
             CarPlayGlance.Snapshot(connected = true, maneuverType = 2, distanceMeters = 300,
                 road = "沿人民大街行驶", arrivalEpochSeconds = 1792827000,
                 remainingMeters = 12400, remainingSeconds = 1560),
-            ClusterDashboardMusic(CarPlayNowPlaying(title = "有缘天涯亦咫尺", artist = "音乐信息来自 iPhone",
+            ClusterDashboardMusic(CarPlayNowPlaying(title = "有缘天涯亦咫尺", artist = "音乐信息来自手机", lyrics = "[00:00.00]有缘天涯亦咫尺",
                 elapsedMillis = 64000, durationMillis = 240000, playing = true)),
         )
         for ((name, w, h) in listOf(Triple("full-dark", 1920, 720), Triple("compact-dark", 1280, 480),
-            Triple("full-light", 1920, 720), Triple("waiting", 1920, 720),
+            Triple("carlink-full", 1920, 720), Triple("carlink-compact", 1280, 480),
+            Triple("carlink-arabic", 1920, 720), Triple("full-light", 1920, 720), Triple("waiting", 1920, 720),
             Triple("reference-fixture-only", 1920, 720), Triple("full-arabic", 1920, 720),
             Triple("vehicle-integration-fixture-only", 1920, 720),
             Triple("vehicle-integration-compact-fixture-only", 1280, 480),
@@ -80,7 +107,9 @@ class ClusterDashboardScreenshotTest {
                         assistance = OemClusterAssistance(true, 5, true, true)))
                     else -> fixture
                 }
-            })
+            }, externalNavigation = if (name.startsWith("carlink-")) ({
+                com.shilapi.xcertplay.hud.ClusterTurnGuidance(3, 0, 300, "沿人民大街行驶")
+            }) else null)
             view.setNightMode(name != "full-light")
             view.refreshState()
             view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),

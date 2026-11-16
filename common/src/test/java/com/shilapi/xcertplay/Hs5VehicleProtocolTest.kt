@@ -96,7 +96,7 @@ class Hs5VehicleProtocolTest {
                 tires = listOf(240, 260, 275, -65533).map { Hs5TimedInt(it, 100) }).vehicle(100, null)
             assertEquals(listOf(2.4f, 2.6f, 2.75f, null), pressures.tirePressureBar)
         }
-        assertEquals(listOf(null, null, null), car.tirePressureBar.drop(1))
+        assertEquals(listOf(null, 2.54f, 2.55f), car.tirePressureBar.drop(1))
         assertEquals(listOf(false, true, null, null), car.tireWarning)
         assertTrue(Hs5VehicleSample().vehicle(100, null).tirePressureBar.all { it == null })
     }

@@ -40,27 +40,31 @@ import androidx.compose.ui.unit.dp
 
 object NewUiSurfaces {
 
-    val hairlineBorder = NewUiColors.DropdownBorder
+    val hairlineBorder get() = NewUiColors.DropdownBorder
 
-    val hairlineBorderStrong = NewUiColors.DropdownBorder
+    val hairlineBorderStrong get() = NewUiColors.DropdownBorder
 
-    val glassBorder = NewUiColors.DropdownBorder
+    val glassBorder get() = NewUiColors.DropdownBorder
 
-    val glassBorderSoft = NewUiColors.DropdownBorder
+    val glassBorderSoft get() = NewUiColors.DropdownBorder
 
-    val glassDivider = NewUiColors.Divider
+    val glassDivider get() = NewUiColors.Divider
 
-    val innerDivider = NewUiColors.Divider
+    val innerDivider get() = NewUiColors.Divider
 
 
 
-    fun panelBrush(): Brush = Brush.linearGradient(
+    fun panelBrush(): Brush = Brush.verticalGradient(
 
-        listOf(NewUiColors.CardPanel, NewUiColors.CardPanel),
+        listOf(NewUiColors.CardSecondary, NewUiColors.CardPanel),
 
     )
 
 
+
+    fun panelBorderBrush(): Brush = Brush.verticalGradient(
+        listOf(NewUiColors.CardBorderTop, NewUiColors.CardBorderBottom),
+    )
 
     fun panelTopSheen(): Brush = Brush.verticalGradient(
 
@@ -122,9 +126,9 @@ object NewUiSurfaces {
 
     fun accentGlossBrush(): Brush = Brush.verticalGradient(
 
-        0f to NewUiColors.PrimaryBlue,
+        0f to NewUiColors.PrimaryButtonFill,
 
-        0.42f to NewUiColors.PrimaryBlue,
+        0.42f to NewUiColors.PrimaryButtonFill,
 
         1f to NewUiColors.MenuSelected,
 
@@ -226,7 +230,7 @@ fun Modifier.newUiGlassTile(
 
         .background(NewUiSurfaces.panelBrush(), shape)
 
-        .border(1.dp, NewUiSurfaces.hairlineBorder, shape)
+        .border(1.dp, NewUiSurfaces.panelBorderBrush(), shape)
 
 }
 
@@ -256,7 +260,7 @@ fun NewUiPremiumPanel(
 
             .background(NewUiSurfaces.panelBrush(), shape)
 
-            .border(1.dp, NewUiSurfaces.hairlineBorder, shape),
+            .border(1.dp, NewUiSurfaces.panelBorderBrush(), shape),
 
     ) {
 

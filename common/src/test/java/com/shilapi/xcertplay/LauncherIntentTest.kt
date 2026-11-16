@@ -51,6 +51,7 @@ class LauncherIntentTest {
     }
 
     @Test fun freshLauncherReturnsToTheExistingHostWithoutStoppingTheSession() {
+        CarPlayBackgroundSession.active = true
         controller = Robolectric.buildActivity(NewUiActivity::class.java, launcher()).create()
         val activity = controller!!.get()
         assertTrue(activity.isFinishing)
@@ -61,6 +62,7 @@ class LauncherIntentTest {
     }
 
     @Test fun launcherDeliveredToExistingSettingsOpensProjectionAndClearsReturnNavigation() {
+        CarPlayBackgroundSession.active = true
         controller = Robolectric.buildActivity(NewUiActivity::class.java,
             Intent().putExtra(DiPlayLauncher.EXTRA_PAGE, "settings")).create()
         val activity = controller!!.get()
@@ -76,7 +78,29 @@ class LauncherIntentTest {
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
+    @Test fun pendingSessionKeepsHomeVisibleWithoutOpeningProjection() {
+        controller = Robolectric.buildActivity(NewUiActivity::class.java, launcher()).create()
+        val activity = controller!!.get()
+        assertFalse(activity.isFinishing)
+        assertEquals(NewUiDestination.CONNECTION, activity.currentDestinationForTests)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(0, stops)
+    }
+
+    @Test fun pendingLauncherReturnsFromSettingsToHome() {
+        controller = Robolectric.buildActivity(NewUiActivity::class.java,
+            Intent().putExtra(DiPlayLauncher.EXTRA_PAGE, "settings")).create()
+        val activity = controller!!.get()
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "onNewIntent",
+            ReflectionHelpers.ClassParameter(Intent::class.java, launcher()))
+        assertFalse(activity.isFinishing)
+        assertEquals(NewUiDestination.CONNECTION, activity.currentDestinationForTests)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(0, stops)
+    }
+
     @Test fun recreationRetainsSettingsInsteadOfRedirectingToProjection() {
+        CarPlayBackgroundSession.active = true
         controller = Robolectric.buildActivity(NewUiActivity::class.java, launcher())
             .create(Bundle().apply { putString(DiPlayLauncher.EXTRA_PAGE, "settings") })
         val activity = controller!!.get()

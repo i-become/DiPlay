@@ -32,8 +32,13 @@ import com.shilapi.xcertplay.ConnectionProgressUiState
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
 import com.shilapi.xcertplay.Hs5HongqiStartupWarmup
 import com.shilapi.xcertplay.Hs5SteeringKeys
+import com.shilapi.xcertplay.Hs5ClusterActivityOutput
+import com.shilapi.xcertplay.ClusterMapPresentation
 import androidx.core.content.FileProvider
 import com.shilapi.xcertplay.AppLocale
+import com.shilapi.xcertplay.AppAppearanceRuntime
+import com.shilapi.xcertplay.HongqiPositionLights
+import com.shilapi.xcertplay.resolveAppNightNow
 import com.shilapi.xcertplay.DiPlayLauncher
 import com.shilapi.xcertplay.DiPlayActivity
 import com.shilapi.xcertplay.DiPlayPreferences
@@ -82,6 +87,7 @@ import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayIconSizeScreen
 import com.shilapi.xcertplay.newui.display.NewUiClusterManagerScreen
+import com.shilapi.xcertplay.newui.display.NewUiClusterCopyRegionScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayNavMarkerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayState
@@ -112,9 +118,11 @@ import java.util.Locale
 class NewUiActivity : ComponentActivity() {
     private var interfaceOverride: Configuration? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var unsubscribeAppearance: (() -> Unit)? = null
     private lateinit var connectionActions: NewUiConnectionActions
     private var snapshot by mutableStateOf(NewUiConnectionSnapshot.placeholder)
     private var displayState by mutableStateOf(NewUiDisplayState.placeholder)
+    private var clusterOnlyMode by mutableStateOf(false)
     private var settingsState by mutableStateOf(NewUiSettingsState.placeholder)
     private var diagnosticReports by mutableStateOf(emptyList<NewUiDiagnosticFile>())
     private var diagnosticUsbRoots by mutableStateOf(emptyList<RemovableStorageVolume>())
@@ -125,6 +133,7 @@ class NewUiActivity : ComponentActivity() {
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
+    private var copyRegionStyle by mutableStateOf(com.shilapi.xcertplay.ClusterStyle.ORIGINAL)
     private var displaySubpage by mutableStateOf(NewUiDisplaySubpage.MAIN)
     private var clusterNavMarkerX by mutableStateOf(50)
     private var clusterNavMarkerY by mutableStateOf(45)
@@ -195,15 +204,9 @@ class NewUiActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
+        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) && CarPlayBackgroundSession.active &&
+            DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARPLAY) {
             DiPlayLauncher.openCarPlayProjection(this)
-            finish()
-            return
-        }
-        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) &&
-            !intent.hasExtra(DiPlayActivity.EXTRA_SETTINGS_CATEGORY) &&
-            !intent.getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false) &&
-            DiPlayLauncher.startAutomaticConnection(this)) {
             finish()
             return
         }
@@ -250,7 +253,9 @@ class NewUiActivity : ComponentActivity() {
         setContent {
             val activity = this@NewUiActivity
             NewUiTheme {
-                NewUiShell(
+                if (destination == NewUiDestination.DISPLAY && displaySubpage == NewUiDisplaySubpage.CLUSTER_COPY_REGION) {
+                    NewUiClusterCopyRegionScreen(style = copyRegionStyle, onBack = { popDisplaySubpage() })
+                } else NewUiShell(
                     destination = destination,
                     showHs5Branding = true,
                     topBarStatus = topBarStatus,
@@ -296,6 +301,13 @@ class NewUiActivity : ComponentActivity() {
                                 connectAfterSave = connectPhoneAfterSave,
                                 onBack = { popConnectionSubpage() },
                                 onConfirm = { confirmConnectPhone(it) },
+                                onModeChange = { address, mode ->
+                                    DiPlayPreferences.savePhoneLinkMode(this@NewUiActivity, address, mode)
+                                    if (address == DiPlayPreferences.phoneAddress(this@NewUiActivity) && mode == DiPlayPreferences.PhoneLinkMode.CARLINK) {
+                                        connectionActions.startCarlinkOnHome()
+                                    }
+                                    refreshAll()
+                                },
                                 onRequestBluetoothPermission = {
                                     connectionActions.requestBluetoothPermissionForPhone()
                                 },
@@ -307,6 +319,13 @@ class NewUiActivity : ComponentActivity() {
                                 state = phoneSelectionState,
                                 onBack = { popConnectionSubpage() },
                                 onSelectPhone = { switchPhone(it) },
+                                onModeChange = { address, mode ->
+                                    DiPlayPreferences.savePhoneLinkMode(this@NewUiActivity, address, mode)
+                                    if (address == DiPlayPreferences.phoneAddress(this@NewUiActivity) && mode == DiPlayPreferences.PhoneLinkMode.CARLINK) {
+                                        connectionActions.startCarlinkOnHome()
+                                    }
+                                    refreshAll()
+                                },
                                 onAddPhone = { connectionActions.openBluetoothSettings() },
                                 onRequestBluetoothPermission = {
                                     connectionActions.requestBluetoothPermissionForPhone()
@@ -384,6 +403,11 @@ class NewUiActivity : ComponentActivity() {
                                     displaySubpage = NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG
                                     syncSubpageBackCallback()
                                 },
+                                onConfigureCopyRegion = { style ->
+                                    copyRegionStyle = style
+                                    displaySubpage = NewUiDisplaySubpage.CLUSTER_COPY_REGION
+                                    syncSubpageBackCallback()
+                                },
                                 onApply = { style ->
                                     if (style != displayState.clusterStyle) {
                                         applyWithReconnectConfirm(
@@ -403,8 +427,36 @@ class NewUiActivity : ComponentActivity() {
                                 onBack = { closeOriginalClusterConfig() },
                                 registerExitGuard = { originalClusterExitGuard = it },
                             )
+                            NewUiDisplaySubpage.CLUSTER_COPY_REGION -> NewUiClusterCopyRegionScreen(
+                                style = copyRegionStyle,
+                                onBack = { popDisplaySubpage() },
+                            )
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
+                                clusterOnlyMode = clusterOnlyMode,
+                                onClusterOnlyModeChanged = { enabled ->
+                                    AirPlayPersistence.saveClusterOnlyMode(activity, enabled)
+                                    clusterOnlyMode = enabled
+                                    if (enabled) {
+                                        com.shilapi.xcertplay.carlink.CarlinkBridge.get(activity).stop()
+                                        if (CarPlayBackgroundSession.hasSession()) {
+                                            CarPlayBackgroundSession.stop {
+                                                activity.runOnUiThread {
+                                                    if (!activity.isFinishing && !activity.isDestroyed) {
+                                                        refreshAll()
+                                                        startClusterOnlyOutput()
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            refreshAll()
+                                            startClusterOnlyOutput()
+                                        }
+                                    } else {
+                                        Hs5ClusterActivityOutput.close("cluster-only disabled")
+                                        refreshAll()
+                                    }
+                                },
                                 navMarkerSummary = getString(
                                     R.string.new_ui_display_nav_marker_summary,
                                     clusterNavMarkerX,
@@ -713,17 +765,20 @@ class NewUiActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (DiPlayLauncher.isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
+        if (DiPlayLauncher.isLauncherIntent(intent)) {
             popAllSubpages()
             destination = NewUiDestination.CONNECTION
-            DiPlayLauncher.openCarPlayProjection(this)
-            return
+            if (CarPlayBackgroundSession.active &&
+                DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARPLAY) {
+                DiPlayLauncher.openCarPlayProjection(this)
+                return
+            }
         }
         applyIntentNavigation(intent)
         refreshAll()
-        if (consumeBluetoothAutoConnectIntent(intent)) {
+        if (!AirPlayPersistence.loadClusterOnlyMode(this) && consumeBluetoothAutoConnectIntent(intent)) {
             handler.post { connectionActions.connect(wirelessForAutoConnect()) }
-        } else if (shouldAutoConnectOnColdStart(intent)) {
+        } else if (!AirPlayPersistence.loadClusterOnlyMode(this) && shouldAutoConnectOnColdStart(intent)) {
             handler.post { connectionActions.connect(wirelessForAutoConnect()) }
         }
     }
@@ -737,10 +792,17 @@ class NewUiActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        HongqiPositionLights.initialize(this)
+        unsubscribeAppearance = AppAppearanceRuntime.observeHost {
+            handler.post { if (!isFinishing && !isDestroyed) refreshAppearance() }
+        }
+        refreshAll()
         handler.post(tick)
     }
 
     override fun onStop() {
+        unsubscribeAppearance?.invoke()
+        unsubscribeAppearance = null
         handler.removeCallbacks(tick)
         super.onStop()
     }
@@ -762,6 +824,7 @@ class NewUiActivity : ComponentActivity() {
         super.onConfigurationChanged(newConfig)
         enforceInterfaceSize()
         DiPlayWindowFullscreen.apply(this)
+        refreshAppearance()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -776,7 +839,17 @@ class NewUiActivity : ComponentActivity() {
         interfaceOverride?.let { InterfaceSize.enforce(resources, it) }
     }
 
+    private fun refreshAppearance() {
+        // The car's position lights remain the source of truth even without a phone.
+        NewUiColors.night = HongqiPositionLights.night() ?: resolveAppNightNow()
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !NewUiColors.night
+            isAppearanceLightNavigationBars = !NewUiColors.night
+        }
+    }
+
     private fun refreshAll() {
+        refreshAppearance()
         updateController.refreshInstallResult()
         connectionActions.refreshSetupError()
         if (!CarPlayBackgroundSession.hasSession() && !ConnectionProgressUiState.failed() &&
@@ -784,6 +857,7 @@ class NewUiActivity : ComponentActivity() {
             ConnectionProgressUiState.reset()
         }
         val carPlayNowActive = CarPlayBackgroundSession.active
+        if (AirPlayPersistence.loadClusterOnlyMode(this) && !carPlayNowActive) startClusterOnlyOutput()
         snapshot = NewUiConnectionSnapshotReader.read(this, connectionActions.setupError)
         if (
             !carPlayWasActive &&
@@ -794,8 +868,13 @@ class NewUiActivity : ComponentActivity() {
             DiPlayLauncher.openCarPlayProjection(this)
         }
         carPlayWasActive = carPlayNowActive
+        if (DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK &&
+            destination == NewUiDestination.CONNECTION && connectionSubpage == NewUiConnectionSubpage.MAIN) {
+            connectionActions.openReadyCarlinkProjection()
+        }
         topBarStatus = NewUiTopBarStatusReader.read(this)
         displayState = NewUiDisplayStateReader.read(this)
+        clusterOnlyMode = AirPlayPersistence.loadClusterOnlyMode(this)
         clusterNavMarkerX = AirPlayPersistence.loadClusterMarkerXPercent(this)
         clusterNavMarkerY = AirPlayPersistence.loadClusterMarkerYPercent(this)
         clusterNavigationCrop = com.shilapi.xcertplay.ClusterMapCropSettings.load(this)
@@ -809,6 +888,15 @@ class NewUiActivity : ComponentActivity() {
         if (connectionSubpage == NewUiConnectionSubpage.CONNECTION_METHOD) {
             manualHotspotOffHint = NewUiConnectionMethodActions.manualHotspotOff(this)
         }
+    }
+
+    private fun startClusterOnlyOutput() {
+        if (Hs5ClusterActivityOutput.isOpen()) return
+        val display = ClusterMapPresentation.findDisplay(this) ?: return
+        Hs5ClusterActivityOutput.open(this, display, object : Hs5ClusterActivityOutput.Host {
+            override fun onClusterWindowSurface(surface: android.view.Surface?) = Unit
+            override fun onClusterWindowClosed(reason: String) = Unit
+        })
     }
 
     /** Saving a display preference never interrupts a running session. */
@@ -977,6 +1065,10 @@ class NewUiActivity : ComponentActivity() {
     private fun applyIntentNavigation(intent: Intent) {
         when (intent.getStringExtra(DiPlayLauncher.EXTRA_PAGE)) {
             "settings" -> destination = NewUiDestination.SETTINGS
+            "home" -> {
+                popAllSubpages()
+                destination = NewUiDestination.CONNECTION
+            }
             "wireless-recovery" -> {
                 destination = NewUiDestination.CONNECTION
                 pendingWirelessRecovery = true
@@ -1007,6 +1099,7 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun consumeBluetoothAutoConnectIntent(intent: Intent): Boolean {
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) return false
         val requested = intent.getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false)
         intent.removeExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT)
         if (!requested || !DiPlayPreferences.connectOnPhoneBluetooth(this)) return false
@@ -1017,6 +1110,7 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun shouldAutoConnectOnColdStart(intent: Intent): Boolean =
+        !AirPlayPersistence.loadClusterOnlyMode(this) &&
         NewUiAutoConnectPolicy.shouldConnectOnColdStart(
             intent = intent,
             phoneAddress = DiPlayPreferences.phoneAddress(this),
@@ -1124,10 +1218,17 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun confirmConnectPhone(phone: NewUiBondedPhone) {
+        val shouldConnect = connectPhoneAfterSave
         connectionActions.selectBondedPhone(phone.address, phone.displayName)
+        if (DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
+            connectionActions.startCarlinkOnHome()
+        }
         popConnectionSubpage()
         Toast.makeText(this, R.string.saved_for_your_next_connection, Toast.LENGTH_LONG).show()
         refreshAll()
+        if (shouldConnect && DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
+            connectionActions.openCarPlay()
+        }
     }
 
     private fun switchPhone(phone: NewUiBondedPhone) {

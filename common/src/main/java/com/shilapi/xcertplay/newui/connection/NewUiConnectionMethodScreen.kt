@@ -278,7 +278,7 @@ private fun ConnectionMethodOption(
                     Modifier
                         .size(7.dp)
                         .clip(CircleShape)
-                        .background(NewUiColors.SwitchThumb),
+                        .background(NewUiColors.OnAccent),
                 )
             }
         }

@@ -44,7 +44,8 @@ internal object DiPlayBootStartup {
         }
         try {
             val connecting = DiPlayLauncher.startAutomaticConnection(app, fromBoot = true)
-            if (!connecting) app.startActivity(launch)
+            // Always expose the hub while the background connection is pending.
+            app.startActivity(launch)
             StartupDiagnosticSnapshot.launchResult(app)
             DiagnosticLogging.logcat { Log.i(TAG, "boot launch ${if (connecting) "CarPlayHostActivity" else "NewUiActivity"}") }
         } catch (error: RuntimeException) {

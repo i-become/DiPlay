@@ -18,6 +18,7 @@ import com.shilapi.xcertplay.hud.CarPlayCallCard
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.media.CarPlayTelephonyAudio
 import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.carlink.CarlinkBridge
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
@@ -46,6 +47,7 @@ internal object Hs5SteeringKeys {
     }
     @Volatile private var appContext: Context? = null
     @Volatile private var controller: CarPlayController? = null
+    @Volatile private var carlinkBridge: CarlinkBridge? = null
     @Volatile private var controllerGeneration = 0L
     @Volatile private var hostRef = WeakReference<Activity>(null)
     private var hostGeneration = 0L
@@ -125,6 +127,25 @@ internal object Hs5SteeringKeys {
             if (active) mainHandler.post { scheduleRefresh(force = true) }
             else mainHandler.postDelayed({ scheduleRefresh(force = true) }, CALL_KEY_RETURN_DELAY_MS)
         }
+        scheduleRefresh(force = true)
+    }
+
+    /** Reuses the existing QiSi/NWD hard-key registration while a Carlink session owns the phone. */
+    fun attachCarlink(context: Context, bridge: CarlinkBridge) {
+        if (!supported(context)) return
+        appContext = context.applicationContext
+        carlinkBridge = bridge
+        mediaRightHeld = false
+        controller = null
+        SteeringWheelEvents.attachCarlink(context, bridge)
+        scheduleRefresh(force = true)
+    }
+
+    fun detachCarlink(bridge: CarlinkBridge) {
+        if (carlinkBridge !== bridge) return
+        carlinkBridge = null
+        mediaRightHeld = false
+        SteeringWheelEvents.detachCarlink(bridge)
         scheduleRefresh(force = true)
     }
 
@@ -226,9 +247,12 @@ internal object Hs5SteeringKeys {
     internal fun supported(context: Context): Boolean = Hs5HeadUnit.isHeadUnit(context)
 
     private fun shouldClaimHardKeys(context: Context): Boolean {
-        if (!Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context, CarPlayHostSettingsBridge.wheelBackTargetShown())) return false
-        return sessionReady(controller)
+        if (!Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context, wheelBackShown())) return false
+        return carlinkBridge != null || sessionReady(controller)
     }
+
+    private fun wheelBackShown(): Boolean = CarPlayHostSettingsBridge.wheelBackTargetShown() ||
+        com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.flyScreenShown() == true
 
     private fun shouldHoldViewFocus(): Boolean {
         if (viewFocusSuppressed || (hostRef.get() == null && !CarPlayHostSettingsBridge.flyScreenShown())) return false
@@ -285,7 +309,7 @@ internal object Hs5SteeringKeys {
                 }
         }
         val phoneCall = Hs5NavigationOutputs.carPlayCall() != null || CarPlayTelephonyAudio.active()
-        val flyScreen = CarPlayHostSettingsBridge.wheelBackTargetShown()
+        val flyScreen = wheelBackShown()
         val desiredKeys = if (claimKeys) {
             Hs5SteeringKeyPolicy.factoryKeyCodes(context, phoneCall, flyScreen)
         } else {
@@ -498,9 +522,50 @@ internal object Hs5SteeringKeys {
         viewFocusCooldownUntil = 0L
     }
 
-    private fun onHardKey(keyCode: Int, action: Int, receivedAt: Long, backTarget: CarPlayHostActivity?) {
+    private fun onHardKey(keyCode: Int, action: Int, receivedAt: Long, backTarget: CarPlayHostActivity?,
+        carlinkTarget: com.shilapi.xcertplay.carlink.CarlinkConnectionActivity?) {
         val context = appContext ?: return
         val active = controller
+        val carlink = carlinkBridge
+        if (carlink != null && active == null) {
+            if (carlinkTarget != null && keyCode == QisiSteeringServiceClient.KEYCODE_BACK) {
+                if (action == HARD_KEY_ACTION_DOWN &&
+                    com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get() === carlinkTarget) {
+                    val closed = carlinkTarget.closeFlyScreen()
+                    recordEvent { "Carlink BACK fly screen close=$closed" }
+                }
+                return
+            }
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) {
+                if (action == 1) {
+                    if (!mediaRightHeld && AirPlayPersistence.loadCarPlayWheelMedia(context) &&
+                        !AirPlayPersistence.loadCarBluetoothAudio(context) &&
+                        Hs5NavigationOutputs.carPlayCall() == null && !CarPlayTelephonyAudio.active()) {
+                        carlink.sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN)
+                        carlink.sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP)
+                    }
+                    mediaRightHeld = true
+                    return
+                }
+                if (action == 2) { mediaRightHeld = false; return }
+                if (mediaRightHeld) return
+            }
+            val mapped = when (keyCode) {
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> KeyEvent.KEYCODE_MEDIA_PREVIOUS.takeIf { AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context) }
+                KeyEvent.KEYCODE_MEDIA_NEXT -> KeyEvent.KEYCODE_MEDIA_NEXT.takeIf { AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context) }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK -> keyCode
+                else -> null
+            }
+            if (mapped != null && action == HARD_KEY_ACTION_DOWN) {
+                carlink.sendKey(mapped, KeyEvent.ACTION_DOWN)
+                carlink.sendKey(mapped, KeyEvent.ACTION_UP)
+            }
+            recordEvent { "Carlink key=$keyCode action=$action sent=${mapped != null}" }
+            return
+        }
         if (active == null || !shouldClaimHardKeys(context)) {
             scheduleRefresh(force = true)
             return
@@ -655,11 +720,15 @@ internal object Hs5SteeringKeys {
                 CarPlayHostSettingsBridge.wheelBackTarget()
             } else null
             val backSession = if (backTarget != null) controller?.activeAirPlaySessionToken() else null
+            val capturedCarlink = carlinkBridge
+            val carlinkTarget = if (keyCode == QisiSteeringServiceClient.KEYCODE_BACK)
+                com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.takeIf { it.flyScreenShown() }
+                else null
             mainHandler.post {
                 recordEvent { "hard key raw code=$keyCode action=$action listener=$generation current=$hardKeyGeneration" }
                 if (generation == hardKeyGeneration && (backTarget == null ||
                         controller?.activeAirPlaySessionToken() === backSession)) {
-                    onHardKey(keyCode, action, receivedAt, backTarget)
+                    if (capturedCarlink === carlinkBridge) onHardKey(keyCode, action, receivedAt, backTarget, carlinkTarget)
                 }
             }
             reply?.writeNoException()

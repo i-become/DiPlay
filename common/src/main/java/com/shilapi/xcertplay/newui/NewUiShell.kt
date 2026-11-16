@@ -179,7 +179,7 @@ private fun NewUiTopNavTab(
     val duration = if (reduceMotion) 0 else NewUiMotion.NavTabDurationMs
     val shape = RoundedCornerShape(NewUiLayout.NavTabRadius)
     val background by animateColorAsState(
-        targetValue = if (selected) NewUiColors.Accent else androidx.compose.ui.graphics.Color.Transparent,
+        targetValue = if (selected) NewUiColors.MenuSelected else androidx.compose.ui.graphics.Color.Transparent,
         animationSpec = tween(duration, easing = NewUiMotion.EaseOut),
         label = "navTabBg",
     )

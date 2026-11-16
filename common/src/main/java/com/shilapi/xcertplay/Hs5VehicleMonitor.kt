@@ -41,6 +41,7 @@ internal class Hs5VehicleMonitor(
     private var lastRpmPollAt = Long.MIN_VALUE
     private var lastTireReadAt = Long.MIN_VALUE
     private var tireRefreshQueued = false
+    private var drivingRefreshRequested = false
     private val pushTimes = mutableMapOf<Int, Long>()
     private val tirePushTimes = mutableMapOf<Pair<Int, Int>, Long>()
     @Volatile private var speedPushes = 0L
@@ -89,7 +90,7 @@ internal class Hs5VehicleMonitor(
             "remainFuelRaw=${value.fuel.value} fuelWarningRaw=${value.fuelWarning.value} " +
             "speedUnits=raw-div-100-kph rpmSource=background-rpc-750ms " +
             "coolantDisplay=native fuelDisplay=native extensionPolling=disabled " +
-            "tireRefresh=vehicle-events tireReadIntervalMs=$TIRE_READ_INTERVAL_MS " +
+            "tireRefresh=vehicle-events-and-missing-wheel-retry tireReadIntervalMs=$TIRE_READ_INTERVAL_MS " +
             "tirePressureKpa=${value.tires.map { it.value }} tireWarningRaw=${value.tireWarnings.map { it.value }} " +
             "rpmPollIntervalMs=750\n" +
             speedEvidence.report() + "\n" + vehicleEvidence.report()
@@ -158,6 +159,7 @@ internal class Hs5VehicleMonitor(
                     subscribeAssistance(service, binder)
                     publish()
                     event()
+                    if (sample.tires.any { !validTirePressure(it.value) }) requestTireRefresh(refreshDriving = false)
                     requestRpmPoll()
                 } catch (_: Exception) { disconnect("manager-unavailable") }
             } }
@@ -227,11 +229,12 @@ internal class Hs5VehicleMonitor(
         val key = code to wheel
         if (at < (tirePushTimes[key] ?: Long.MIN_VALUE)) return
         val values = if (code == 47) sample.tires else sample.tireWarnings
-        val valid = if (code == 47) raw in 1..700 && raw != 254 && raw != 255 else raw == 0 || raw == 1
-        val next = values.toMutableList().apply { this[wheel] = Hs5TimedInt(raw.takeIf { valid }, at) }
+        val valid = if (code == 47) validTirePressure(raw) else raw == 0 || raw == 1
+        val next = values.toMutableList().apply { if (valid) this[wheel] = Hs5TimedInt(raw, at) }
         sample = if (code == 47) sample.copy(tires = next) else sample.copy(tireWarnings = next)
         tirePushTimes[key] = at
         publish()
+        if (!valid) requestTireRefresh(refreshDriving = false)
     }
 
     private fun subscribeAssistance(root: IBinder, vehicle: Hs5VehicleBinder) {
@@ -293,6 +296,7 @@ internal class Hs5VehicleMonitor(
     private fun releaseBinding() {
         worker.removeCallbacks(tireRefresh)
         tireRefreshQueued = false
+        drivingRefreshRequested = false
         lastTireReadAt = Long.MIN_VALUE
         assistancePushes.forEach { (manager, listener) ->
             if (manager.alive) manager.listenAt(listener.module.unregister, listener)
@@ -323,8 +327,9 @@ internal class Hs5VehicleMonitor(
         }
     }
 
-    private fun requestTireRefresh(immediate: Boolean = false) {
+    private fun requestTireRefresh(immediate: Boolean = false, refreshDriving: Boolean = true) {
         if (!active || state?.alive != true) return
+        drivingRefreshRequested = drivingRefreshRequested || refreshDriving
         if (tireRefreshQueued) {
             if (!immediate) return // Frequent speed callbacks must not postpone a queued read.
             worker.removeCallbacks(tireRefresh)
@@ -340,17 +345,25 @@ internal class Hs5VehicleMonitor(
         val binder = state ?: return
         if (!active || !binder.alive) return
         val previous = sample
-        val tires = List(4) { wheel -> Hs5TimedInt(binder.read(26, wheel), clock()) }
-        val warnings = List(4) { wheel -> Hs5TimedInt(binder.read(80, wheel), clock()) }
+        val readings = List(4) { wheel -> binder.read(26, wheel) }
+        val tires = List(4) { wheel -> readings[wheel]?.takeIf { validTirePressure(it) }
+            ?.let { Hs5TimedInt(it, clock()) } ?: previous.tires[wheel] }
+        val warnings = List(4) { wheel -> binder.read(80, wheel)?.takeIf { it == 0 || it == 1 }
+            ?.let { Hs5TimedInt(it, clock()) } ?: previous.tireWarnings[wheel] }
         lastTireReadAt = clock()
         sample = previous.copy(tires = tires, tireWarnings = warnings)
-        refreshDrivingInfo(binder)
+        if (drivingRefreshRequested) refreshDrivingInfo(binder)
+        drivingRefreshRequested = false
         if (tires.map { it.value } != previous.tires.map { it.value } ||
             warnings.map { it.value } != previous.tireWarnings.map { it.value } ||
             sample.averageFuelConsumption.value != previous.averageFuelConsumption.value ||
             sample.totalMileage.value != previous.totalMileage.value || sample.remainingMileage.value != previous.remainingMileage.value) publish()
-        // Deliberately do not reschedule. A new vehicle event is required for another read.
+        // Bootstrap can precede TPMS initialization. Recover missing wheels even parked;
+        // once all four have valid readings, return to event-driven refreshes.
+        if (readings.any { !validTirePressure(it) }) requestTireRefresh(refreshDriving = false)
     }
+
+    private fun validTirePressure(raw: Int?) = raw != null && raw in 1..700
 
     private fun requestRpmPoll() {
         if (!active || state?.alive != true) return

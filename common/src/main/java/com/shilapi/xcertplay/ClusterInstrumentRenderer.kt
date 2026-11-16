@@ -6,6 +6,7 @@ import android.graphics.RectF
 
 /** Each style owns its map geometry and artwork; all styles share live subscriptions/motion. */
 internal interface ClusterInstrumentRenderer {
+    val lyricAnimating: Boolean get() = false
     fun draw(canvas: Canvas, width: Int, height: Int, state: ClusterDashboardState, night: Boolean,
              includeNeedles: Boolean = true)
     fun drawNeedles(canvas: Canvas, width: Int, height: Int, speedKph: Float?, rpm: Float?)

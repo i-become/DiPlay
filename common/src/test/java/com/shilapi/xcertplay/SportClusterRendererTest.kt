@@ -34,7 +34,7 @@ class SportClusterRendererTest {
         return image
     }
     private fun pixel(image: Bitmap, x: Int, y: Int): Int = image.getPixel(
-        (SportClusterGeometry.offsetX(2048, 768) + x * SportClusterGeometry.CONTENT_SCALE).toInt(),
+        (SportClusterGeometry.offsetX(2048, 768) + x * SportClusterGeometry.horizontalScale(2048, 768)).toInt(),
         (SportClusterGeometry.CONTENT_TOP + y * SportClusterGeometry.CONTENT_SCALE).toInt())
 
     private fun assertSameRegion(a: Bitmap, b: Bitmap, left: Int, top: Int, right: Int, bottom: Int) {
@@ -45,7 +45,7 @@ class SportClusterRendererTest {
     @Test fun sportSurfaceAndStreamCoverTheEntireRedFrameWithoutStretching() {
         for ((w,h) in listOf(2048 to 768, 1280 to 480, 1920 to 1080)) {
             val expected = SportClusterGeometry.mapBounds(w,h)
-            assertEquals(4f/3f, expected.width()/expected.height(), .001f)
+            assertEquals(4f/3f/SportClusterGeometry.CONTENT_SCALE, expected.width()/expected.height(), .001f)
             // The surface intentionally overscans beneath the tachometer to soften the lower-left join.
             assertTrue(expected.left > w*.58f)
             assertTrue(expected.right <= w)
@@ -53,8 +53,8 @@ class SportClusterRendererTest {
             view.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY))
             view.layout(0,0,w,h)
-            assertTrue(kotlin.math.abs(expected.left.toInt() - view.mapSurface.left) <= 1)
-            assertTrue(kotlin.math.abs(expected.top.toInt() - view.mapSurface.top) <= 1)
+            assertTrue(kotlin.math.abs(expected.left.toInt() - view.mapViewport.left) <= 1)
+            assertTrue(kotlin.math.abs(expected.top.toInt() - view.mapViewport.top) <= 1)
         }
         val config = ClusterStyle.SPORT.streamConfig(2048,768,100,50,50)
         assertEquals(4f/3f, config.widthPixels.toFloat()/config.heightPixels, .001f)
@@ -124,12 +124,13 @@ class SportClusterRendererTest {
                 CarPlayGlance.Snapshot(connected=false,maneuverType=2),
                 CarPlayGlance.Snapshot(connected=true,remainingMeters=12800))) {
                 val image=render(ClusterDashboardState(guidance=nav))
-                try {assertSameRegion(empty,image,1428,156,1813,315)}finally{image.recycle()}
+                try {assertSameRegion(empty,image,1700,72,2000,230)}finally{image.recycle()}
             }
             val image=render(ClusterDashboardState(guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,
                 maneuverType=2,distanceMeters=1200,road="望京西路")))
             try {
-                assertTrue(Color.alpha(pixel(image, 1700,220))>=248)
+                assertTrue(Color.alpha(pixel(image, 1900,130))>=248)
+                assertSameRegion(empty,image,1430,180,1800,315)
                 assertSameRegion(empty,image,1430,275,1800,315)
             }finally{image.recycle()}
         }finally{empty.recycle()}
@@ -195,14 +196,15 @@ class SportClusterRendererTest {
             guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,maneuverType=2,distanceMeters=1200,
                 road="进入 望京西路",remainingMeters=12800,remainingSeconds=1080),
             music=ClusterDashboardMusic(CarPlayNowPlaying(title="晴天",artist="周杰伦",elapsedMillis=112000,
-                durationMillis=269000,playing=true),cover),
+                durationMillis=269000,playing=true,lyrics="故事的小黄花"),cover),
             vehicle=OemClusterVehicleState(speedKph=80f,rpm=2300f,
                 assistance=OemClusterAssistance(true,0,false,false),
                 tirePressureBar=listOf(2.4f,2.4f,2.5f,2.5f),tireWarning=List(4){false}))
         try {
             for((name,w,h) in listOf(Triple("sport-reference-composite",2048,768),
                 Triple("sport-reference-compact",1280,480),Triple("sport-idle",2048,768),
-                Triple("sport-tire-warning",2048,768),Triple("sport-waiting",2048,768))) {
+                Triple("sport-tire-warning",2048,768),Triple("sport-waiting",2048,768),
+                Triple("sport-carlink-summary",2048,768))) {
                 val image=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888)
                 val canvas=Canvas(image);canvas.drawColor(Color.rgb(2,3,5))
                 // Only the reference's right map is test content; never shipped in APK resources.
@@ -215,6 +217,7 @@ class SportClusterRendererTest {
                     "sport-idle"->state.copy(guidance=CarPlayGlance.Snapshot(connected=true))
                     "sport-tire-warning"->state.copy(vehicle=state.vehicle.copy(tireWarning=listOf(true,false,false,true)))
                     "sport-waiting"->ClusterDashboardState()
+                    "sport-carlink-summary"->state.copy(guidance=state.guidance.copy(routeSummary="18:20 到达   剩余 12.8 公里"))
                     else->state
                 }
                 val renderer=SportClusterRenderer(context)

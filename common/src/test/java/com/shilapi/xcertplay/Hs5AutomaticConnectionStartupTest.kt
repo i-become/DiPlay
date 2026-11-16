@@ -29,6 +29,8 @@ class Hs5AutomaticConnectionStartupTest {
         app.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit().clear().commit()
         app.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
         CarPlayBackgroundSession.clear()
+        ConnectionProgressUiState.reset()
+        ReflectionHelpers.setStaticField(HongqiScreenStatus::class.java, "screenOff", false)
         ShadowBuild.setManufacturer("HONG QI")
         ShadowBuild.setModel("HS5")
         DiPlayPreferences.saveAutoConnect(app, true)
@@ -37,12 +39,18 @@ class Hs5AutomaticConnectionStartupTest {
         AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.WIFI_P2P)
     }
 
-    @After fun cleanup() { CarPlayBackgroundSession.clear() }
+    @After fun cleanup() {
+        CarPlayBackgroundSession.clear()
+        ConnectionProgressUiState.reset()
+        ReflectionHelpers.setStaticField(HongqiScreenStatus::class.java, "screenOff", false)
+    }
 
-    @Test fun bootRoutesStraightToConnectionAndUsesTheSelectedDefaultTransport() {
+    @Test fun bootStartsConnectionBehindHomeAndUsesTheSelectedDefaultTransport() {
         AirPlayPersistence.saveWirelessEnabled(app, false)
         DiPlayPreferences.saveDefaultConnectionMode(app, DefaultConnectionMode.WIRELESS)
         DiPlayBootStartup.launchUi(app)
+        // Robolectric pops started activities in reverse launch order: home is on top.
+        assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
         val launch = shadowOf(app).nextStartedActivity!!
         assertEquals(CarPlayHostActivity::class.java.name, launch.component?.className)
         assertTrue(launch.getBooleanExtra(EXTRA_BOOT_AUTO_START, false))
@@ -51,14 +59,13 @@ class Hs5AutomaticConnectionStartupTest {
         assertNull(shadowOf(app).nextStartedActivity)
     }
 
-    @Test fun configuredColdLauncherStartsConnectionWithoutConstructingTheHomeUi() {
+    @Test fun configuredColdLauncherShowsHomeWhileConnectionIsPending() {
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val activity = Robolectric.buildActivity(NewUiActivity::class.java, launcher).create()
         try {
-            assertTrue(activity.get().isFinishing)
-            assertEquals(CarPlayHostActivity::class.java.name,
-                shadowOf(activity.get()).nextStartedActivity?.component?.className)
-            assertNull(activity.get().findViewById<android.view.ViewGroup>(android.R.id.content)?.getChildAt(0))
+            assertFalse(activity.get().isFinishing)
+            assertNull(shadowOf(activity.get()).nextStartedActivity)
+            assertNotNull(activity.get().findViewById<android.view.ViewGroup>(android.R.id.content)?.getChildAt(0))
         } finally { activity.destroy() }
     }
 
@@ -69,6 +76,14 @@ class Hs5AutomaticConnectionStartupTest {
         DiPlayBootStartup.launchUi(app)
         assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
         assertFalse(AirPlayPersistence.loadWirelessEnabled(app))
+    }
+
+    @Test fun carlinkBootOpensHomeWithoutStartingCarPlay() {
+        DiPlayPreferences.savePhoneLinkMode(app, DiPlayPreferences.phoneAddress(app)!!,
+            DiPlayPreferences.PhoneLinkMode.CARLINK)
+        DiPlayBootStartup.launchUi(app)
+        assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
+        assertNull(shadowOf(app).nextStartedActivity)
     }
 
     @Test fun manualHotspotRetainsTheExistingSetupAndHotspotChecks() {

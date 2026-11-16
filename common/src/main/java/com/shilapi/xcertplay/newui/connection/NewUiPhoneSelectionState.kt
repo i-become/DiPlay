@@ -8,21 +8,23 @@ import android.os.Build
 import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.host.R
 
-data class NewUiBondedPhone(
+internal data class NewUiBondedPhone(
     val address: String,
     val displayName: String,
     val suffix: String?,
 ) {
+    val linkMode: DiPlayPreferences.PhoneLinkMode = DiPlayPreferences.PhoneLinkMode.CARPLAY
     val subtitle: String?
         get() = suffix?.let { "···$it" }
 }
 
-data class NewUiPhoneSelectionState(
+internal data class NewUiPhoneSelectionState(
     val needsBluetoothPermission: Boolean,
     val bluetoothEnabled: Boolean,
     val bondedPhones: List<NewUiBondedPhone>,
     val selectedAddress: String?,
     val selectedName: String,
+    val linkModes: Map<String, DiPlayPreferences.PhoneLinkMode> = emptyMap(),
 ) {
     val hasSelectedPhone: Boolean get() = selectedAddress != null
 
@@ -33,6 +35,7 @@ data class NewUiPhoneSelectionState(
             bondedPhones = emptyList(),
             selectedAddress = null,
             selectedName = "",
+            linkModes = emptyMap(),
         )
     }
 }
@@ -49,6 +52,7 @@ internal object NewUiPhoneSelectionReader {
                 bondedPhones = emptyList(),
                 selectedAddress = DiPlayPreferences.phoneAddress(context),
                 selectedName = DiPlayPreferences.phoneName(context),
+                linkModes = emptyMap(),
             )
         }
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
@@ -73,6 +77,7 @@ internal object NewUiPhoneSelectionReader {
             bondedPhones = phones,
             selectedAddress = DiPlayPreferences.phoneAddress(context),
             selectedName = DiPlayPreferences.phoneName(context),
+            linkModes = phones.associate { it.address to DiPlayPreferences.phoneLinkMode(context, it.address, it.displayName) },
         )
     }
 }

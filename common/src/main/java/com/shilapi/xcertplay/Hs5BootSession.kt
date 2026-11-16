@@ -165,7 +165,8 @@ internal object Hs5BootSession {
         scheduled.set(true)
     }
 
-    private fun eligible(context: Context): Boolean = Hs5HeadUnit.isHeadUnit(context) &&
+    private fun eligible(context: Context): Boolean =
+        DiPlayPreferences.phoneLinkMode(context) == DiPlayPreferences.PhoneLinkMode.CARPLAY && Hs5HeadUnit.isHeadUnit(context) &&
         !ConnectionProgressUiState.disconnected() && !HongqiScreenStatus.screenOff &&
         AirPlayPersistence.loadAutoStartOnBoot(context) && DiPlayPreferences.autoConnect(context) &&
         DiPlayPreferences.autoConnectWireless(context) && !DiPlayPreferences.phoneAddress(context).isNullOrBlank() &&

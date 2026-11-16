@@ -31,6 +31,7 @@ android {
 
 dependencies {
     api(project(":shared"))
+    compileOnly(files("libs/icar-sdk-stubs.jar"))
     implementation(files("libs/hs5-vehicle-sdk.jar"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
@@ -45,6 +46,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.zxing.core)
     testImplementation(libs.junit)
+    testImplementation(files("libs/icar-sdk-stubs.jar"))
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation(libs.androidx.activity.compose)

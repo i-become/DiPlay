@@ -43,10 +43,11 @@ class Hs5VehicleMonitorTest {
     private var speed = 4200
     private var drivingEnabled = false
     private var drivingReads = 0
-    private val tirePressures = IntArray(4)
+    private val tirePressures = IntArray(4) { 240 }
     private val tireWarnings = IntArray(4)
     private var duringSpeedRead: (() -> Unit)? = null
     private var failSpeed = false
+    private var failTires = false
     private var reject = false
     private var allowListen = true
     private var lead = Hs5LeadVehicleReading()
@@ -76,7 +77,7 @@ class Hs5VehicleMonitorTest {
             assertEquals(0, data.dataAvail())
             reads++
             if (code == 7) duringSpeedRead?.invoke()
-            if (code == 7 && failSpeed) {
+            if ((code == 7 && failSpeed) || (code == 26 && failTires)) {
                 reply!!.writeException(SecurityException("getter unavailable"))
                 return true
             }
@@ -270,6 +271,7 @@ class Hs5VehicleMonitorTest {
     }
 
     @Test fun tirePushDuringBootstrapWinsEvenWhenGetterCompletesLater() {
+        tirePressures.fill(0)
         duringSpeedRead = {
             val data = Parcel.obtain()
             try {
@@ -340,6 +342,7 @@ class Hs5VehicleMonitorTest {
     }
 
     @Test fun individualTirePushesRetainWheelIdentityAndUnknownIndicesRefreshGetters() {
+        tirePressures.fill(0)
         start(); connect()
         val before = reads
         fun tire(code: Int, wheel: Int, raw: Int) {
@@ -360,9 +363,11 @@ class Hs5VehicleMonitorTest {
         assertEquals(2.33f, car.tirePressureBar[2]!!, .00001f)
         assertEquals(true, car.tireWarning[2])
         assertNull(car.tirePressureBar[0])
-        assertEquals(before + 8, reads)
+        assertTrue("Missing wheels must keep refreshing even parked", reads > before + 8)
         tire(47, 2, 255)
-        assertNull(monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
+        assertEquals(2.55f, monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
+        tire(47, 2, -2)
+        assertEquals(2.55f, monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
         tire(47, 2, 260)
         assertEquals(2.6f, monitor!!.sample.vehicle(SystemClock.elapsedRealtime(), null).tirePressureBar[2])
     }
@@ -390,6 +395,27 @@ class Hs5VehicleMonitorTest {
         idle(60_000)
         assertEquals(afterSpeedNotification, changes.size)
         assertEquals(28, reads)
+    }
+
+    @Test fun missingWheelsRecoverWhileParkedAndTransportFailuresKeepKnownPressures() {
+        tirePressures[1] = 0
+        tirePressures[3] = -2
+        start(); connect()
+        assertNull(monitor!!.sample.vehicle(0, null).tirePressureBar[1])
+        tirePressures[1] = 235
+        tirePressures[3] = 245
+        idle(1000)
+        assertEquals(listOf(2.4f, 2.35f, 2.4f, 2.45f), changes.last().vehicle(1000, null).tirePressureBar)
+        val recoveredReads = reads
+        idle(5000)
+        assertEquals("Stop retrying when all wheels recover", recoveredReads, reads)
+        tirePressures[0] = -2
+        tirePressures[2] = 0
+        emit(4000); idle(1000)
+        assertEquals(listOf(2.4f, 2.35f, 2.4f, 2.45f), monitor!!.sample.vehicle(7000, null).tirePressureBar)
+        failTires = true
+        emit(4200); idle(1000)
+        assertEquals(listOf(2.4f, 2.35f, 2.4f, 2.45f), monitor!!.sample.vehicle(7000, null).tirePressureBar)
     }
 
     @Test fun speedBurstsCoalesceTireReadsWithoutPostponingThemAndIdleDoesNotPoll() {

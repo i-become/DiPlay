@@ -19,6 +19,13 @@
         android:resizeableActivity="true"
         android:theme="@style/Theme.Xcertplay">
 
+        <!-- The injected ICCOA dex contains these services; Android still needs registrations. -->
+        <service android:name="com.share.connect.ShareLinkService" android:exported="false" tools:ignore="MissingClass,Instantiatable" />
+        <service android:name="com.share.connect.ble.BluetoothLeService" android:exported="false" tools:ignore="MissingClass,Instantiatable" />
+        <service android:name="com.share.connect.wifiap.WifiApService" android:exported="false" tools:ignore="MissingClass,Instantiatable" />
+        <service android:name="com.share.connect.wifip2p.WifiP2pService" android:exported="false" tools:ignore="MissingClass,Instantiatable" />
+        <service android:name="androidx.room.MultiInstanceInvalidationService" android:directBootAware="true" android:exported="false" />
+
         <meta-data
             android:name="android.allow_multiple_resumed_activities"
             android:value="true" />

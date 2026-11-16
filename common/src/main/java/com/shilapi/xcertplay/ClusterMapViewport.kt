@@ -9,6 +9,14 @@ import kotlin.math.roundToInt
  * No position is guessed from maneuver direction, speed, or a missing turn card.
  */
 internal data class ClusterMapViewport(val scale: Float = 1f, val x: Float = 0f, val y: Float = 0f) {
+    // A video cannot reveal pixels outside its original frame. Stop at full-frame
+    // coverage rather than shrinking the image and introducing black borders.
+    fun cover(): ClusterMapViewport {
+        val boundedScale = scale.coerceAtLeast(1f)
+        return ClusterMapViewport(boundedScale, x.coerceIn(1f - boundedScale, 0f),
+            y.coerceIn(1f - boundedScale, 0f))
+    }
+
     fun zoom(percent: Int, anchorPercent: Int): ClusterMapViewport {
         val factor = percent.coerceIn(50, 200) / 100f
         return ClusterMapViewport(scale * factor, x * factor + (1f - factor) / 2f,
@@ -54,6 +62,26 @@ internal object ClusterMapCropSettings {
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+}
+
+internal data class ClusterCopyRegion(val left: Float = 0.18f, val top: Float = 0.12f,
+    val right: Float = 0.82f, val bottom: Float = 0.88f) {
+    fun clamped() = ClusterCopyRegion(left.coerceIn(0f, 0.98f), top.coerceIn(0f, 0.98f),
+        right.coerceIn(left.coerceIn(0f, 0.98f) + 0.02f, 1f),
+        bottom.coerceIn(top.coerceIn(0f, 0.98f) + 0.02f, 1f))
+    companion object {
+        fun load(context: Context, style: ClusterStyle = AirPlayPersistence.loadClusterStyle(context)): ClusterCopyRegion {
+            val p = context.getSharedPreferences("cluster_copy_region_${style.preferenceValue}", Context.MODE_PRIVATE)
+            return ClusterCopyRegion(p.getFloat("left", .18f), p.getFloat("top", .12f),
+                p.getFloat("right", .82f), p.getFloat("bottom", .88f)).clamped()
+        }
+        fun save(context: Context, region: ClusterCopyRegion, style: ClusterStyle) {
+            val v = region.clamped()
+            context.getSharedPreferences("cluster_copy_region_${style.preferenceValue}", Context.MODE_PRIVATE).edit()
+                .putFloat("left", v.left).putFloat("top", v.top)
+                .putFloat("right", v.right).putFloat("bottom", v.bottom).apply()
+        }
     }
 }
 

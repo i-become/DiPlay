@@ -72,6 +72,7 @@ class NewUiDisplayIconSizeTest {
         var stops = 0
         storeSession(CarPlaySize.MEDIUM) { stops++ }
         var state by mutableStateOf(NewUiDisplayStateReader.read(context))
+        var clusterManagerRequests = 0
         var reconnectRequests = 0
         var choosingSize by mutableStateOf(false)
         compose.setContent {
@@ -85,7 +86,7 @@ class NewUiDisplayIconSizeTest {
                         if (!choosingSize) {
                             NewUiDisplayScreen(
                                 state = state, navMarkerSummary = "50%, 45%",
-                                onPickFps = {}, onPickNavMarker = {}, onOpenClusterManager = {},
+                                onPickFps = {}, onPickNavMarker = {}, onOpenClusterManager = { clusterManagerRequests++ },
                                 onSmoothVideoChanged = {}, onDirectVideoOutputChanged = {},
                                 onLowLatencyDecoderChanged = {}, onMtkDecoderTuningChanged = {},
                                 onHudNavigationChanged = {}, onClusterMapChanged = {},
@@ -106,6 +107,10 @@ class NewUiDisplayIconSizeTest {
                 }
             }
         }
+        compose.onNodeWithText(context.getString(R.string.new_ui_cluster_only_title)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.settings_cluster_manager))
+            .performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, clusterManagerRequests) }
         compose.onNodeWithText(context.getString(R.string.settings_carplay_icon_size))
             .performScrollTo().assertIsDisplayed()
         screenshot(name + "-entry")

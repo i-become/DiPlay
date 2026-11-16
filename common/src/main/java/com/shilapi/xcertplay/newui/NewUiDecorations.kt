@@ -36,7 +36,7 @@ fun NewUiScreenBackground(modifier: Modifier = Modifier) {
 
             .fillMaxSize()
 
-            .background(NewUiColors.Canvas),
+            .background(Brush.verticalGradient(listOf(NewUiColors.Canvas, NewUiColors.CanvasBottom))),
 
     )
 

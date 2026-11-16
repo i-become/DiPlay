@@ -70,4 +70,35 @@ class DiagnosticRecordingOptInTest {
             old.close(); current.close()
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun disablingRecordingFreezesExistingSessionAndStartupFiles() {
+        val root = Files.createTempDirectory("diplay-stop-recording").toFile()
+        try {
+            DiagnosticLogging.setEnabled(true)
+            SessionLogFile(root.resolve("session.log")).use { session ->
+                val startup = StartupTraceStore(root.resolve("startup"))
+                try {
+                    session.reset("active")
+                    AsyncDiagnosticLog.append(session, "active session")
+                    startup.append("active startup")
+                    assertTrue(AsyncDiagnosticLog.awaitIdle(2_000))
+                    assertTrue(startup.awaitIdle(2_000))
+                    DiagnosticLogging.setEnabled(false)
+                    val before = root.walkTopDown().filter { it.isFile }
+                        .associate { it.relativeTo(root).path to it.readText() }
+                    assertTrue(before.size >= 2)
+                    repeat(100) {
+                        session.append("disabled")
+                        AsyncDiagnosticLog.append(session, "disabled")
+                        startup.append("disabled")
+                    }
+                    startup.clear()
+                    assertTrue(startup.awaitIdle(2_000))
+                    assertTrue(AsyncDiagnosticLog.awaitIdle(2_000))
+                    assertEquals(before, root.walkTopDown().filter { it.isFile }
+                        .associate { it.relativeTo(root).path to it.readText() })
+                } finally { startup.close() }
+            }
+        } finally { root.deleteRecursively() }
+    }
 }

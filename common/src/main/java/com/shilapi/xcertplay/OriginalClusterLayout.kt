@@ -12,6 +12,7 @@ internal enum class OriginalClusterComponent(val key: String, val left: Float, v
     DRIVING("driving", .045f, .665f, .241f, .244f),
     TURN("turn", .736f, .094f, .221f, .255f),
     TIME("time", .736f, .828f, .221f, .081f),
+    MUSIC("music", .371f, .704f, .258f, .230f),
 }
 
 internal data class OriginalClusterPlacement(val visible: Boolean = true, val x: Float, val y: Float)

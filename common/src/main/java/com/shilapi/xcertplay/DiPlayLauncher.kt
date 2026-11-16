@@ -15,6 +15,8 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 internal object DiPlayLauncher {
     /** Start the configured Hongqi connection before constructing either full UI. */
     fun startAutomaticConnection(context: Context, fromBoot: Boolean = false): Boolean {
+        if (AirPlayPersistence.loadClusterOnlyMode(context)) return false
+        if (DiPlayPreferences.phoneLinkMode(context) == DiPlayPreferences.PhoneLinkMode.CARLINK) return false
         if (ConnectionProgressUiState.disconnected() || HongqiScreenStatus.screenOff) return false
         if (Hs5BootSession.isPreparing()) {
             val app = context.applicationContext

@@ -59,6 +59,12 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
     private val laneStrip = ClusterLaneStrip()
     private var glyph: Drawable? = null
     private var glyphTag: Int = -1
+    private val phoneIcon = ClusterNavigationIcon()
+
+    override fun onDetachedFromWindow() {
+        phoneIcon.release()
+        super.onDetachedFromWindow()
+    }
 
     init { applyPalette() }
 
@@ -215,6 +221,7 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
     private fun infoParts(next: ClusterTurnGuidance): List<String> {
+        if (next.routeSummary.isNotBlank()) return listOf(next.routeSummary)
         val parts = mutableListOf<String>()
         next.arrivalEpochSeconds?.takeIf { it > 0 }?.let { epoch ->
             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epoch * 1000L))
@@ -237,6 +244,7 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
 
     /** Draws the tinted Material Symbols glyph; the roundabout exit number gets a corner badge. */
     private fun drawGlyph(canvas: Canvas, next: ClusterTurnGuidance, left: Float, top: Float, side: Float, exit: Int?) {
+        if (phoneIcon.draw(canvas, next.directionIcon, RectF(left, top, left + side, top + side))) return
         if (next.icon == 0) return
         val resId = glyphRes(next.icon)
         if (resId != glyphTag) {

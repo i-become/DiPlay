@@ -11,17 +11,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.host.R
+import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiLayout
 import com.shilapi.xcertplay.newui.NewUiPanel
@@ -63,10 +74,12 @@ fun NewUiPhoneHintPanel(
 }
 
 @Composable
-fun NewUiPhoneDeviceList(
+internal fun NewUiPhoneDeviceList(
     phones: List<NewUiBondedPhone>,
     selectedAddress: String?,
+    linkModes: Map<String, DiPlayPreferences.PhoneLinkMode> = emptyMap(),
     onSelect: (NewUiBondedPhone) -> Unit,
+    onModeChange: (NewUiBondedPhone, DiPlayPreferences.PhoneLinkMode) -> Unit = { _, _ -> },
 ) {
     if (phones.isEmpty()) return
     NewUiPanel {
@@ -75,6 +88,8 @@ fun NewUiPhoneDeviceList(
                 phone = phone,
                 selected = phone.address == selectedAddress,
                 onClick = { onSelect(phone) },
+                linkMode = linkModes[phone.address] ?: DiPlayPreferences.PhoneLinkMode.CARPLAY,
+                onModeChange = { onModeChange(phone, it) },
             )
             if (index < phones.lastIndex) {
                 HorizontalDivider(color = NewUiColors.Divider)
@@ -84,10 +99,12 @@ fun NewUiPhoneDeviceList(
 }
 
 @Composable
-fun NewUiPhoneDeviceRow(
+internal fun NewUiPhoneDeviceRow(
     phone: NewUiBondedPhone,
     selected: Boolean,
     onClick: () -> Unit,
+    linkMode: DiPlayPreferences.PhoneLinkMode = DiPlayPreferences.PhoneLinkMode.CARPLAY,
+    onModeChange: (DiPlayPreferences.PhoneLinkMode) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -135,12 +152,46 @@ fun NewUiPhoneDeviceRow(
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(NewUiColors.SwitchThumb),
+                        .background(NewUiColors.OnAccent),
                 )
+            }
+        }
+        var protocolMenuOpen by remember(phone.address) { mutableStateOf(false) }
+        Box(Modifier.padding(start = 14.dp)) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(NewUiColors.ButtonNormal.copy(alpha = 0.35f))
+                    .border(1.dp, NewUiColors.Divider, RoundedCornerShape(10.dp))
+                    .clickable { protocolMenuOpen = true }
+                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(protocolLabel(linkMode), style = NewUiTypography.SettingSubtitle,
+                    color = NewUiColors.TextPrimary)
+                Icon(painterResource(R.drawable.new_ui_ic_chevron_right), contentDescription = null,
+                    tint = NewUiColors.TextSecondary,
+                    modifier = Modifier.padding(start = 4.dp).size(16.dp).rotate(90f))
+            }
+            DropdownMenu(expanded = protocolMenuOpen,
+                onDismissRequest = { protocolMenuOpen = false }) {
+                DiPlayPreferences.PhoneLinkMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(protocolLabel(mode), color = if (mode == linkMode)
+                            NewUiColors.Accent else NewUiColors.TextPrimary) },
+                        onClick = {
+                            protocolMenuOpen = false
+                            if (mode != linkMode) onModeChange(mode)
+                        },
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun protocolLabel(mode: DiPlayPreferences.PhoneLinkMode): String = mode.label
 
 @Composable
 fun NewUiPhonePrimaryFooter(
@@ -151,7 +202,7 @@ fun NewUiPhonePrimaryFooter(
     Text(
         label,
         style = NewUiTypography.ActionSubtitle,
-        color = NewUiColors.TextPrimary,
+        color = if (enabled) NewUiColors.OnAccent else NewUiColors.TextSecondary,
         modifier = Modifier
             .fillMaxWidth()
             .padding(

@@ -227,6 +227,32 @@ class Hs5SteeringServiceLifecycleTest {
         verify(controller, times(1)).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.NEXT)
     }
 
+    @Test fun carlinkFactoryLongNextTogglesOnceAndShortClickHasAMatchingRelease() {
+        val bridge = mock(com.shilapi.xcertplay.carlink.CarlinkBridge::class.java)
+        AirPlayPersistence.saveCarPlayWheelMedia(context, true)
+        com.shilapi.xcertplay.media.CarPlayTelephonyAudio.clear()
+        try {
+            Hs5SteeringKeys.attachCarlink(context, bridge)
+            drain()
+            val callback = listener!!
+            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
+            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
+            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 2)
+            drain()
+            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN)
+            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP)
+            verify(bridge, never()).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN)
+            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+            drain()
+            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN)
+            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_UP)
+        } finally {
+            Hs5SteeringKeys.detachCarlink(bridge)
+            drain()
+            Hs5SteeringKeys.detach(null)
+        }
+    }
+
     private fun drain() {
         val field = Hs5SteeringKeys::class.java.getDeclaredField("worker").apply { isAccessible = true }
         val worker = field.get(Hs5SteeringKeys) as ExecutorService
@@ -360,6 +386,16 @@ class Hs5SteeringServiceLifecycleTest {
         assertEquals(1, closes)
         assertArrayEquals(intArrayOf(4), unregistrations.single())
         assertNull(listener)
+        verify(controller, never()).close()
+    }
+
+    @Test fun backClosesClusterBeforeProjectionWhenBothAreVisible() {
+        `when`(host.projectionShown()).thenReturn(true)
+        start()
+        sendKey(listener!!)
+        drain()
+        assertEquals(1, closes)
+        verify(host, never()).exitProjection(anyString())
         verify(controller, never()).close()
     }
 

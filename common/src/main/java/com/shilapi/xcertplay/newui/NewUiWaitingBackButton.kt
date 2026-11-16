@@ -31,7 +31,7 @@ internal class NewUiWaitingBackButton @JvmOverloads constructor(
         val padV = (18 * density).toInt()
         setPadding(padH, padV, padH, padV)
         val ripple = RippleDrawable(
-            ColorStateList.valueOf(0x33087BFF),
+            ColorStateList.valueOf(0x33555267),
             ContextCompat.getDrawable(context, R.drawable.new_ui_waiting_back_button_bg),
             null,
         )

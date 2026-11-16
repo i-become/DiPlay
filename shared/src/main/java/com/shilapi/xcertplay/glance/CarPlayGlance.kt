@@ -29,12 +29,15 @@ object CarPlayGlance {
         val playing: Boolean = false,
         val navigating: Boolean = false,
         val lanes: List<CarPlayLane> = emptyList(),
+        val directionIcon: ByteArray? = null,
+        val routeSummary: String = "",
     ) {
         val laneSourceType: String get() = if (lanes.isEmpty()) "none" else "metadata"
     }
 
     private val route = Hs5RouteState()
     private var connected = false
+    private var externalActive = false
     private var last = Snapshot()
     private val laneState = CarPlayLaneState { route.monotonicNow() }
     private val expiryExecutor by lazy {
@@ -139,6 +142,7 @@ object CarPlayGlance {
                 expiryTask = expiryExecutor.scheduleWithFixedDelay({ snapshot() }, 1, 1, TimeUnit.SECONDS)
             }
             if (!next) {
+                externalActive = false
                 expiryTask?.cancel(false)
                 expiryTask = null
                 route.clear()
@@ -149,7 +153,51 @@ object CarPlayGlance {
         changed?.let(::notifyChanged)
     }
 
+    /** Updates the shared dashboard/navigation snapshot from Carlink metadata. */
+    fun onExternalNavigation(navigating: Boolean, distanceMeters: Int, road: String, maneuverType: Int? = 3,
+        directionIcon: ByteArray? = null, routeSummary: String = "") {
+        val changed = synchronized(this) {
+            externalActive = true
+            val next = last.copy(
+                connected = true,
+                navigating = navigating,
+                distanceMeters = distanceMeters.coerceAtLeast(0),
+                road = road,
+                maneuverType = if (navigating) maneuverType else null,
+                directionIcon = if (navigating) directionIcon else null,
+                routeSummary = if (navigating) routeSummary else "",
+                arrivalEpochSeconds = null,
+                remainingSeconds = null,
+                remainingMeters = null,
+                lanes = emptyList(),
+            )
+            if (next == last) null else { last = next; next }
+        }
+        changed?.let(::notifyChanged)
+    }
+
+    fun onExternalMusic(title: String?, playing: Boolean) {
+        val changed = synchronized(this) {
+            externalActive = true
+            val next = last.copy(connected = true, song = title?.takeIf(String::isNotBlank), playing = playing)
+            if (next == last) null else { last = next; next }
+        }
+        changed?.let(::notifyChanged)
+    }
+
+    fun clearExternal() {
+        val changed = synchronized(this) {
+            if (!externalActive) return
+            externalActive = false
+            val next = Snapshot()
+            if (next == last) null else { last = next; next }
+        }
+        changed?.let(::notifyChanged)
+    }
+
     private fun publishLocked(): Snapshot? {
+        // Reading the dashboard must not replace Carlink metadata with the idle iAP2 route.
+        if (externalActive) return null
         val maneuver = route.currentApple()
         val navigating = connected && (route.isNavigating() || laneState.current().isNotEmpty())
         val summary = if (navigating) route.currentSummary() else null

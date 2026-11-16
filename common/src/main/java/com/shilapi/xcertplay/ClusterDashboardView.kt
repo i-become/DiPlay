@@ -9,9 +9,12 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.widget.ImageView
+import android.widget.ImageView.ScaleType
 import android.view.Surface
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.TextureView
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
 import android.view.View
 import android.widget.FrameLayout
 import com.shilapi.xcertplay.glance.CarPlayGlance
@@ -52,6 +55,7 @@ internal class ClusterDashboardView(
             HongqiClusterVehicleData.snapshot())
     },
     private val readNavigationCrop: () -> Int = { ClusterMapCropSettings.load(context) },
+    private val externalNavigation: (() -> com.shilapi.xcertplay.hud.ClusterTurnGuidance?)? = null,
     private val onSurface: (Surface?) -> Unit = {},
 ) : FrameLayout(context) {
     private var state = ClusterDashboardState()
@@ -67,6 +71,7 @@ internal class ClusterDashboardView(
     private val picture = object : View(context) {
         override fun onDraw(canvas: Canvas) {
             renderer.draw(canvas, width, height, state, night, includeNeedles = false)
+            if (ticking && renderer.lyricAnimating) postInvalidateDelayed(33L)
         }
     }
     private val needles = object : View(context) {
@@ -76,7 +81,21 @@ internal class ClusterDashboardView(
             if (ticking && (speedMotion.moving(now) || rpmMotion.moving(now))) postInvalidateOnAnimation()
         }
     }
-    internal val mapSurface = SurfaceView(context)
+    // Texture transforms stay inside a fixed, clipping viewport. Neither zoom nor crop
+    // changes the dashboard aperture or replaces the decoder Surface.
+    internal val mapViewport = FrameLayout(context).apply {
+        clipChildren = true
+        clipToPadding = true
+        setBackgroundColor(Color.BLACK)
+    }
+    // Decode the original stream into a texture; transform only texture coordinates,
+    // never the fixed instrument aperture or the decoder Surface identity.
+    internal val mapSurface = TextureView(context)
+    internal var decoderSurface: Surface? = null
+        private set
+    // Keep the fixed map slot measured before the first copied frame arrives.
+    private val copiedMap = ImageView(context).apply { scaleType = ScaleType.FIT_XY; visibility = INVISIBLE }
+    private val externalTurn: ClusterTurnCardView? = null
     private val waiting = MapWaitingView(context)
     private val refresh = object : Runnable {
         override fun run() {
@@ -87,14 +106,27 @@ internal class ClusterDashboardView(
 
     init {
         setBackgroundColor(Color.TRANSPARENT)
-        mapSurface.holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(holder: SurfaceHolder) = onSurface(holder.surface)
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
-            override fun surfaceDestroyed(holder: SurfaceHolder) = onSurface(null)
-        })
-        addView(mapSurface, LayoutParams(1, 1))
+        mapSurface.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+                decoderSurface = Surface(texture)
+                onSurface(decoderSurface)
+            }
+            override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = updateMapViewport()
+            override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                try { onSurface(null) } finally {
+                    decoderSurface?.release()
+                    decoderSurface = null
+                }
+                return true
+            }
+            override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+        }
+        mapViewport.addView(mapSurface, LayoutParams(-1, -1))
+        mapViewport.addView(copiedMap, LayoutParams(-1, -1))
+        addView(mapViewport, LayoutParams(1, 1))
         addView(waiting, LayoutParams(1, 1))
-        // Keep the opaque dial faces and their feathered rims above the map Surface.
+        externalTurn?.let { addView(it, LayoutParams(1, 1)) }
+        // Keep the opaque dial faces and their feathered rims above the map texture.
         // The cached picture has a transparent opening only between the instruments.
         addView(picture, LayoutParams(-1, -1))
         addView(needles, LayoutParams(-1, -1))
@@ -104,6 +136,14 @@ internal class ClusterDashboardView(
 
     fun setStreamActive(active: Boolean) {
         streamActive = active
+        updateMapWaiting()
+    }
+
+    internal fun setCopiedMap(bitmap: Bitmap?) {
+        copiedMap.setImageBitmap(bitmap)
+        updateMapViewport()
+        copiedMap.visibility = if (bitmap == null) INVISIBLE else VISIBLE
+        if (bitmap != null) streamActive = true
         updateMapWaiting()
     }
 
@@ -148,7 +188,14 @@ internal class ClusterDashboardView(
     }
 
     private fun updateMapWaiting() {
-        waiting.visibility = if (streamActive && state.guidance.connected) GONE else VISIBLE
+        val guidance = externalNavigation?.invoke()
+        externalTurn?.setGuidance(guidance)
+        externalTurn?.setNightMode(night)
+        externalTurn?.visibility = if (guidance != null) VISIBLE else GONE
+        // Copied video is already a usable map, even before navigation metadata arrives.
+        waiting.visibility = if (copiedMap.visibility == VISIBLE || guidance != null ||
+            (streamActive && state.guidance.connected)) GONE else VISIBLE
+        waiting.invalidate()
     }
 
     override fun onAttachedToWindow() {
@@ -204,7 +251,7 @@ internal class ClusterDashboardView(
                 MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY))
         }
         val map = style.mapBounds(w, h, mapAspect)
-        for (child in listOf(mapSurface, waiting)) {
+        for (child in listOfNotNull(mapViewport, waiting, externalTurn)) {
             child.measure(MeasureSpec.makeMeasureSpec(map.width().roundToInt(), MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(map.height().roundToInt(), MeasureSpec.EXACTLY))
         }
@@ -214,7 +261,7 @@ internal class ClusterDashboardView(
         picture.layout(0, 0, width, height)
         needles.layout(0, 0, width, height)
         val map = style.mapBounds(width, height, mapAspect)
-        for (child in listOf(mapSurface, waiting)) {
+        for (child in listOfNotNull(mapViewport, waiting, externalTurn)) {
             child.layout(map.left.roundToInt(), map.top.roundToInt(),
                 map.left.roundToInt() + child.measuredWidth, map.top.roundToInt() + child.measuredHeight)
         }
@@ -222,17 +269,25 @@ internal class ClusterDashboardView(
     }
 
     private fun updateMapViewport() {
+        val anchor = AirPlayPersistence.loadClusterMarkerYPercent(context)
         val crop = ClusterMapViewport.navigation(state.guidance.connected && state.guidance.navigating,
-            readNavigationCrop(), AirPlayPersistence.loadClusterMarkerYPercent(context))
-            .zoom(ClusterMapCropSettings.loadZoom(context), AirPlayPersistence.loadClusterMarkerYPercent(context))
-        // API 28 SurfaceView transforms are composed by the platform. Keep holder dimensions,
-        // decoder ownership and Surface identity unchanged when navigation starts/stops.
-        mapSurface.pivotX = 0f
-        mapSurface.pivotY = 0f
-        mapSurface.scaleX = crop.scale
-        mapSurface.scaleY = crop.scale
-        mapSurface.translationX = crop.x * mapSurface.width
-        mapSurface.translationY = crop.y * mapSurface.height
+            readNavigationCrop(), anchor).zoom(ClusterMapCropSettings.loadZoom(context), anchor).cover()
+        // Rebuild from the original texture on every update. Never concatenate the
+        // previous matrix: repeated zoom changes must not accumulate resampling/crop.
+        mapSurface.setTransform(Matrix().apply {
+            setScale(crop.scale, crop.scale)
+            postTranslate(crop.x * mapSurface.width, crop.y * mapSurface.height)
+        })
+        copiedMap.scaleType = ScaleType.MATRIX
+        copiedMap.drawable?.let { drawable ->
+            if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
+                copiedMap.imageMatrix = Matrix().apply {
+                    setScale(copiedMap.width * crop.scale / drawable.intrinsicWidth,
+                        copiedMap.height * crop.scale / drawable.intrinsicHeight)
+                    postTranslate(crop.x * copiedMap.width, crop.y * copiedMap.height)
+                }
+            }
+        }
     }
 
     private inner class MapWaitingView(context: Context) : View(context) {
@@ -242,7 +297,7 @@ internal class ClusterDashboardView(
             paint.color = Color.rgb(170, 179, 207)
             paint.textSize = min(width / 32f, height / 16f)
             paint.textAlign = Paint.Align.CENTER
-            canvas.drawText(context.getString(R.string.cluster_dashboard_waiting_map),
+            canvas.drawText(context.getString(if (externalNavigation != null) R.string.cluster_dashboard_waiting_navigation else R.string.cluster_dashboard_waiting_map),
                 width / 2f, height / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
         }
     }

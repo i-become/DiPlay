@@ -19,6 +19,9 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         typeface = Typeface.create("sans-serif", Typeface.NORMAL)
     }
     private val lanes = ClusterLaneStrip()
+    private val phoneIcon = ClusterNavigationIcon()
+
+    fun release() = phoneIcon.release()
     private val white = Color.rgb(245, 247, 250)
     private val accent = if (sport) Color.rgb(120, 231, 249) else Color.rgb(119, 228, 255)
 
@@ -43,8 +46,8 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         val turnHeight = if (maneuver != null) max(arrowSize, distanceHeight + roadHeight) + 12f else 0f
         val laneTop = turnHeight + if (showLanes && maneuver != null) 2f else 0f
         val height = turnHeight + if (showLanes) 56f + if (maneuver != null) 2f else 0f else 0f
-        val centerX = if (sport) 1620.5f else 997.5f
-        val top = if (sport) 156f else 112f
+        val centerX = if (sport) 2000f - width / 2 else 997.5f
+        val top = if (sport) 72f else 112f
         val bounds = RectF(centerX - width / 2, top, centerX + width / 2, top + height)
         paint.style = Paint.Style.FILL
         paint.color = if (sport) Color.argb(249, 3, 15, 22) else Color.argb(249, 0, 21, 45)
@@ -55,6 +58,7 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         if (maneuver != null) {
             val arrowLeft = bounds.left + 12f
             val arrowTop = top + (turnHeight - arrowSize) / 2
+            if (!phoneIcon.draw(canvas, nav.directionIcon, RectF(arrowLeft, arrowTop, arrowLeft + arrowSize, arrowTop + arrowSize)))
             context.getDrawable(NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide))?.mutate()?.let {
                 it.setTint(white)
                 it.setBounds(arrowLeft.toInt(), arrowTop.toInt(), (arrowLeft + arrowSize).toInt(), (arrowTop + arrowSize).toInt())

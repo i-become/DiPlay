@@ -1,4 +1,12 @@
 <resources>
+    <string name="new_ui_cluster_copy_region_fullscreen">全螢幕</string>
+    <string name="new_ui_cluster_copy_region_center">置中</string>
+    <string name="new_ui_cluster_only_title">僅儀表</string>
+    <string name="new_ui_cluster_only_sub">不連接手機，僅保持儀表顯示；媒體詳情取決於車輛原車媒體工作階段。</string>
+    <string name="new_ui_phone_protocol">協定</string>
+    <string name="new_ui_cluster_copy_region">複製中控區域作為地圖</string>
+    <string name="new_ui_cluster_copy_region_sub">拖曳矩形框可移動區域，拖曳右下角可調整大小。目前用於作用中的 Carlink 視訊流；僅儀表模式還需要車機提供螢幕擷取權限。</string>
+    <string name="new_ui_cluster_copy_region_placeholder">按住框內移動，拖曳任意角調整大小。每個儀表獨立儲存，選取畫面會縮放填滿儀表的固定地圖區域。</string>
     <string name="existing_wifi_title">現有 Wi-Fi / 同一區域網路</string>
     <string name="existing_wifi_description">使用已有路由器或隨身 Wi-Fi。讓 iPhone 和車機保持連線同一網路，並透過它上網。</string>
     <string name="existing_wifi_hint">現有 Wi-Fi · 兩部裝置保持連線同一 Wi-Fi，藍牙保持開啟，無需開啟車機熱點。</string>
@@ -949,4 +957,29 @@
     <string name="new_ui_about_sec5_title">五、鳴謝</string>
     <string name="new_ui_about_sec5_body">感謝抖音@YiMeng谁的梦还没醒（1768868288）大佬提供車輛示寬燈介面。</string>
     <string name="new_ui_diag_log_record_sub">開啟後才會記錄日誌、採集診斷資料並產生報告。關閉後停止日誌記錄與背景診斷取樣。</string>
+    <string name="new_ui_carlink_pairing_code">Carlink 配對碼</string>
+    <string name="new_ui_carlink_step_sdk_ready">Carlink 已就緒</string>
+    <string name="new_ui_carlink_step_sdk_ready_sub">正在準備 Carlink 連線</string>
+    <string name="new_ui_carlink_step_waiting">等待手機</string>
+    <string name="new_ui_carlink_step_waiting_sub">請將手機放在附近並開啟 Carlink</string>
+    <string name="new_ui_carlink_step_pairing">正在配對手機</string>
+    <string name="new_ui_carlink_step_phone_connected">手機已連線</string>
+    <string name="new_ui_carlink_step_phone_connected_sub">正在準備投影顯示</string>
+    <string name="new_ui_carlink_step_projection_ready">投影已就緒</string>
+    <string name="new_ui_carlink_step_projection_ready_sub">正在啟動 Carlink 投影</string>
+    <string name="new_ui_carlink_step_projecting">Carlink 投影中</string>
+    <string name="new_ui_carlink_step_projecting_sub">投影已啟動</string>
+    <string name="new_ui_carlink_step_failed">Carlink 連線失敗</string>
+    <string name="new_ui_carlink_step_failed_sub">請重試 Carlink 連線</string>
+    <string name="new_ui_carlink_name">Carlink</string>
+    <string name="new_ui_carlink_pairing">Carlink 配對中</string>
+    <string name="new_ui_carlink_waiting_phone">等待 Carlink 手機…</string>
+    <string name="new_ui_carlink_ready">Carlink 已就緒</string>
+    <string name="new_ui_carlink_failure_detail">Carlink 連線失敗（%1$s）</string>
+    <string name="new_ui_carlink_connecting">正在連線 Carlink…</string>
+    <string name="new_ui_carlink_open">開啟 Carlink</string>
+    <string name="new_ui_carlink_retry">重試 Carlink 連線</string>
+    <string name="new_ui_carlink_connect">連線 Carlink</string>
+    <string name="new_ui_carlink_switch_phone">切換 Carlink 手機 · %1$s</string>
+    <string name="new_ui_carlink_pair_phone">配對並選擇 Carlink 手機</string>
 </resources>

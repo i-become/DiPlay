@@ -8,6 +8,8 @@ import com.shilapi.xcertplay.DiPlayPreferences
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.AirPlayPersistence
+import com.shilapi.xcertplay.carlink.CarlinkBridge
+import com.shilapi.xcertplay.carlink.CarlinkLinkState
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -34,6 +36,8 @@ data class NewUiConnectionSnapshot(
     val progressStepTitle: String,
     val progressStepSubtitle: String?,
     val failureBanner: String?,
+    val carlink: Boolean,
+    val progressStepCount: Int = CarPlayConnectionProgress.STEP_COUNT,
 ) {
     val isConnected: Boolean get() = phase == NewUiConnectionPhase.CONNECTED
 
@@ -55,12 +59,16 @@ data class NewUiConnectionSnapshot(
             progressStepTitle = "",
             progressStepSubtitle = null,
             failureBanner = null,
+            carlink = false,
+            progressStepCount = CarPlayConnectionProgress.STEP_COUNT,
         )
     }
 }
 
 internal object NewUiConnectionSnapshotReader {
     fun read(context: Context, setupError: String?): NewUiConnectionSnapshot {
+        val carlinkMode = DiPlayPreferences.phoneLinkMode(context) == DiPlayPreferences.PhoneLinkMode.CARLINK
+        if (carlinkMode) return readCarlink(context, setupError)
         val disconnected = ConnectionProgressUiState.disconnected()
         val sessionRunning = CarPlayBackgroundSession.hasSession() && !disconnected
         val carPlayActive = CarPlayBackgroundSession.active
@@ -141,6 +149,72 @@ internal object NewUiConnectionSnapshotReader {
             progressStepTitle = progressTitle,
             progressStepSubtitle = progressSubtitle,
             failureBanner = failureBanner,
+            carlink = false,
+        )
+    }
+
+    private fun readCarlink(context: Context, setupError: String?): NewUiConnectionSnapshot {
+        val carlink = CarlinkBridge.get(context).snapshot.value
+        val connected = carlink.state == CarlinkLinkState.CONNECTED
+        val pairing = carlink.state == CarlinkLinkState.PAIRING
+        val failed = setupError != null || carlink.state in setOf(CarlinkLinkState.ERROR, CarlinkLinkState.UNSUPPORTED)
+        val phase = when {
+            failed -> NewUiConnectionPhase.FAILED
+            connected -> NewUiConnectionPhase.CONNECTED
+            pairing -> NewUiConnectionPhase.CONNECTING
+            else -> NewUiConnectionPhase.READY
+        }
+        // A fresh SDK PIN is authoritative even if this phone was paired before.
+        val showPairingCode = !carlink.pin.isNullOrBlank()
+        val pairDetail = if (showPairingCode) {
+            carlink.pin
+        } else if (carlink.state == CarlinkLinkState.ADVERTISING) {
+            context.getString(R.string.new_ui_carlink_waiting_phone)
+        } else null
+        return NewUiConnectionSnapshot(
+            phase = phase,
+            statusTitle = when {
+                setupError != null -> context.getString(R.string.setup_needs_attention)
+                connected -> context.getString(R.string.new_ui_status_connected)
+                failed -> context.getString(R.string.new_ui_status_failed)
+                pairing -> context.getString(R.string.new_ui_carlink_pairing)
+                carlink.state == CarlinkLinkState.ADVERTISING -> context.getString(R.string.new_ui_carlink_waiting_phone)
+                else -> context.getString(R.string.new_ui_carlink_ready)
+            },
+            phoneName = DiPlayPreferences.phoneName(context).ifBlank { context.getString(R.string.connect_phone) },
+            linkSummary = pairDetail,
+            connectionMethodLabel = wirelessModeLabel(context, AirPlayPersistence.loadWirelessHotspotMode(context)),
+            locationReportingEnabled = AirPlayPersistence.loadLocationReportingEnabled(context),
+            canConnect = setupError == null,
+            sessionRunning = carlink.state != CarlinkLinkState.IDLE,
+            hasSelectedPhone = DiPlayPreferences.phoneAddress(context) != null,
+            progressLitCount = when {
+                carlink.projecting -> 6
+                connected -> 5
+                else -> carlink.progressStep
+            },
+            progressStepTitle = when {
+                failed -> context.getString(R.string.new_ui_carlink_step_failed)
+                carlink.projecting -> context.getString(R.string.new_ui_carlink_step_projecting)
+                carlink.state == CarlinkLinkState.PAIRING -> context.getString(R.string.new_ui_carlink_step_pairing)
+                carlink.state == CarlinkLinkState.ADVERTISING -> context.getString(R.string.new_ui_carlink_step_waiting)
+                carlink.progressStep >= 5 -> context.getString(R.string.new_ui_carlink_step_projection_ready)
+                carlink.progressStep == 4 -> context.getString(R.string.new_ui_carlink_step_phone_connected)
+                carlink.progressStep == 1 -> context.getString(R.string.new_ui_carlink_step_sdk_ready)
+                else -> context.getString(R.string.new_ui_carlink_step_waiting)
+            },
+            progressStepSubtitle = when {
+                failed -> context.getString(R.string.new_ui_carlink_step_failed_sub)
+                carlink.projecting -> context.getString(R.string.new_ui_carlink_step_projecting_sub)
+                carlink.state == CarlinkLinkState.PAIRING -> pairDetail
+                carlink.state == CarlinkLinkState.ADVERTISING -> context.getString(R.string.new_ui_carlink_step_waiting_sub)
+                carlink.progressStep >= 5 -> context.getString(R.string.new_ui_carlink_step_projection_ready_sub)
+                carlink.progressStep == 4 -> context.getString(R.string.new_ui_carlink_step_phone_connected_sub)
+                else -> context.getString(R.string.new_ui_carlink_step_sdk_ready_sub)
+            },
+            failureBanner = if (failed && setupError == null) context.getString(R.string.new_ui_carlink_failure_detail, carlink.error ?: "unknown") else setupError,
+            carlink = true,
+            progressStepCount = 6,
         )
     }
 

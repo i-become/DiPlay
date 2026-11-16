@@ -28,6 +28,41 @@ import org.robolectric.annotation.GraphicsMode
 class OriginalClusterLayoutTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 
+    @Test fun musicCardUsesTheSameTranslucentSurfaceAsVehicleCards() {
+        val renderer = OriginalClusterRenderer(context)
+        val layout = OriginalClusterLayout()
+        val frame = Bitmap.createBitmap(2048, 768, Bitmap.Config.ARGB_8888)
+        try {
+            renderer.draw(Canvas(frame), 2048, 768, layout, OemClusterVehicleState(), CarPlayGlance.Snapshot())
+            val colors = listOf(OriginalClusterComponent.TIRES, OriginalClusterComponent.DRIVING,
+                OriginalClusterComponent.MUSIC).map { component ->
+                val r = layout.bounds(component)
+                frame.getPixel((r.left + 24).toInt(), (r.bottom - 16).toInt())
+            }
+            assertEquals(colors[0], colors[1])
+            assertEquals(colors[0], colors[2])
+            assertTrue(Color.alpha(colors[2]) in 1..254)
+        } finally { frame.recycle(); renderer.releaseNavigationIcon() }
+    }
+
+    @Test fun carlinkSummaryAppearsWithoutCarplayArrivalFieldsAndClearsAtRouteEnd() {
+        val renderer = OriginalClusterRenderer(context)
+        val layout = OriginalClusterLayout()
+        val bounds = layout.bounds(OriginalClusterComponent.TIME)
+        fun draw(nav: CarPlayGlance.Snapshot): Bitmap =
+            Bitmap.createBitmap(2048, 768, Bitmap.Config.ARGB_8888).also {
+                renderer.draw(Canvas(it), 2048, 768, layout, OemClusterVehicleState(), nav)
+            }
+        val nav = CarPlayGlance.Snapshot(connected = true, navigating = true,
+            routeSummary = "18:20 到达   剩余 12.8 公里")
+        val active = draw(nav)
+        val ended = draw(nav.copy(navigating = false))
+        try {
+            assertTrue(Color.alpha(active.getPixel(bounds.centerX().toInt(), bounds.centerY().toInt())) > 0)
+            assertEquals(0, Color.alpha(ended.getPixel(bounds.centerX().toInt(), bounds.centerY().toInt())))
+        } finally { active.recycle(); ended.recycle(); renderer.releaseNavigationIcon() }
+    }
+
     @Test fun visibleOverlayAppliesSavedSettingsWithoutRebuildingTheVideo() {
         val controller = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup()
         val overlay = OriginalClusterOverlayView(controller.get())
@@ -56,6 +91,16 @@ class OriginalClusterLayoutTest {
         assertEquals(1f - OriginalClusterComponent.TIRES.width, damaged[OriginalClusterComponent.TIRES].x, .0001f)
         assertEquals(0f, damaged[OriginalClusterComponent.TIRES].y, 0f)
         assertEquals(OriginalClusterComponent.TIME.left, damaged[OriginalClusterComponent.TIME].x, 0f)
+    }
+
+    @Test fun originalMusicCardIsVisibleByDefaultAndCanBeMovedAndHidden() {
+        val bounds = OriginalClusterLayout().bounds(OriginalClusterComponent.MUSIC)
+        assertTrue(bounds.width() > 400f && bounds.height() > 150f)
+        val edited = OriginalClusterLayout().place(OriginalClusterComponent.MUSIC, .1f, .2f)
+            .show(OriginalClusterComponent.MUSIC, false)
+        assertFalse(edited[OriginalClusterComponent.MUSIC].visible)
+        assertEquals(.1f, edited[OriginalClusterComponent.MUSIC].x, .0001f)
+        assertEquals(edited, OriginalClusterLayout.decode(edited.encode()))
     }
 
     @Test fun longPressDragsOnlyTheDraftAtTheSameNormalizedPositionOnAnyDisplay() {

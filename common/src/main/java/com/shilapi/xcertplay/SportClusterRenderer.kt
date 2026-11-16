@@ -45,7 +45,8 @@ internal object SportClusterGeometry {
     const val CONTENT_SCALE = .96f
     const val CONTENT_TOP = 24f
     fun scale(width: Int, height: Int) = min(width.coerceAtLeast(0) / WIDTH, height.coerceAtLeast(0) / HEIGHT) * CONTENT_SCALE
-    fun offsetX(width: Int, height: Int) = (width - WIDTH * scale(width, height)) / 2
+    fun horizontalScale(width: Int, height: Int) = scale(width, height) / CONTENT_SCALE
+    fun offsetX(width: Int, height: Int) = (width - WIDTH * horizontalScale(width, height)) / 2
     fun offsetY(width: Int, height: Int): Float {
         val fit = min(width.coerceAtLeast(0) / WIDTH, height.coerceAtLeast(0) / HEIGHT)
         return (height - HEIGHT * fit) / 2 + CONTENT_TOP * fit
@@ -56,9 +57,10 @@ internal object SportClusterGeometry {
         val aspect = sourceAspect.takeIf { it.isFinite() && it > 0 } ?: MAP_ASPECT
         val w = min(MAP_WIDTH, MAP_HEIGHT * aspect)
         val h = w / aspect
-        val x = offsetX(width, height) + (MAP_LEFT + (MAP_WIDTH - w) / 2) * scale
+        val xScale = horizontalScale(width, height)
+        val x = offsetX(width, height) + (MAP_LEFT + (MAP_WIDTH - w) / 2) * xScale
         val y = offsetY(width, height) + (MAP_TOP + (MAP_HEIGHT - h) / 2) * scale
-        return RectF(x, y, x + w * scale, y + h * scale)
+        return RectF(x, y, x + w * xScale, y + h * scale)
     }
 
     fun streamConfig(width: Int, height: Int, scalePercent: Int, markerXPercent: Int, markerYPercent: Int): com.shilapi.xcertplay.airplay.AirPlayDisplayConfig {
@@ -77,6 +79,8 @@ internal object SportClusterGeometry {
  * No top-left speed/gear card is drawn: that rectangle belongs to the OEM overlay.
  */
 internal class SportClusterRenderer(private val context: Context) : ClusterInstrumentRenderer {
+    private val lyricScroll = ClusterLyricScroll()
+    override val lyricAnimating: Boolean get() = lyricScroll.animating
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val path = Path()
     private val images = mutableMapOf<Int, Bitmap>()
@@ -92,7 +96,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         if (scale <= 0) return
         canvas.save()
         canvas.translate(SportClusterGeometry.offsetX(width, height), SportClusterGeometry.offsetY(width, height))
-        canvas.scale(scale, scale)
+        canvas.scale(SportClusterGeometry.horizontalScale(width, height), scale)
         reset()
         canvas.drawBitmap(image(R.drawable.cluster_sport_face), 0f, 0f, paint)
         val car = state.vehicle.validated()
@@ -109,7 +113,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         if (scale <= 0) return
         canvas.save()
         canvas.translate(SportClusterGeometry.offsetX(width, height), SportClusterGeometry.offsetY(width, height))
-        canvas.scale(scale, scale)
+        canvas.scale(SportClusterGeometry.horizontalScale(width, height), scale)
         needles(canvas, speedKph, rpm)
         canvas.restore()
     }
@@ -183,6 +187,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
 
     private fun music(canvas: Canvas, state: ClusterDashboardState) {
         val song = state.music.metadata
+        val content = ClusterMusicText.from(song)
         val cover = state.music.artwork?.takeUnless { it.isRecycled }
         val bounds = RectF(976f, 239f, 1072f, 335f)
         reset(Color.rgb(7, 13, 18)); canvas.drawRoundRect(bounds, 8f, 8f, paint)
@@ -192,9 +197,13 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
             reset(); canvas.drawBitmap(cover, Rect((cover.width-side)/2, (cover.height-side)/2,
                 (cover.width+side)/2, (cover.height+side)/2), bounds, paint); canvas.restore()
         } else text(canvas, "♪", 1024f, 310f, 63f, 85f, muted, center = true)
-        text(canvas, song.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.cluster_dashboard_waiting_music),
-            1024f, 366f, 23f, 245f, white, center = true)
-        text(canvas, song.artist.orEmpty(), 1024f, 394f, 19f, 245f, muted, center = true)
+        text(canvas, listOfNotNull(content.title, content.artist).joinToString(" · ")
+            .ifBlank { context.getString(R.string.cluster_dashboard_waiting_music) },
+            1024f, 359f, 16f, 290f, muted, center = true)
+        reset(white); paint.textSize = 34f
+        lyricScroll.draw(canvas, content.lyric ?: song.album.orEmpty(),
+            listOf(content.title, content.artist, song.album), paint,
+            869.0f, 401f, 310f, centered = true, remainingMillis = content.lyricRemainingMillis)
         line(canvas, 920f, 414f, 1129f, 414f, Color.rgb(43, 43, 46), 4f)
         state.progress()?.let {
             val end = 920f + 209 * it
@@ -236,6 +245,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
     }
 
     internal fun navigationSummary(nav: com.shilapi.xcertplay.glance.CarPlayGlance.Snapshot): String {
+        if (nav.routeSummary.isNotBlank()) return nav.routeSummary
         // Keep route totals together, with remaining distance as the final value.
         val arrival = nav.arrivalEpochSeconds?.takeIf { it > 0 }?.let {
             context.getString(R.string.settings_original_cluster_arrival,
@@ -290,7 +300,7 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         canvas.restore()
     }
 
-    override fun release() { images.values.forEach { it.recycle() }; images.clear() }
+    override fun release() { guidanceCard.release(); images.values.forEach { it.recycle() }; images.clear() }
     private fun image(id: Int): Bitmap = images.getOrPut(id) {
         val source = BitmapFactory.decodeResource(context.resources, id, BitmapFactory.Options().apply { inScaled = false })
         if (id == R.drawable.cluster_sport_face) {
