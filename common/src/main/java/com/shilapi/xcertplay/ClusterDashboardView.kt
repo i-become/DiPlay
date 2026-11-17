@@ -105,7 +105,10 @@ internal class ClusterDashboardView(
     }
 
     init {
-        setBackgroundColor(Color.TRANSPARENT)
+        // The reference artwork is intentionally letterboxed on some cluster sizes.
+        // Keep those uncovered pixels on the instrument's dark base instead of exposing
+        // the head unit's white window background through the translucent activity.
+        setBackgroundColor(Color.BLACK)
         mapSurface.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
                 decoderSurface = Surface(texture)

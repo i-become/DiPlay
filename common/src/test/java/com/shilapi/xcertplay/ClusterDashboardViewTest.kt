@@ -2,7 +2,9 @@ package com.shilapi.xcertplay
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Color
 import android.graphics.RectF
+import android.graphics.drawable.ColorDrawable
 import android.os.Looper
 import android.view.Surface
 import android.view.View
@@ -61,6 +63,7 @@ class ClusterDashboardViewTest {
 
     @Test fun instrumentForegroundIsAboveBothVideoAndDisconnectPlaceholder() {
         val view = ClusterDashboardView(context)
+        assertEquals(Color.BLACK, (view.background as ColorDrawable).color)
         assertEquals(4, view.childCount)
         assertSame(view.mapViewport, view.getChildAt(0))
         assertSame(view.mapViewport, view.mapSurface.parent)
