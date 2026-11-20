@@ -5,7 +5,7 @@
   <string name="settings_original_cluster_driving">Driving information</string>
   <string name="settings_original_cluster_turn">Turn card and lanes</string>
   <string name="settings_original_cluster_time">Navigation time</string>`r`n
-  <string name="settings_original_cluster_preview_hint">Scaled preview · sample data. Long-press a component to drag it. Saving applies immediately to the original style.</string>
+  <string name="settings_original_cluster_preview_hint">Scaled preview · sample data. Drag a component to move it. Saving applies immediately to the original style.</string>
   <string name="settings_original_cluster_reset">Reset to defaults</string>
   <string name="settings_original_cluster_back">Back to instruments</string>
   <string name="settings_original_cluster_save">Save</string>

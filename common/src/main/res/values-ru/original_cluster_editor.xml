@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">Карта навигации</string>
+    <string name="settings_original_components">‹ Компоненты</string>
+    <string name="settings_original_image">Изображение</string>
+    <string name="settings_original_video">Видео (без звука, по кругу)</string>
+    <string name="settings_original_visible">Показать компонент</string>
+    <string name="settings_original_scale">Пропорциональный масштаб</string>
+    <string name="settings_original_rotation">Поворот</string>
+    <string name="settings_original_opacity">Непрозрачность компонента</string>
+    <string name="settings_original_background">Непрозрачность фона</string>
+    <string name="settings_original_x">По горизонтали</string>
+    <string name="settings_original_y">По вертикали</string>
+    <string name="settings_original_replace">Заменить файл</string>
+    <string name="settings_original_remove">Удалить компонент</string>
+    <string name="settings_original_edit">Стиль и положение</string>
+    <string name="settings_original_add_image">＋ Добавить изображение</string>
+    <string name="settings_original_add_video">＋ Добавить видео</string>
+    <string name="settings_original_select_hint">Нажмите компонент для настройки; перетащите для перемещения. Карта и медиа находятся под информационными карточками.</string>
+    <string name="settings_original_media_error">Не удалось прочитать файл. Выберите доступное локальное изображение или видео.</string>
+    <string name="settings_original_flip_horizontal">Отразить по горизонтали</string>
+    <string name="settings_original_flip_vertical">Отразить по вертикали</string>
+    <string name="settings_original_layer_position">Слой %1$d из %2$d</string>
+    <string name="settings_original_layer_bottom">На задний план</string>
+    <string name="settings_original_layer_down">Переместить назад</string>
+    <string name="settings_original_layer_up">Переместить вперёд</string>
+    <string name="settings_original_layer_top">На передний план</string>
+    <string name="settings_original_music_artist_size">Размер имени исполнителя</string>
+    <string name="settings_original_music_artist_color">Цвет имени исполнителя</string>
+    <string name="settings_original_music_lyric_size">Размер текста песни</string>
+    <string name="settings_original_music_lyric_color">Цвет текста песни</string>
+    <string name="settings_original_music_progress_length">Длина прогресса</string>
+    <string name="settings_original_music_progress_color">Цвет прогресса</string>
+    <string name="settings_original_music_cover_size">Размер обложки</string>
+    <string name="settings_original_music_custom_color">Свой цвет</string>
+    <string name="settings_original_music_title_size">Размер названия</string>
+    <string name="settings_original_music_title_color">Цвет названия</string>
+    <string name="settings_original_music_show_time">Показывать время воспроизведения</string>
+    <string name="settings_original_music_show_playback">Показывать кнопки воспроизведения</string>
+    <string name="settings_original_media_stretch_fullscreen">Растянуть на весь экран</string>
+</resources>

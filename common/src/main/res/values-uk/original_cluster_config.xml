@@ -5,7 +5,7 @@
   <string name="settings_original_cluster_driving">Дані поїздки</string>
   <string name="settings_original_cluster_turn">Повороти та смуги</string>
   <string name="settings_original_cluster_time">Час навігації</string>`r`n
-  <string name="settings_original_cluster_preview_hint">Масштабний перегляд · приклад даних. Утримуйте блок для переміщення. Збереження одразу застосовує зміни початкового стилю.</string>
+  <string name="settings_original_cluster_preview_hint">Масштабний перегляд · приклад даних. Перетягніть блок для переміщення. Збереження одразу застосовує зміни початкового стилю.</string>
   <string name="settings_original_cluster_reset">Скинути налаштування</string>
   <string name="settings_original_cluster_back">До стилів приладів</string>
   <string name="settings_original_cluster_save">Зберегти</string>

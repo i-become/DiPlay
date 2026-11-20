@@ -26,6 +26,15 @@ import org.junit.rules.TemporaryFolder
 class LocalMfiAuthenticationClientTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    private fun load(directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient =
+        LocalMfiAuthenticationClient.loadWithSigner(directory, { key, digest ->
+            Signature.getInstance("NONEwithECDSA").run {
+                initSign(key)
+                update(digest)
+                sign()
+            }
+        }, onSignature)
+
     private fun identity(): File = temporary.newFolder().also { directory ->
         // Fresh self-signed test material for each test. No stored accessory identity.
         val generator = KeyPairGenerator.getInstance("EC")
@@ -55,7 +64,7 @@ class LocalMfiAuthenticationClientTest {
     @Test fun freshDigestsVerifyWithoutDoubleHashingAndRejectReplay() {
         val directory = identity()
         var count = 0
-        val client = LocalMfiAuthenticationClient.load(directory) { count++ }
+        val client = load(directory) { count++ }
         val certificate = CertificateFactory.getInstance("X.509")
             .generateCertificates(client.readCertificate().inputStream()).single()
         repeat(8) { index ->
@@ -85,12 +94,12 @@ class LocalMfiAuthenticationClientTest {
         val generator = KeyPairGenerator.getInstance("EC")
         generator.initialize(ECGenParameterSpec("secp256r1"))
         File(directory, "identity.pk8").writeBytes(generator.generateKeyPair().private.encoded)
-        assertThrows(IllegalArgumentException::class.java) { LocalMfiAuthenticationClient.load(directory) }
+        assertThrows(IllegalArgumentException::class.java) { load(directory) }
     }
 
     @Test fun rejectsIncompleteIdentityAndWrongChallengeLength() {
-        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(temporary.newFolder()) }
-        val client = LocalMfiAuthenticationClient.load(identity())
+        assertThrows(Exception::class.java) { load(temporary.newFolder()) }
+        val client = load(identity())
         for (length in listOf(0, 20, 31, 33, 64)) {
             assertThrows(IllegalArgumentException::class.java) { client.signChallenge(ByteArray(length)) }
         }
@@ -99,9 +108,9 @@ class LocalMfiAuthenticationClientTest {
 
     @Test fun certificateIsReturnedAsIndependentCopyAndSurvivesReload() {
         val directory = identity()
-        val first = LocalMfiAuthenticationClient.load(directory)
+        val first = load(directory)
         val certificate = first.readCertificate()
-        val second = LocalMfiAuthenticationClient.load(directory)
+        val second = load(directory)
         assertArrayEquals(certificate, second.readCertificate())
         certificate.fill(0)
         assertFalse(first.readCertificate().all { it == 0.toByte() })
@@ -112,8 +121,8 @@ class LocalMfiAuthenticationClientTest {
         val directory = identity()
         var firstCount = 0
         var secondCount = 0
-        val first = LocalMfiAuthenticationClient.load(directory) { firstCount++ }
-        val second = LocalMfiAuthenticationClient.load(directory) { secondCount++ }
+        val first = load(directory) { firstCount++ }
+        val second = load(directory) { secondCount++ }
         val key = LocalMfiAuthenticationClient::class.java.getDeclaredField("privateKey").apply { isAccessible = true }
         assertSame("Reload must reuse the parsed, validated key", key.get(first), key.get(second))
         assertNotSame(first, second)
@@ -127,7 +136,7 @@ class LocalMfiAuthenticationClientTest {
 
     @Test fun changedKeyWithUnchangedFileMetadataCannotReuseTheValidatedIdentity() {
         val directory = identity()
-        LocalMfiAuthenticationClient.load(directory)
+        load(directory)
         val file = File(directory, "identity.pk8")
         val modified = file.lastModified()
         val originalSize = file.length()
@@ -137,16 +146,16 @@ class LocalMfiAuthenticationClientTest {
         file.writeBytes(generator.generateKeyPair().private.encoded)
         assertEquals(originalSize, file.length())
         assertTrue(file.setLastModified(modified))
-        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+        assertThrows(Exception::class.java) { load(directory) }
     }
 
     @Test fun missingOrChangedCertificateCannotUseThePreviouslyValidatedKey() {
         val directory = identity()
-        LocalMfiAuthenticationClient.load(directory)
+        load(directory)
         val certificate = File(directory, "certificate.p7b")
         certificate.writeBytes(ByteArray(certificate.length().toInt()))
-        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+        assertThrows(Exception::class.java) { load(directory) }
         assertTrue(certificate.delete())
-        assertThrows(Exception::class.java) { LocalMfiAuthenticationClient.load(directory) }
+        assertThrows(Exception::class.java) { load(directory) }
     }
 }

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">Mapa de navegación</string>
+    <string name="settings_original_components">‹ Componentes</string>
+    <string name="settings_original_image">Imagen</string>
+    <string name="settings_original_video">Vídeo (bucle sin sonido)</string>
+    <string name="settings_original_visible">Mostrar componente</string>
+    <string name="settings_original_scale">Escala proporcional</string>
+    <string name="settings_original_rotation">Rotación</string>
+    <string name="settings_original_opacity">Opacidad del componente</string>
+    <string name="settings_original_background">Opacidad del fondo</string>
+    <string name="settings_original_x">Posición horizontal</string>
+    <string name="settings_original_y">Posición vertical</string>
+    <string name="settings_original_replace">Cambiar archivo</string>
+    <string name="settings_original_remove">Eliminar componente</string>
+    <string name="settings_original_edit">Editar estilo y posición</string>
+    <string name="settings_original_add_image">＋ Añadir imagen</string>
+    <string name="settings_original_add_video">＋ Añadir vídeo</string>
+    <string name="settings_original_select_hint">Toca un componente para editarlo; arrastra para moverlo. El mapa y los medios quedan detrás de las tarjetas.</string>
+    <string name="settings_original_media_error">No se puede leer el archivo. Elige una imagen o un vídeo local accesible.</string>
+    <string name="settings_original_flip_horizontal">Voltear horizontalmente</string>
+    <string name="settings_original_flip_vertical">Voltear verticalmente</string>
+    <string name="settings_original_layer_position">Capa %1$d de %2$d</string>
+    <string name="settings_original_layer_bottom">Enviar al fondo</string>
+    <string name="settings_original_layer_down">Mover hacia atrás</string>
+    <string name="settings_original_layer_up">Mover hacia delante</string>
+    <string name="settings_original_layer_top">Traer al frente</string>
+    <string name="settings_original_music_artist_size">Tamaño del artista</string>
+    <string name="settings_original_music_artist_color">Color del artista</string>
+    <string name="settings_original_music_lyric_size">Tamaño de la letra</string>
+    <string name="settings_original_music_lyric_color">Color de la letra</string>
+    <string name="settings_original_music_progress_length">Longitud del progreso</string>
+    <string name="settings_original_music_progress_color">Color del progreso</string>
+    <string name="settings_original_music_cover_size">Tamaño de la portada</string>
+    <string name="settings_original_music_custom_color">Personalizado</string>
+    <string name="settings_original_music_title_size">Tamaño del título</string>
+    <string name="settings_original_music_title_color">Color del título</string>
+    <string name="settings_original_music_show_time">Mostrar tiempo de reproducción</string>
+    <string name="settings_original_music_show_playback">Mostrar controles de reproducción</string>
+    <string name="settings_original_media_stretch_fullscreen">Estirar a pantalla completa</string>
+</resources>

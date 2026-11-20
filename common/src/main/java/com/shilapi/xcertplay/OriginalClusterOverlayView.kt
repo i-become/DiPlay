@@ -4,18 +4,22 @@ import android.content.Context
 import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import com.shilapi.xcertplay.glance.CarPlayGlance
 import com.shilapi.xcertplay.glance.CarPlayLane
-import com.shilapi.xcertplay.CarPlayMediaKeys
+import com.shilapi.xcertplay.media.CarPlayNowPlaying
 
 /** A transparent, event-driven overlay. Preview instances never bind the vehicle service. */
 internal class OriginalClusterOverlayView(context: Context, private val preview: Boolean = false) : View(context) {
     var layout = OriginalClusterSettings.load(context)
-        set(value) { if (field != value) { field = value; invalidate() } }
+        set(value) { if (field != value) { field = value; invalidate(); onDataInvalidated?.invoke() } }
+    var onSelectionChanged: ((String) -> Unit)? = null
+    var selectedId: String? = null
+        set(value) { if (field != value) { field = value; invalidate(); onDataInvalidated?.invoke() } }
+    var drawPreviewBackground = true
     var onLayoutChanged: ((OriginalClusterLayout) -> Unit)? = null
+    var onDataInvalidated: (() -> Unit)? = null
     private val renderer = OriginalClusterRenderer(context)
     private val main = Handler(Looper.getMainLooper())
     private val subscriptions = mutableListOf<() -> Unit>()
@@ -29,24 +33,14 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
         vehicle = HongqiClusterVehicleData.snapshot()
         nav = CarPlayGlance.snapshot()
         invalidate()
+        onDataInvalidated?.invoke()
     }
-    private val musicRefresh = Runnable { invalidate() }
+    private val musicRefresh = Runnable { invalidate(); onDataInvalidated?.invoke() }
     private val background by lazy { com.shilapi.xcertplay.newui.display.ClusterStylePreview.create(context, ClusterStyle.ORIGINAL) }
-    private var dragging: OriginalClusterComponent? = null
-    private var candidate: OriginalClusterComponent? = null
+    private var dragging: String? = null
+    private var candidate: String? = null
     private var offsetX = 0f
     private var offsetY = 0f
-    private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent): Boolean = candidate != null
-        override fun onLongPress(e: MotionEvent) {
-            dragging = candidate
-            if (dragging != null) {
-                parent?.requestDisallowInterceptTouchEvent(true)
-                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                invalidate()
-            }
-        }
-    })
 
     override fun onAttachedToWindow() { super.onAttachedToWindow(); updateObservation() }
     override fun onDetachedFromWindow() { stopObservation(); renderer.releaseNavigationIcon(); super.onDetachedFromWindow() }
@@ -102,25 +96,44 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (!drawingVisible) return
-        if (preview) {
-            canvas.drawBitmap(background, null, android.graphics.Rect(0, 0, width, height), null)
-            renderer.draw(canvas, width, height, layout, previewVehicle, previewNav, editing = dragging)
-        } else renderer.draw(canvas, width, height, layout, vehicle, nav)
-        if (observing && layout[OriginalClusterComponent.MUSIC].visible && renderer.lyricAnimating) postInvalidateDelayed(33L)
     }
+
+    fun drawComponent(canvas: Canvas, width: Int, height: Int, component: OriginalClusterComponent) {
+        if (!drawingVisible) return
+        val editing = component.takeIf { preview && selectedId == it.key }
+        renderer.draw(canvas, width, height, layout,
+            if (preview) previewVehicle else vehicle, if (preview) previewNav else nav,
+            editing = editing, only = component,
+            musicState = if (preview) previewMusic else if (component == OriginalClusterComponent.MUSIC)
+                CarPlayMediaKeys.dashboardMusic() else emptyMusic)
+    }
+    fun shouldAnimate(component: OriginalClusterComponent) = observing && component == OriginalClusterComponent.MUSIC &&
+        layout[component].visible && renderer.lyricAnimating
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!preview || width == 0 || height == 0) return false
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             val x = event.x / width * OriginalClusterLayout.WIDTH
             val y = event.y / height * OriginalClusterLayout.HEIGHT
-            candidate = OriginalClusterComponent.entries.lastOrNull { layout[it].visible && layout.bounds(it).contains(x, y) }
-            candidate?.let { offsetX = event.x / width - layout[it].x; offsetY = event.y / height - layout[it].y }
+            candidate = OriginalClusterComponent.entries.filter { it != OriginalClusterComponent.MAP }
+                .lastOrNull { originalHit(layout.bounds(it), layout[it], x, y) }?.key
+                ?: layout.media.lastOrNull { originalHit(layout.mediaBounds(it), it.placement, x, y) }?.id
+                ?: OriginalClusterComponent.MAP.takeIf { originalHit(layout.bounds(it), layout[it], x, y) }?.key
+            candidate?.let { id ->
+                val p = placement(id) ?: return@let
+                offsetX = event.x / width - p.x; offsetY = event.y / height - p.y
+                selectedId = id; onSelectionChanged?.invoke(id)
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
         }
-        gestures.onTouchEvent(event)
         when (event.actionMasked) {
-            MotionEvent.ACTION_MOVE -> dragging?.let {
-                layout = layout.place(it, event.x / width - offsetX, event.y / height - offsetY)
+            MotionEvent.ACTION_MOVE -> (dragging ?: candidate)?.let {
+                dragging = it
+                placement(it)?.let { p ->
+                    val next = p.copy(x = event.x / width - offsetX, y = event.y / height - offsetY)
+                    val component = OriginalClusterComponent.entries.find { c -> c.key == it }
+                    layout = if (component != null) layout.update(component, next) else layout.updateMedia(it, next)
+                }
                 onLayoutChanged?.invoke(layout)
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -132,9 +145,18 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
         return candidate != null || event.actionMasked == MotionEvent.ACTION_UP
     }
 
+    private fun placement(id: String): OriginalClusterPlacement? =
+        OriginalClusterComponent.entries.find { it.key == id }?.let { layout[it] }
+            ?: layout.media.find { it.id == id }?.placement
+
     override fun performClick(): Boolean { super.performClick(); return true }
 
     companion object {
+        private val emptyMusic = ClusterDashboardMusic()
+        private val previewMusic = ClusterDashboardMusic(CarPlayNowPlaying(
+            title = "City Lights", artist = "The Midnight", lyrics = "City lights glow",
+            elapsedMillis = 84000L, durationMillis = 214000L,
+        ))
         val previewVehicle = OemClusterVehicleState(tirePressureBar = listOf(2.7f, 2.7f, 2.7f, 2.7f),
             averageFuelConsumption = 8.6f, totalMileageKm = 12680f, remainingMileageKm = 620)
         val previewNav = CarPlayGlance.Snapshot(connected = true, navigating = true, maneuverType = 0,

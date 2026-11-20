@@ -20,6 +20,7 @@ class LocalMfiAuthenticationClient private constructor(
     private val privateKey: PrivateKey,
     private val certificate: ByteArray,
     private val onSignature: (Int) -> Unit,
+    private val signDigest: (PrivateKey, ByteArray) -> ByteArray = { _, _ -> error("Use the protected runtime identity loader") },
 ) : MfiAuthenticator {
     override fun protocolMajor(): Int = 3
 
@@ -33,10 +34,8 @@ class LocalMfiAuthenticationClient private constructor(
     override fun signChallenge(challenge: ByteArray): ByteArray {
         require(challenge.size == 32) { "Local MFi v3 expects a 32-byte digest" }
         // The iAP2/AirPlay caller supplies a digest already. Do not hash it a second time.
-        val signer = Signature.getInstance("NONEwithECDSA")
-        signer.initSign(privateKey)
-        signer.update(challenge)
-        val result = derToRaw(signer.sign())
+        val der = signDigest(privateKey, challenge)
+        val result = derToRaw(der)
         onSignature(challenge.size)
         return result
     }
@@ -73,6 +72,22 @@ class LocalMfiAuthenticationClient private constructor(
                 encodedKey.fill(0)
             }
             return LocalMfiAuthenticationClient(material.privateKey, material.certificate, onSignature)
+        }
+
+        /** Runtime connection path; source-only identity validation stays usable in host tests. */
+        fun loadProtected(context: android.content.Context, directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
+            val identity = load(directory, onSignature)
+            val app = context.applicationContext
+            return LocalMfiAuthenticationClient(identity.privateKey, identity.certificate, onSignature) { key, digest ->
+                com.shilapi.xcertplay.security.NativeIntegrity.sign(app, key, digest)
+            }
+        }
+
+        // JVM tests supply synthetic signing material. R8 removes this unused entry in releases.
+        internal fun loadWithSigner(directory: File, signer: (PrivateKey, ByteArray) -> ByteArray,
+                                    onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
+            val identity = load(directory, onSignature)
+            return LocalMfiAuthenticationClient(identity.privateKey, identity.certificate, onSignature, signer)
         }
 
         private fun validateIdentity(

@@ -126,7 +126,7 @@ class CarlinkBridge private constructor(private val context: Context) : ICarConn
                 .setSupportCamera(false).setSupportHevc(false).setSupportMic(true).setUseCustomAudioRecord(false)
                 .setSupportStereoRecord(false).setSupportLowLatencyDecodingMode(false).setSupportPOINav(false)
                 .setCcdFilePath("ccd.data").setSupportedWorkModes(UCarCommon.WorkMode.Builder().setSupportNormalCast(true).build()).build()
-            val submitted = adapter.init(context, config, object : ICarInitCallback {
+            val submitted = com.shilapi.xcertplay.security.NativeIntegrity.initializeCarlink(context, adapter, config, object : ICarInitCallback {
                 override fun onInitSuccess() {
                     main.post {
                         initPending = false

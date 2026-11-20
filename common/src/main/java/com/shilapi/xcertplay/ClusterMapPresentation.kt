@@ -38,7 +38,7 @@ internal class ClusterMapPresentation(
     private var videoView: View? = null
     private var streamActive = false
     private var dashboard: ClusterDashboardView? = null
-    private var originalOverlay: OriginalClusterOverlayView? = null
+    private var originalScene: OriginalClusterScene? = null
     private var copiedMap: ImageView? = null
     private val dashboardForeground = Hs5ClusterForeground()
     var outputSurface: Surface? = null
@@ -74,42 +74,38 @@ internal class ClusterMapPresentation(
         val root = FrameLayout(context).apply {
             setBackgroundColor(placeholder)
         }
-        val surfaceView = SurfaceView(context)
-        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(holder: SurfaceHolder) {
-                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface created") }
-                outputSurface = holder.surface
-                onSurface(holder.surface)
-            }
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface ${width}x$height") }
-            }
-            override fun surfaceDestroyed(holder: SurfaceHolder) {
-                DiagnosticLogging.logcat { Log.i(TAG, "cluster surface destroyed") }
-                onSurface(null)
-                outputSurface = null
-            }
-        })
-        root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
-        videoView = surfaceView
-        copiedMap = ImageView(context).apply {
-            scaleType = ImageView.ScaleType.FIT_XY
-            visibility = View.GONE
-        }
-        // Original uses the full display for its native map, with OEM cards overlaid.
-        // The copied stream must occupy that same space, not the custom dashboard's slot.
-        val displaySize = sizeOf(display)
-        val mapBounds = if (AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL)
-            android.graphics.RectF(0f, 0f, displaySize.x.toFloat(), displaySize.y.toFloat())
-        else AirPlayPersistence.loadClusterStyle(context).mapBounds(displaySize.x, displaySize.y)
-        root.addView(copiedMap, FrameLayout.LayoutParams(mapBounds.width().toInt(), mapBounds.height().toInt()).apply {
-            leftMargin = mapBounds.left.toInt(); topMargin = mapBounds.top.toInt()
-        })
-        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(context) &&
-            AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL) {
-            root.addView(OriginalClusterOverlayView(context).also { originalOverlay = it }, FrameLayout.LayoutParams(-1, -1))
-            originalOverlay?.setOverlayVisible(mapVisible)
+        if (AirPlayPersistence.loadClusterStyle(context) == ClusterStyle.ORIGINAL) {
+            originalScene = OriginalClusterScene(context) { surface ->
+                outputSurface = surface; onSurface(surface)
+            }.also { root.addView(it, FrameLayout.LayoutParams(-1, -1)); it.setSceneVisible(mapVisible) }
         } else {
+            val surfaceView = SurfaceView(context)
+            surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: SurfaceHolder) {
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface created") }
+                    outputSurface = holder.surface
+                    onSurface(holder.surface)
+                }
+                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface ${width}x$height") }
+                }
+                override fun surfaceDestroyed(holder: SurfaceHolder) {
+                    DiagnosticLogging.logcat { Log.i(TAG, "cluster surface destroyed") }
+                    onSurface(null)
+                    outputSurface = null
+                }
+            })
+            root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
+            videoView = surfaceView
+            copiedMap = ImageView(context).apply {
+                scaleType = ImageView.ScaleType.FIT_XY
+                visibility = View.GONE
+            }
+            val displaySize = sizeOf(display)
+            val mapBounds = AirPlayPersistence.loadClusterStyle(context).mapBounds(displaySize.x, displaySize.y)
+            root.addView(copiedMap, FrameLayout.LayoutParams(mapBounds.width().toInt(), mapBounds.height().toInt()).apply {
+                leftMargin = mapBounds.left.toInt(); topMargin = mapBounds.top.toInt()
+            })
             turnCardView = ClusterTurnCardView(context).apply { visibility = View.GONE }
             root.addView(turnCardView, FrameLayout.LayoutParams(-1, -1))
         }
@@ -153,6 +149,7 @@ internal class ClusterMapPresentation(
     }
 
     fun setCopiedMap(bitmap: Bitmap?) {
+        originalScene?.setCopiedMap(bitmap)
         dashboard?.setCopiedMap(bitmap)
         copiedMap?.apply {
             setImageBitmap(bitmap)
@@ -165,7 +162,7 @@ internal class ClusterMapPresentation(
     fun setMapVisible(visible: Boolean) {
         mapVisible = visible
         dashboard?.setDashboardVisible(visible)
-        originalOverlay?.setOverlayVisible(visible)
+        originalScene?.setSceneVisible(visible)
         dashboardForeground.setVisible(visible)
         window?.let { window ->
             val alpha = if (visible) 1f else 0f

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">Map navigation</string>
+    <string name="settings_original_components">‹ Components</string>
+    <string name="settings_original_image">Image</string>
+    <string name="settings_original_video">Video (muted loop)</string>
+    <string name="settings_original_visible">Show component</string>
+    <string name="settings_original_scale">Proportional scale</string>
+    <string name="settings_original_rotation">Rotation</string>
+    <string name="settings_original_opacity">Component opacity</string>
+    <string name="settings_original_background">Card background opacity</string>
+    <string name="settings_original_x">Horizontal position</string>
+    <string name="settings_original_y">Vertical position</string>
+    <string name="settings_original_replace">Replace file</string>
+    <string name="settings_original_remove">Remove component</string>
+    <string name="settings_original_edit">Edit style and position</string>
+    <string name="settings_original_add_image">＋ Add image</string>
+    <string name="settings_original_add_video">＋ Add video</string>
+    <string name="settings_original_select_hint">Tap a component in the preview to edit; drag to move. Map and media sit below information cards.</string>
+    <string name="settings_original_media_error">Unable to read this file. Choose an accessible local image or video.</string>
+    <string name="settings_original_flip_horizontal">Flip horizontally</string>
+    <string name="settings_original_flip_vertical">Flip vertically</string>
+    <string name="settings_original_layer_position">Layer %1$d of %2$d</string>
+    <string name="settings_original_layer_bottom">Send to back</string>
+    <string name="settings_original_layer_down">Move backward</string>
+    <string name="settings_original_layer_up">Move forward</string>
+    <string name="settings_original_layer_top">Bring to front</string>
+    <string name="settings_original_music_artist_size">Artist text size</string>
+    <string name="settings_original_music_artist_color">Artist color</string>
+    <string name="settings_original_music_lyric_size">Lyric text size</string>
+    <string name="settings_original_music_lyric_color">Lyric color</string>
+    <string name="settings_original_music_progress_length">Progress length</string>
+    <string name="settings_original_music_progress_color">Progress color</string>
+    <string name="settings_original_music_cover_size">Cover size</string>
+    <string name="settings_original_music_custom_color">Custom</string>
+    <string name="settings_original_music_title_size">Title size</string>
+    <string name="settings_original_music_title_color">Title color</string>
+    <string name="settings_original_music_show_time">Show playback time</string>
+    <string name="settings_original_music_show_playback">Show playback controls</string>
+    <string name="settings_original_media_stretch_fullscreen">Stretch to full screen</string>
+</resources>

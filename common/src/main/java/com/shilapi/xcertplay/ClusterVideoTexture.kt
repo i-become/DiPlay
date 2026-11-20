@@ -10,7 +10,8 @@ internal class ClusterVideoTexture(context: Context, private val onPresented: ()
     private val onSurface: (Surface?) -> Unit) :
     TextureView(context), java.io.Closeable {
     private var output: Surface? = null
-    private val pictureBinding = CarPlayPicture.Binding(this)
+    private var pictureBinding: CarPlayPicture.Binding? = CarPlayPicture.Binding(this)
+    private var closed = false
     init {
         isOpaque = false
         surfaceTextureListener = object : SurfaceTextureListener {
@@ -33,8 +34,17 @@ internal class ClusterVideoTexture(context: Context, private val onPresented: ()
         output?.release()
         output = null
     }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!closed && pictureBinding == null) pictureBinding = CarPlayPicture.Binding(this)
+    }
+    override fun onDetachedFromWindow() {
+        pictureBinding?.close(); pictureBinding = null
+        super.onDetachedFromWindow()
+    }
     override fun close() {
-        pictureBinding.close()
+        closed = true
+        pictureBinding?.close(); pictureBinding = null
         surfaceTextureListener = null
         releaseOutput()
     }

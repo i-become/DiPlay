@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">返回 / 上層</string>
+    <string name="local_media_locations">儲存位置</string>
+    <string name="local_media_image">選擇圖片</string>
+    <string name="local_media_video">選擇影片</string>
+    <string name="local_media_empty">此處沒有可選檔案。請選擇其他資料夾，或在 App 權限中允許讀取照片和影片。</string>
+    <string name="local_media_unreadable">無法讀取此位置或檔案。請檢查儲存權限及剩餘空間，可嘗試 Pictures、Movies 或 USB 目錄。</string>
+    <string name="local_media_importing">正在匯入… 可點取消返回。</string>
+</resources>

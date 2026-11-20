@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">Назад / Угору</string>
+    <string name="local_media_locations">Сховища</string>
+    <string name="local_media_image">Вибрати зображення</string>
+    <string name="local_media_video">Вибрати відео</string>
+    <string name="local_media_empty">Немає відповідних файлів. Виберіть іншу папку або дозвольте доступ до фото й відео.</string>
+    <string name="local_media_unreadable">Не вдалося прочитати. Перевірте дозволи й вільне місце; спробуйте Pictures, Movies або USB.</string>
+    <string name="local_media_importing">Імпорт… Можна скасувати й повернутися.</string>
+</resources>

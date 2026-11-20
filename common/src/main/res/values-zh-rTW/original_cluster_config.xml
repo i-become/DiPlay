@@ -5,7 +5,7 @@
   <string name="settings_original_cluster_driving">行車資訊</string>
   <string name="settings_original_cluster_turn">轉向卡與車道箭頭</string>
   <string name="settings_original_cluster_time">導航時間</string>`r`n
-  <string name="settings_original_cluster_preview_hint">等比例預覽 · 範例資料。長按元件可拖曳位置，儲存後立即套用於原始風格。</string>
+  <string name="settings_original_cluster_preview_hint">等比例預覽 · 範例資料。直接拖曳元件調整位置，儲存後立即套用於原始風格。</string>
   <string name="settings_original_cluster_reset">重設為預設配置</string>
   <string name="settings_original_cluster_back">返回儀表管理</string>
   <string name="settings_original_cluster_save">儲存</string>

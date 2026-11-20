@@ -14,6 +14,7 @@ class DiPlayBootInitProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         val app = context?.applicationContext ?: return true
         com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(AirPlayPersistence.loadSessionLogRecordingEnabled(app))
+        InstallationIntegrity.install(app as android.app.Application)
         CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.PROCESS_READY)
         if (!Hs5HeadUnit.isHeadUnit(app)) return true
         CarPlayStartupDiagnostics.initialize(app)

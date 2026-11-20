@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">Карта навігації</string>
+    <string name="settings_original_components">‹ Компоненти</string>
+    <string name="settings_original_image">Зображення</string>
+    <string name="settings_original_video">Відео (без звуку, циклічно)</string>
+    <string name="settings_original_visible">Показати компонент</string>
+    <string name="settings_original_scale">Пропорційний масштаб</string>
+    <string name="settings_original_rotation">Обертання</string>
+    <string name="settings_original_opacity">Непрозорість компонента</string>
+    <string name="settings_original_background">Непрозорість тла</string>
+    <string name="settings_original_x">По горизонталі</string>
+    <string name="settings_original_y">По вертикалі</string>
+    <string name="settings_original_replace">Замінити файл</string>
+    <string name="settings_original_remove">Видалити компонент</string>
+    <string name="settings_original_edit">Стиль і положення</string>
+    <string name="settings_original_add_image">＋ Додати зображення</string>
+    <string name="settings_original_add_video">＋ Додати відео</string>
+    <string name="settings_original_select_hint">Натисніть компонент для налаштування; перетягніть для переміщення. Карта й медіа розташовані під інформаційними картками.</string>
+    <string name="settings_original_media_error">Не вдалося прочитати файл. Виберіть доступне локальне зображення або відео.</string>
+    <string name="settings_original_flip_horizontal">Віддзеркалити горизонтально</string>
+    <string name="settings_original_flip_vertical">Віддзеркалити вертикально</string>
+    <string name="settings_original_layer_position">Шар %1$d із %2$d</string>
+    <string name="settings_original_layer_bottom">На задній план</string>
+    <string name="settings_original_layer_down">Перемістити назад</string>
+    <string name="settings_original_layer_up">Перемістити вперед</string>
+    <string name="settings_original_layer_top">На передній план</string>
+    <string name="settings_original_music_artist_size">Розмір імені виконавця</string>
+    <string name="settings_original_music_artist_color">Колір імені виконавця</string>
+    <string name="settings_original_music_lyric_size">Розмір тексту пісні</string>
+    <string name="settings_original_music_lyric_color">Колір тексту пісні</string>
+    <string name="settings_original_music_progress_length">Довжина прогресу</string>
+    <string name="settings_original_music_progress_color">Колір прогресу</string>
+    <string name="settings_original_music_cover_size">Розмір обкладинки</string>
+    <string name="settings_original_music_custom_color">Свій колір</string>
+    <string name="settings_original_music_title_size">Розмір назви</string>
+    <string name="settings_original_music_title_color">Колір назви</string>
+    <string name="settings_original_music_show_time">Показувати час відтворення</string>
+    <string name="settings_original_music_show_playback">Показувати кнопки відтворення</string>
+    <string name="settings_original_media_stretch_fullscreen">Розтягнути на весь екран</string>
+</resources>

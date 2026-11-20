@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">地圖導航</string>
+    <string name="settings_original_components">‹ 元件列表</string>
+    <string name="settings_original_image">圖片</string>
+    <string name="settings_original_video">影片（靜音循環）</string>
+    <string name="settings_original_visible">顯示元件</string>
+    <string name="settings_original_scale">等比縮放</string>
+    <string name="settings_original_rotation">旋轉</string>
+    <string name="settings_original_opacity">元件不透明度</string>
+    <string name="settings_original_background">卡片背景不透明度</string>
+    <string name="settings_original_x">水平位置</string>
+    <string name="settings_original_y">垂直位置</string>
+    <string name="settings_original_replace">更換檔案</string>
+    <string name="settings_original_remove">刪除元件</string>
+    <string name="settings_original_edit">調整樣式與位置</string>
+    <string name="settings_original_add_image">＋ 新增圖片</string>
+    <string name="settings_original_add_video">＋ 新增影片</string>
+    <string name="settings_original_select_hint">點選預覽中的元件調整樣式，直接拖曳調整位置。地圖和媒體位於資訊卡片下方。</string>
+    <string name="settings_original_media_error">無法讀取所選檔案，請選擇本機可存取的圖片或影片。</string>
+    <string name="settings_original_flip_horizontal">左右翻轉</string>
+    <string name="settings_original_flip_vertical">上下翻轉</string>
+    <string name="settings_original_layer_position">層級 %1$d / %2$d</string>
+    <string name="settings_original_layer_bottom">置於底層</string>
+    <string name="settings_original_layer_down">下移一層</string>
+    <string name="settings_original_layer_up">上移一層</string>
+    <string name="settings_original_layer_top">置於頂層</string>
+    <string name="settings_original_music_artist_size">作者字級</string>
+    <string name="settings_original_music_artist_color">作者顏色</string>
+    <string name="settings_original_music_lyric_size">歌詞字級</string>
+    <string name="settings_original_music_lyric_color">歌詞顏色</string>
+    <string name="settings_original_music_progress_length">進度列長度</string>
+    <string name="settings_original_music_progress_color">進度列顏色</string>
+    <string name="settings_original_music_cover_size">封面大小</string>
+    <string name="settings_original_music_custom_color">自訂</string>
+    <string name="settings_original_music_title_size">歌名字體大小</string>
+    <string name="settings_original_music_title_color">歌名顏色</string>
+    <string name="settings_original_music_show_time">顯示播放時間</string>
+    <string name="settings_original_music_show_playback">顯示播放按鈕</string>
+    <string name="settings_original_media_stretch_fullscreen">一鍵拉伸全螢幕</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">رجوع / أعلى</string>
+    <string name="local_media_locations">مواقع التخزين</string>
+    <string name="local_media_image">اختيار صورة</string>
+    <string name="local_media_video">اختيار فيديو</string>
+    <string name="local_media_empty">لا توجد ملفات مناسبة. اختر مجلدًا آخر أو اسمح بالوصول إلى الصور والفيديو.</string>
+    <string name="local_media_unreadable">تعذرت القراءة. تحقق من الأذونات والمساحة المتاحة؛ جرّب Pictures أو Movies أو مجلد USB.</string>
+    <string name="local_media_importing">جارٍ الاستيراد… يمكنك الإلغاء للعودة.</string>
+</resources>

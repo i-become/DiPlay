@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">Back / Up</string>
+    <string name="local_media_locations">Locations</string>
+    <string name="local_media_image">Choose an image</string>
+    <string name="local_media_video">Choose a video</string>
+    <string name="local_media_empty">No matching files here. Choose another folder or allow media access in app permissions.</string>
+    <string name="local_media_unreadable">Cannot read this location or file. Check storage permission and available space; try Pictures, Movies or a USB folder.</string>
+    <string name="local_media_importing">Importing… You can cancel to return.</string>
+</resources>

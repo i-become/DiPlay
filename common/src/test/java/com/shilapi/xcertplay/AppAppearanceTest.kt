@@ -37,8 +37,8 @@ class AppAppearanceTest {
     }
 
     @Test fun stableKeysRoundTripAndUnknownValuesDefaultToDark() {
-        assertEquals(AppAppearance.DARK, AppAppearance.fromKey(null))
-        assertEquals(AppAppearance.DARK, AppAppearance.fromKey("future-value"))
+        assertEquals(AppAppearance.AUTO, AppAppearance.fromKey(null))
+        assertEquals(AppAppearance.AUTO, AppAppearance.fromKey("future-value"))
         AppAppearance.entries.forEach { appearance ->
             assertEquals(appearance, AppAppearance.fromKey(appearance.key))
         }

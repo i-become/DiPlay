@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">Назад / Вверх</string>
+    <string name="local_media_locations">Хранилища</string>
+    <string name="local_media_image">Выбрать изображение</string>
+    <string name="local_media_video">Выбрать видео</string>
+    <string name="local_media_empty">Нет подходящих файлов. Выберите другую папку или разрешите доступ к фото и видео.</string>
+    <string name="local_media_unreadable">Не удалось прочитать. Проверьте разрешения и свободное место; попробуйте Pictures, Movies или USB.</string>
+    <string name="local_media_importing">Импорт… Можно отменить и вернуться.</string>
+</resources>

@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <!-- Read-only vehicle state on Hongqi HS5 Qisi firmware. -->
     <uses-permission android:name="ltd.qisi.adapterservice.permission.READ_SETTINGS" />
     <!-- Optional, user-authorized startup of the car's own hotspot. -->
@@ -58,6 +61,13 @@
         </intent>
     </queries>
     <application>
+        <activity android:name="com.shilapi.xcertplay.LocalMediaPickerActivity"
+            android:exported="false" android:theme="@style/Theme.Xcertplay" />
+        <provider android:name="com.shilapi.xcertplay.ImportedMediaProvider"
+            android:authorities="${applicationId}.imported-media" android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/imported_media_paths" />
+        </provider>
         <receiver
             android:name="com.shilapi.xcertplay.update.UpdatePackageReplacedReceiver"
             android:exported="false">

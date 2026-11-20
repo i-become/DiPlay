@@ -11,7 +11,7 @@ enum class AppAppearance(val key: String) {
     AUTO("auto");
 
     companion object {
-        fun fromKey(key: String?): AppAppearance = entries.firstOrNull { it.key == key } ?: DARK
+        fun fromKey(key: String?): AppAppearance = entries.firstOrNull { it.key == key } ?: AUTO
     }
 }
 

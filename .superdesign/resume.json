@@ -17,23 +17,26 @@
       ],
       "fingerprints": {
         ".superdesign/design-system.md": "11879723213C16881BB2B21E4EAF6639AE68720C433BB7CCFBE3BCB2BE54FE5E",
-        "common/src/main/java/com/shilapi/xcertplay/newui/display/NewUiOriginalClusterConfigScreen.kt": "F7DCC8A064016314D40B0328C27E747EF9CD666E6B5A5A1FC9BA61481277D323",
-        "common/src/main/java/com/shilapi/xcertplay/OriginalClusterLayout.kt": "3954C06043FE76D008E6FB93B6D50E9B6DD9A11AF48658E0759A816C403899BE",
-        "common/src/main/java/com/shilapi/xcertplay/OriginalClusterRenderer.kt": "8AF7D929177F2686057F18F9A7E39827A2AC0E31C98DD736821B88C5A0DD8C21",
-        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiLayout.kt": "510FCBA55221B8D200B5B0AFF9EFE89D828F720E998323491940B507A04E694D"
+        "common/src/main/java/com/shilapi/xcertplay/newui/display/NewUiOriginalClusterConfigScreen.kt": "B2ECF5C0C7021334AF1E23B137EB4CD4DD56DC9BAF610D7E369A5120A629CBD8",
+        "common/src/main/java/com/shilapi/xcertplay/OriginalClusterLayout.kt": "414AA2C9CE77BBB8E67065709E2CC883D0102F3D1AF39E78AEE03AFA308C4FB1",
+        "common/src/main/java/com/shilapi/xcertplay/OriginalClusterRenderer.kt": "191CB6594E02A8AAA22651FE9CD66431BD2F5022AFBE95068109122C86EFAD14",
+        "common/src/main/java/com/shilapi/xcertplay/newui/NewUiLayout.kt": "353402CC0B8014B896545FD3CC3B93075A7DCFC2F50BDFA22B7BD0BF7DF5C693"
       },
       "components": [],
       "drafts": {
         "3b34c879-eab2-4eed-a5f7-3ba8a37ed4c4": {
           "title": "CarPlay HS5 · 原始仪表配置",
-          "visualDirection": "Native implementation at font scale 1.4. Original cluster widgets calibrated against the supplied 2048x768 reference: 36% charcoal information panels, cropped horizontal tire car, reference typography and alignment, broad dark turn card with solid arrow and dashed tail, pill-shaped arrival/time bar. Lane data fits within the same card; the maneuver arrow moves up to keep its tail clear of the road text. No permanent edit outlines. Preview and live output share one renderer. Long-press drag, visibility, save and discard remain supported. Full, compact high-density and Arabic RTL screenshots verified.",
-          "currentVersion": 3,
+          "visualDirection": "Original left preview size retained; all configuration on the right. Direct drag without long-press. Card background opacity spans 0 to 100 percent independently of content; default glass appearance retained and older saved multipliers migrated. Full, compact and RTL large-font screenshots verified.",
+          "currentVersion": 6,
           "previewUrl": "https://p.superdesign.dev/draft/3b34c879-eab2-4eed-a5f7-3ba8a37ed4c4",
           "htmlSource": ".superdesign/tmp/original-cluster-config.html"
         }
       },
-      "viewport": { "width": 1280, "height": 656 },
-      "updatedAt": "2026-10-31T07:08:00.000Z"
+      "viewport": {
+        "width": 1280,
+        "height": 656
+      },
+      "updatedAt": "2026-11-18T04:06:53.019721+00:00"
     },
     "display-icon-size": {
       "targetKind": "existing-ui",
@@ -64,7 +67,10 @@
           "htmlSource": ".superdesign/tmp/display-icon-size.html"
         }
       },
-      "viewport": { "width": 1920, "height": 720 },
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
       "updatedAt": "2026-10-28T15:29:00Z"
     },
     "hs5-cluster-dashboard": {
@@ -336,4 +342,3 @@
     }
   }
 }
-

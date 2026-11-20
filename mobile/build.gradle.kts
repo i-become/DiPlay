@@ -6,6 +6,7 @@ import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 import java.io.File
 import java.security.MessageDigest
+import java.security.KeyStore
 
 plugins {
     alias(libs.plugins.android.application)
@@ -34,13 +35,14 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 1401
-        versionName = "1.4.1"
+        versionCode = 1402
+        versionName = "1.4.2"
+        testInstrumentationRunner = "com.shihab.diplay.test.IntegrityInstrumentation"
 
     }
 
 
-    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }
+    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.directories.add(it.path) }
 
     signingConfigs {
         create("release") {
@@ -67,6 +69,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+    if (providers.gradleProperty("integrityReleaseTest").orNull == "true") testBuildType = "release"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -150,10 +153,37 @@ listOf("debug", "release").forEach { buildType ->
             val storePassword = signing.storePassword!!
             val keyAlias = signing.keyAlias!!
             val keyPassword = signing.keyPassword!!
+            if (buildType == "release") {
+                // Fail packaging on accidental certificate changes instead of shipping a locked-out app.
+                val pinnedSource = rootProject.file("shared/src/main/jni/diplay_integrity.c").readText()
+                val pin = Regex("official\\[\\] = \"([0-9a-f]{64})\"").find(pinnedSource)?.groupValues?.get(1)
+                    ?: error("Native release certificate pin is missing")
+                val passwordChars = storePassword.toCharArray()
+                val certificate = try {
+                    KeyStore.getInstance(keystore, passwordChars).getCertificate(keyAlias)
+                } finally { passwordChars.fill('\u0000') }
+                check(certificate != null) { "Release signing certificate is missing" }
+                val actual = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+                    .joinToString("") { "%02x".format(it.toInt() and 255) }
+                check(actual == pin) { "Release signing certificate differs from the native pin. Review key rotation before packaging." }
+                val authorityHeader = rootProject.file("shared/src/main/jni/seal_authority.h").readText()
+                val authority = Regex("0x([0-9a-f]{2})").findAll(authorityHeader)
+                    .map { it.groupValues[1].toInt(16).toByte() }.toList().toByteArray()
+                check(authority.contentEquals(certificate.publicKey.encoded)) {
+                    "Content-seal public key differs from release signing key. Review authority rotation before packaging."
+                }
+            }
             val python = if (windows) "python" else "python3"
             val dexTool = rootProject.file("scripts/carlink_dex.py")
             fun runTool(vararg args: String) {
-                val process = ProcessBuilder(*args).redirectErrorStream(true).start()
+                val builder = ProcessBuilder(*args).redirectErrorStream(true)
+                builder.environment().apply {
+                    put("DIPLAY_SEAL_KEYSTORE", keystore.absolutePath)
+                    put("DIPLAY_SEAL_STORE_PASSWORD", storePassword)
+                    put("DIPLAY_SEAL_ALIAS", keyAlias)
+                    put("DIPLAY_SEAL_KEY_PASSWORD", keyPassword)
+                }
+                val process = builder.start()
                 process.inputStream.bufferedReader().useLines { lines -> lines.forEach(::println) }
                 check(process.waitFor() == 0) { "Tool failed: ${args.first()}" }
             }
@@ -183,11 +213,15 @@ listOf("debug", "release").forEach { buildType ->
                         zout.putNextEntry(ZipEntry(dexName)); preparedDex.inputStream().use { it.copyTo(zout) }; zout.closeEntry()
                     }
                 }
+                val java = File(System.getProperty("java.home"), "bin/java${if (windows) ".exe" else ""}").absolutePath
+                val sealTool = rootProject.file("scripts/ApkContentSeal.java").absolutePath
+                if (buildType == "release") runTool(java, sealTool, "seal", raw.absolutePath)
                 runTool(zipalign.absolutePath, "-f", "4", raw.absolutePath, aligned.absolutePath)
                 runTool(apksigner.absolutePath, "sign", "--ks", keystore.absolutePath,
-                        "--ks-pass", "pass:$storePassword", "--ks-key-alias", keyAlias,
-                        "--key-pass", "pass:$keyPassword", "--out", signed.absolutePath, aligned.absolutePath)
+                        "--ks-pass", "env:DIPLAY_SEAL_STORE_PASSWORD", "--ks-key-alias", keyAlias,
+                        "--key-pass", "env:DIPLAY_SEAL_KEY_PASSWORD", "--out", signed.absolutePath, aligned.absolutePath)
                 runTool(apksigner.absolutePath, "verify", "--verbose", signed.absolutePath)
+                if (buildType == "release") runTool(java, sealTool, "verify", signed.absolutePath)
                 check(apk.delete() && signed.renameTo(apk)) { "Could not replace APK with signed Carlink build: $apk" }
                 raw.delete(); aligned.delete(); signed.delete()
                 runTool(python, dexTool.absolutePath, apk.absolutePath, carlinkDex.absolutePath, "--verify", "--audit-members",

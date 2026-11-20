@@ -46,9 +46,9 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         val turnHeight = if (maneuver != null) max(arrowSize, distanceHeight + roadHeight) + 12f else 0f
         val laneTop = turnHeight + if (showLanes && maneuver != null) 2f else 0f
         val height = turnHeight + if (showLanes) 56f + if (maneuver != null) 2f else 0f else 0f
-        val centerX = if (sport) 2000f - width / 2 else 997.5f
+        val left = if (sport) 1366f else 997.5f - width / 2
         val top = if (sport) 72f else 112f
-        val bounds = RectF(centerX - width / 2, top, centerX + width / 2, top + height)
+        val bounds = RectF(left, top, left + width, top + height)
         paint.style = Paint.Style.FILL
         paint.color = if (sport) Color.argb(249, 3, 15, 22) else Color.argb(249, 0, 21, 45)
         canvas.drawRoundRect(bounds, 12f, 12f, paint)

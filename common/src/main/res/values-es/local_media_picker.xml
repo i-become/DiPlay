@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">Volver / Subir</string>
+    <string name="local_media_locations">Ubicaciones</string>
+    <string name="local_media_image">Elegir imagen</string>
+    <string name="local_media_video">Elegir vídeo</string>
+    <string name="local_media_empty">No hay archivos compatibles. Elige otra carpeta o permite el acceso a fotos y vídeos.</string>
+    <string name="local_media_unreadable">No se puede leer. Comprueba permisos y espacio libre; prueba Pictures, Movies o una carpeta USB.</string>
+    <string name="local_media_importing">Importando… Puedes cancelar para volver.</string>
+</resources>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_original_map">خريطة الملاحة</string>
+    <string name="settings_original_components">‹ المكونات</string>
+    <string name="settings_original_image">صورة</string>
+    <string name="settings_original_video">فيديو (تكرار بلا صوت)</string>
+    <string name="settings_original_visible">إظهار المكون</string>
+    <string name="settings_original_scale">تحجيم متناسب</string>
+    <string name="settings_original_rotation">التدوير</string>
+    <string name="settings_original_opacity">عتامة المكون</string>
+    <string name="settings_original_background">عتامة خلفية البطاقة</string>
+    <string name="settings_original_x">الموضع الأفقي</string>
+    <string name="settings_original_y">الموضع العمودي</string>
+    <string name="settings_original_replace">استبدال الملف</string>
+    <string name="settings_original_remove">حذف المكون</string>
+    <string name="settings_original_edit">تعديل النمط والموضع</string>
+    <string name="settings_original_add_image">＋ إضافة صورة</string>
+    <string name="settings_original_add_video">＋ إضافة فيديو</string>
+    <string name="settings_original_select_hint">اضغط على مكون في المعاينة لتعديله، واسحبه مباشرة لنقله. تظهر الخريطة والوسائط خلف بطاقات المعلومات.</string>
+    <string name="settings_original_media_error">تعذر قراءة الملف. اختر صورة أو فيديو محلياً يمكن الوصول إليه.</string>
+    <string name="settings_original_flip_horizontal">قلب أفقي</string>
+    <string name="settings_original_flip_vertical">قلب عمودي</string>
+    <string name="settings_original_layer_position">الطبقة %1$d من %2$d</string>
+    <string name="settings_original_layer_bottom">إرسال إلى الخلف</string>
+    <string name="settings_original_layer_down">تحريك إلى الخلف</string>
+    <string name="settings_original_layer_up">تحريك إلى الأمام</string>
+    <string name="settings_original_layer_top">إحضار إلى المقدمة</string>
+    <string name="settings_original_music_artist_size">حجم خط الفنان</string>
+    <string name="settings_original_music_artist_color">لون الفنان</string>
+    <string name="settings_original_music_lyric_size">حجم خط الكلمات</string>
+    <string name="settings_original_music_lyric_color">لون الكلمات</string>
+    <string name="settings_original_music_progress_length">طول شريط التقدم</string>
+    <string name="settings_original_music_progress_color">لون شريط التقدم</string>
+    <string name="settings_original_music_cover_size">حجم الغلاف</string>
+    <string name="settings_original_music_custom_color">مخصص</string>
+    <string name="settings_original_music_title_size">حجم عنوان الأغنية</string>
+    <string name="settings_original_music_title_color">لون عنوان الأغنية</string>
+    <string name="settings_original_music_show_time">إظهار وقت التشغيل</string>
+    <string name="settings_original_music_show_playback">إظهار أزرار التشغيل</string>
+    <string name="settings_original_media_stretch_fullscreen">تمديد إلى ملء الشاشة</string>
+</resources>

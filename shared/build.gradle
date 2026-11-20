@@ -21,6 +21,11 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    buildTypes {
+        debug { externalNativeBuild { ndkBuild { arguments 'DIPLAY_ENFORCE=0' } } }
+        release { externalNativeBuild { ndkBuild { arguments 'DIPLAY_ENFORCE=1' } } }
+    }
+    defaultConfig { consumerProguardFiles 'consumer-rules.pro' }
     ndkVersion = '28.2.13676358'
     externalNativeBuild {
         ndkBuild {

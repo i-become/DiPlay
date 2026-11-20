@@ -53,9 +53,7 @@ import com.shilapi.xcertplay.DiagnosticRemovableVolumes
 import com.shilapi.xcertplay.RemovableStorageVolume
 import com.shilapi.xcertplay.ImageCropActivity
 import com.shilapi.xcertplay.InterfaceSize
-import com.shilapi.xcertplay.documentPickerIsSystem
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.launchCarButtonImagePicker
 import com.shilapi.xcertplay.update.BackgroundUpdateScheduler
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.newui.connection.NewUiConnectionActions
@@ -187,8 +185,7 @@ class NewUiActivity : ComponentActivity() {
             refreshAll()
         }
     }
-    private val iconPicker = registerForActivityResult(ActivityResultContracts.GetContent(), ::cropIcon)
-    private val iconDocumentPicker = registerForActivityResult(ActivityResultContracts.OpenDocument(), ::cropIcon)
+    private val iconPicker = registerForActivityResult(com.shilapi.xcertplay.LocalMediaPicker(), ::cropIcon)
     private val iconCrop = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
         vehicleIconRevision++
@@ -1192,13 +1189,7 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun chooseVehicleIcon() {
-        launchCarButtonImagePicker(
-            openDocument = { iconDocumentPicker.launch(arrayOf("image/*")) },
-            getContent = { iconPicker.launch("image/*") },
-            documentPickerIsSystem = documentPickerIsSystem(),
-        ).onFailure {
-            Toast.makeText(this, R.string.this_head_unit_has_no_image_picker, Toast.LENGTH_LONG).show()
-        }
+        iconPicker.launch("image/*")
     }
 
     private fun openConnectionMethodPage() {

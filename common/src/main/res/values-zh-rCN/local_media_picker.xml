@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="local_media_up">返回 / 上级</string>
+    <string name="local_media_locations">存储位置</string>
+    <string name="local_media_image">选择图片</string>
+    <string name="local_media_video">选择视频</string>
+    <string name="local_media_empty">此处没有可选文件。请选择其他文件夹，或在应用权限中允许读取照片和视频。</string>
+    <string name="local_media_unreadable">无法读取此位置或文件。请检查存储权限及剩余空间，可尝试 Pictures、Movies 或 U 盘目录。</string>
+    <string name="local_media_importing">正在导入… 可点取消返回。</string>
+</resources>

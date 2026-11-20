@@ -129,9 +129,9 @@ class SportClusterRendererTest {
             val image=render(ClusterDashboardState(guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,
                 maneuverType=2,distanceMeters=1200,road="望京西路")))
             try {
-                assertTrue(Color.alpha(pixel(image, 1900,130))>=248)
-                assertSameRegion(empty,image,1430,180,1800,315)
-                assertSameRegion(empty,image,1430,275,1800,315)
+                assertTrue("guidance card stays at the marked upper map corner", Color.alpha(pixel(image, 1400,130))>=248)
+                assertSameRegion(empty,image,1700,72,2000,230)
+                assertSameRegion(empty,image,1100,180,1340,315)
             }finally{image.recycle()}
         }finally{empty.recycle()}
     }

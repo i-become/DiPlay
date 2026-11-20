@@ -50,13 +50,13 @@ class ClusterLaneGuidanceRendererTest {
             val noRoute = draw(sport, guidance.copy(navigating = false))
             val disconnected = draw(sport, guidance.copy(connected = false))
             try {
-                val x = if (sport) 1840 else 997
+                val x = if (sport) 1620 else 997
                 val top = if (sport) 72 else 112
                 val y = top + 120
                 assertTrue(Color.alpha(pixel(with, sport, x, y)) >= 245)
                 assertEquals(0, Color.alpha(pixel(without, sport, x, y)))
                 assertTrue(Color.alpha(pixel(lanesOnly, sport, x, top + 20)) >= 245)
-                assertEquals(0, Color.alpha(pixel(lanesOnly, sport, x, top + 64)))
+                assertEquals(pixel(noCard, sport, x, top + 64), pixel(lanesOnly, sport, x, top + 64))
                 assertEquals(pixel(noRoute, sport, x, top + 20), pixel(noCard, sport, x, top + 20))
                 assertEquals(0, Color.alpha(pixel(noRoute, sport, x, y)))
                 assertEquals(0, Color.alpha(pixel(disconnected, sport, x, y)))
@@ -75,12 +75,13 @@ class ClusterLaneGuidanceRendererTest {
         for (sport in listOf(false, true)) {
             val short = draw(sport, guidance.copy(road = "向右", lanes = emptyList()))
             val long = draw(sport, guidance.copy(road = "进入红旗大道辅路向东行驶", lanes = emptyList()))
+            val bare = draw(sport, CarPlayGlance.Snapshot())
             try {
-                val x = if (sport) 1740 else 1160
+                val x = if (sport) 1600 else 1160
                 val y = if (sport) 130 else 125
-                assertEquals(0, Color.alpha(pixel(short, sport, x, y)))
-                assertTrue(Color.alpha(pixel(long, sport, x, y)) >= 245)
-            } finally { short.recycle(); long.recycle() }
+                assertEquals(pixel(bare, sport, x, y), pixel(short, sport, x, y))
+                assertNotEquals(pixel(bare, sport, x, y), pixel(long, sport, x, y))
+            } finally { short.recycle(); long.recycle(); bare.recycle() }
         }
         for (nav in listOf(guidance, guidance.copy(remainingSeconds = null), guidance.copy(remainingMeters = null))) {
             val image = draw(true, nav.copy(maneuverType = null, lanes = emptyList()))

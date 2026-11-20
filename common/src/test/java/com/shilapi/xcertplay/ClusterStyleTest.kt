@@ -9,7 +9,6 @@ import android.widget.FrameLayout
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import android.hardware.display.DisplayManager
-import android.view.SurfaceView
 import android.view.ViewGroup
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import org.junit.Assert.*
@@ -40,7 +39,7 @@ class ClusterStyleTest {
         assertEquals(ClusterStyle.SPORT, AirPlayPersistence.loadClusterStyle(context))
     }
 
-    @Test fun originalActivityUsesFullSurfaceAndKeepsBackToClose() {
+    @Test fun originalActivityUsesCustomizableSceneAndKeepsBackToClose() {
         AirPlayPersistence.saveClusterStyle(context, ClusterStyle.ORIGINAL)
         var closed = false
         val owner = object : Hs5ClusterActivityOutput.Host {
@@ -56,8 +55,10 @@ class ClusterStyleTest {
             try {
                 val window = controller.get()
                 val content = window.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as FrameLayout
+                assertTrue(content is OriginalClusterScene)
                 assertEquals(2, content.childCount)
-                assertTrue(content.getChildAt(0) is SurfaceView)
+                val map = content.getChildAt(0) as FrameLayout
+                assertTrue(map.getChildAt(0) is ClusterVideoTexture)
                 assertTrue(content.getChildAt(1) is OriginalClusterOverlayView)
                 assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, content.getChildAt(1).layoutParams.width)
                 assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, content.getChildAt(1).layoutParams.height)
@@ -88,18 +89,23 @@ class ClusterStyleTest {
                     val dashboard: ClusterDashboardView? = ReflectionHelpers.getField(presentation, "dashboard")
                     if (style.customDashboard) assertNotNull(dashboard) else {
                         assertNull(dashboard)
-                        val video: android.view.View = ReflectionHelpers.getField(presentation, "videoView")
-                        assertTrue(video is SurfaceView)
+                        val scene: OriginalClusterScene = ReflectionHelpers.getField(presentation, "originalScene")
+                        val map = scene.getChildAt(0) as FrameLayout
+                        val video = map.getChildAt(0)
+                        assertTrue(video is ClusterVideoTexture)
                         val params = video.layoutParams as ViewGroup.LayoutParams
                         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.width)
                         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.height)
-                        val copied: android.widget.ImageView = ReflectionHelpers.getField(presentation, "copiedMap")
-                        val copyParams = copied.layoutParams as FrameLayout.LayoutParams
-                        assertEquals(1920, copyParams.width)
-                        assertEquals(720, copyParams.height)
-                        assertEquals(0, copyParams.leftMargin)
-                        assertEquals(0, copyParams.topMargin)
+                        val copied = map.getChildAt(1) as android.widget.ImageView
+                        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, copied.layoutParams.width)
+                        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, copied.layoutParams.height)
                         assertEquals(android.widget.ImageView.ScaleType.FIT_XY, copied.scaleType)
+                        val frame = android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888)
+                        presentation.setCopiedMap(frame)
+                        assertEquals(android.view.View.VISIBLE, copied.visibility)
+                        assertSame(frame, (copied.drawable as android.graphics.drawable.BitmapDrawable).bitmap)
+                        presentation.setCopiedMap(null)
+                        assertEquals(android.view.View.GONE, copied.visibility)
                     }
                 } finally { presentation.dismiss() }
             }

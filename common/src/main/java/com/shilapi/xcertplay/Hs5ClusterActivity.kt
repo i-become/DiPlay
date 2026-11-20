@@ -15,9 +15,6 @@ import android.util.Log
 import android.view.Display
 import android.view.KeyEvent
 import android.view.Surface
-import android.view.SurfaceView
-import android.view.SurfaceHolder
-import android.widget.FrameLayout
 import android.view.View
 import android.view.WindowManager
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
@@ -36,7 +33,7 @@ import java.util.UUID
  */
 class Hs5ClusterActivity : Activity() {
     private var dashboard: ClusterDashboardView? = null
-    private var originalOverlay: OriginalClusterOverlayView? = null
+    private var originalScene: OriginalClusterScene? = null
     private val foreground = Hs5ClusterForeground()
     internal val windowOutput: String get() = foreground.mode
 
@@ -58,22 +55,9 @@ class Hs5ClusterActivity : Activity() {
                 Hs5ClusterActivityOutput.surfaceChanged(this, it)
             }.also { dashboard = it }
         } else {
-            FrameLayout(this).apply {
-                setBackgroundColor(Color.BLACK)
-                addView(SurfaceView(this@Hs5ClusterActivity).apply {
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, holder.surface)
-                        }
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            Hs5ClusterActivityOutput.surfaceChanged(this@Hs5ClusterActivity, null)
-                        }
-                    })
-                }, FrameLayout.LayoutParams(-1, -1))
-                addView(OriginalClusterOverlayView(this@Hs5ClusterActivity).also { originalOverlay = it },
-                    FrameLayout.LayoutParams(-1, -1))
-            }
+            OriginalClusterScene(this) {
+                Hs5ClusterActivityOutput.surfaceChanged(this, it)
+            }.also { originalScene = it }
         }
         @Suppress("DEPRECATION")
         val targetDisplay = windowManager.defaultDisplay
@@ -92,7 +76,7 @@ class Hs5ClusterActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        originalOverlay?.setOverlayVisible(true)
+        originalScene?.setSceneVisible(true)
         Hs5ClusterActivityOutput.focusChanged(this, resumed = true)
     }
 
@@ -103,7 +87,7 @@ class Hs5ClusterActivity : Activity() {
     }
 
     override fun onStop() {
-        originalOverlay?.setOverlayVisible(false)
+        originalScene?.setSceneVisible(false)
         foreground.close()
         // Another window covering the cluster means the head unit took the fly screen back.
         if (!isFinishing) Hs5ClusterActivityOutput.closedOutside(this, "covered on cluster")

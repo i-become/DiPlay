@@ -14,7 +14,9 @@ object LocalMfiProbe {
         require(arguments.size == 1) { "Expected private identity directory" }
         var signatureCount = 0
         repeat(2) { startup ->
-            val client = LocalMfiAuthenticationClient.load(File(arguments.single())) { signatureCount++ }
+            val client = LocalMfiAuthenticationClient.loadWithSigner(File(arguments.single()), { key, digest ->
+                Signature.getInstance("NONEwithECDSA").run { initSign(key); update(digest); sign() }
+            }) { signatureCount++ }
             val certificate = CertificateFactory.getInstance("X.509")
                 .generateCertificates(client.readCertificate().inputStream()).single()
             repeat(3) { trial ->
