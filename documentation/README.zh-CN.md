@@ -9,5 +9,6 @@
 - [上游与第三方声明](上游与第三方声明.md)：代码来源和许可边界。
 - [DiAuto 的 AGPL-3.0 许可全文](DiAuto-AGPL-3.0.txt)。
 - [界面截图](images/)：首页、仪表配置及实车效果。
+- [AI 开发接手技能](skills/diplay-hs5-development/SKILL.md)：供代码助手快速了解架构、约束和验证方式。
 
 功能、截图和本地构建说明见[项目首页](../README.md#主要能力)。
