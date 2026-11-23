@@ -98,7 +98,6 @@ python scripts/check_public_tree.py
 本适配版基于 [DiPlay](https://github.com/shihabal3amri/DiPlay) 继续开发，重点补充红旗 HS5 的车辆兼容、CarLink 接入与自定义仪表能力。感谢上游作者及贡献者。
 
 - DiPlay 的连接基础来自 [xcertplay](https://github.com/shilapi/xcertplay)，保留其 GPL-3.0 许可与版权声明，见 [LICENSE](LICENSE)。
-- 页面与网站包含基于[DiPlay](https://github.com/shihabal3amri/DiPlay) 的适配内容，这些部分须遵守其 AGPL-3.0 许可，见[许可全文](documentation/DiAuto-AGPL-3.0.txt)。
 - 第三方代码、资源与依赖分别遵守原有许可；详见[上游与第三方声明](documentation/上游与第三方声明.md)。源码公开不表示第三方认证材料、闭源组件或商标获得了再分发授权。
 
 使用、修改或分发时，请保留适用的版权、来源和许可证，并履行对应的源码提供义务。本软件免费提供，不提供适用性或持续兼容性保证。项目的免费声明不改变各开源许可证授予的权利。
