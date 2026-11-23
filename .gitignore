@@ -52,3 +52,16 @@ release-signing.properties
 *.key
 *.apk
 *.aab
+
+# Private authentication material and local vendor SDKs (retain locally only).
+/runtime-assets/
+**/offline-mfi/
+*.cer
+*.crt
+*.der
+*.mobileprovision
+*signing*.properties
+/common/libs/icar-sdk-stubs.jar
+/mobile/libs/icar-sdk-corrected.dex
+**/libovmsink.so
+**/libusbio.so
