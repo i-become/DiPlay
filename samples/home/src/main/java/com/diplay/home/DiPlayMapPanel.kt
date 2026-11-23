@@ -21,7 +21,7 @@ import android.widget.TextView
 
 /**
  * The live CarPlay map from DiPlay, embedded with DiPlay's map service (see DiPlay's
- * docs/LAUNCHER_INTEGRATION.md). Call [start] and [stop] with the screen. A tap on the map opens
+ * Call [start] and [stop] with the screen. A tap on the map opens
  * CarPlay (DiPlay handles it); while there is no map, a tap opens DiPlay.
  */
 class DiPlayMapPanel(context: Context) : FrameLayout(context) {

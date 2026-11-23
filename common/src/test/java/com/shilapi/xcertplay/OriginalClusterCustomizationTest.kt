@@ -203,6 +203,29 @@ class OriginalClusterCustomizationTest {
         } finally { bitmap.recycle(); renderer.releaseNavigationIcon() }
     }
 
+    @Test fun unavailableVideoDecoderDoesNotCrashInstrumentSettingsOrRetainSurface() {
+        val controller = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().visible()
+        val scene = OriginalClusterScene(controller.get(), preview = true)
+        org.robolectric.shadows.ShadowMediaPlayer.setCreateListener { _, _ ->
+            throw RuntimeException("native decoder unavailable")
+        }
+        try {
+            scene.sceneLayout = OriginalClusterLayout(media = listOf(
+                OriginalClusterMedia("unavailable", OriginalMediaType.VIDEO, "content://videos/unavailable")))
+            controller.get().setContentView(scene)
+            val layers = scene.getChildAt(0) as android.view.ViewGroup
+            val mediaView = layers.getChildAt(1) as android.view.ViewGroup
+            val view = mediaView.getChildAt(0) as android.view.TextureView
+            if (view.surfaceTexture == null) view.setSurfaceTexture(android.graphics.SurfaceTexture(0))
+            view.surfaceTextureListener!!.onSurfaceTextureAvailable(view.surfaceTexture!!, 300, 200)
+            assertNull(org.robolectric.util.ReflectionHelpers.getField<Any?>(mediaView, "player"))
+            assertNull(org.robolectric.util.ReflectionHelpers.getField<Any?>(mediaView, "output"))
+        } finally {
+            controller.pause().stop().destroy()
+            org.robolectric.shadows.ShadowMediaPlayer.setCreateListener(null)
+        }
+    }
+
     @Test fun multipleVideosLoopMutedPauseWhenHiddenAndReleaseWhenRemoved() {
         val controller = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().visible()
         val scene = OriginalClusterScene(controller.get(), preview = true)

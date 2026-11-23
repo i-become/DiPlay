@@ -188,6 +188,8 @@ class CarlinkBridge private constructor(private val context: Context) : ICarConn
         log("stop; SDK initialization retained")
     }
     private fun startBluetoothDiscovery() {
+        // Inquiry competes with the active 2.4 GHz/P2P link. Discover only before pairing.
+        if (_snapshot.value.state == CarlinkLinkState.CONNECTED) return
         val adapter = bluetoothAdapter ?: run { log("bluetooth discovery unavailable: no adapter"); return }
         if (Build.VERSION.SDK_INT >= 31 && context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             log("bluetooth discovery skipped: connect permission missing"); return
@@ -320,6 +322,7 @@ class CarlinkBridge private constructor(private val context: Context) : ICarConn
                         _snapshot.value = _snapshot.value.copy(desktopRequested = false)
                     }
                     wirelessFailureStreak = 0
+                    stopBluetoothDiscovery()
                     main.removeCallbacks(discoveryRetry)
                     connecting = true; com.shilapi.xcertplay.DiPlayPreferences.markCarlinkPhonePaired(context, com.shilapi.xcertplay.DiPlayPreferences.phoneAddress(context)); _snapshot.value = _snapshot.value.copy(state = CarlinkLinkState.CONNECTED, sessionId = sessionSequence, error = null, pin = _snapshot.value.pin, progressStep = if (surface?.isValid == true) 5 else 4); tryStartCast() }
                 3 -> {

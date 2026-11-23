@@ -11,6 +11,7 @@ android {
 
     defaultConfig {
         minSdk = 25
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -47,6 +48,8 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.zxing.core)
     testImplementation(libs.junit)
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation(files("libs/icar-sdk-stubs.jar"))
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation("androidx.compose.ui:ui-test-junit4")

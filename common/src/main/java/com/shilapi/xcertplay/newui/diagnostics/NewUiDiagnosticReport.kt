@@ -89,6 +89,8 @@ internal object NewUiDiagnosticReport {
         appendLine(WheelKeyService.report(context))
         appendLine(Hs5SteeringKeys.diagnosticReport(context))
         appendLine()
+        appendLine("--- Last Java crash (may predate current session) ---")
+        appendLine(com.shilapi.xcertplay.CrashDiagnostics.report(context))
         appendLine("--- diplay.log ---")
         append(logTail(File(File(context.filesDir, "logs"), "diplay.log")))
         }

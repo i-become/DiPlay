@@ -35,8 +35,8 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 1402
-        versionName = "1.4.2"
+        versionCode = 1403
+        versionName = "1.4.3"
         testInstrumentationRunner = "com.shihab.diplay.test.IntegrityInstrumentation"
 
     }

@@ -164,7 +164,7 @@ class OriginalClusterLayoutTest {
     }
 
     @Test @Config(qualifiers = "zh-rCN-w2048dp-h768dp-land-mdpi")
-    fun referencePanelsKeepTransparencyAndGuidanceFitsTheEditableBounds() {
+    fun renderedPanelsKeepTransparencyAndGuidanceFitsTheEditableBounds() {
         val renderer = OriginalClusterRenderer(context)
         val bitmap = Bitmap.createBitmap(2048, 768, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -180,7 +180,7 @@ class OriginalClusterLayoutTest {
             assertEquals("Driving card shares the same glass surface", 92, Color.alpha(bitmap.getPixel(110, 670)))
             assertEquals("Turn card has a separate near-opaque surface", 252, Color.alpha(bitmap.getPixel(1900, 110)))
             assertEquals("Time pill uses the reference charcoal surface", 232, Color.alpha(bitmap.getPixel(1920, 665)))
-            assertEquals("Reference turn card keeps its broad round corner", Color.TRANSPARENT, bitmap.getPixel(1510, 75))
+            assertEquals("Turn card keeps its broad round corner", Color.TRANSPARENT, bitmap.getPixel(1510, 75))
             assertEquals("Guidance stays inside the configured rectangle", Color.TRANSPARENT, bitmap.getPixel(1700, 275))
             assertEquals("Solid straight arrow", Color.WHITE, bitmap.getPixel(1587, 155))
             assertEquals("Dashed tail leaves a gap", 252, Color.alpha(bitmap.getPixel(1587, 167)))
@@ -192,7 +192,7 @@ class OriginalClusterLayoutTest {
                     renderer.draw(canvas, 2048, 768, layout, OriginalClusterOverlayView.previewVehicle, guidance)
                     save(name)
                 }
-                preview("components-reference.png", nav)
+                preview("components-preview.png", nav)
                 preview("components-with-lanes.png", OriginalClusterOverlayView.previewNav)
             } finally { background.recycle() }
         } finally { bitmap.recycle() }

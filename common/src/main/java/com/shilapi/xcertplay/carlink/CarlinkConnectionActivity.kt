@@ -9,7 +9,6 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
@@ -28,45 +27,23 @@ class CarlinkConnectionActivity : Activity() {
     private lateinit var bridge: CarlinkBridge
     private lateinit var surfaceView: TextureView
     private var projectionSurface: Surface? = null
-    private var captureBitmap: Bitmap? = null
+    private var videoRenderer: CarlinkVideoRenderer? = null
     private var cluster: ClusterMapPresentation? = null
     private var clusterActivityOwned = false
     private var flyScreenVisible = false
     private var handlingDesktopRequest = false
+    private var centreResumed = false
     private val gestures = CarlinkGesturePolicy()
     private val frameHandler = Handler(Looper.getMainLooper())
-    private var frameBitmap: Bitmap? = null
-    private var lastCopyResult: Int? = null
     private fun scheduleFrameCopy(delay: Long = 0L) {
         frameHandler.removeCallbacks(copyCenterFrame)
         if (cluster != null && !isFinishing) frameHandler.postDelayed(copyCenterFrame, delay)
     }
+    // Preferences are cheap to sample; all pixel work stays on the EGL thread.
     private val copyCenterFrame = object : Runnable {
         override fun run() {
-            val target = cluster ?: return
-            if (isFinishing || !surfaceView.isAvailable || surfaceView.width <= 0 || surfaceView.height <= 0) {
-                scheduleFrameCopy(100L)
-                return
-            }
-            // Read the decoder texture directly: PixelCopy on this firmware returns ERROR_UNKNOWN.
-            val width = bridge.videoWidth
-            val height = bridge.videoHeight
-            val capture = captureBitmap?.takeIf { it.width == width && it.height == height }
-                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { captureBitmap = it }
-            val region = ClusterCopyRegion.load(this@CarlinkConnectionActivity)
-            runCatching {
-                checkNotNull(surfaceView.getBitmap(capture))
-                val output = CarlinkFrameCopy.crop(capture, region, frameBitmap)
-                if (lastCopyResult != 0 || output !== frameBitmap) bridge.recordProjectionEvent(
-                    "cluster texture copy ready source=${width}x$height region=$region output=${output.width}x${output.height} nativePixels=true")
-                frameBitmap = output
-                lastCopyResult = 0
-                if (cluster === target) target.setCopiedMap(output)
-            }.onFailure {
-                if (lastCopyResult != -1) bridge.recordProjectionEvent("cluster texture copy failed ${it.javaClass.simpleName}: ${it.message}")
-                lastCopyResult = -1
-            }
-            scheduleFrameCopy(if (lastCopyResult == 0) 50L else 250L)
+            videoRenderer?.setCopyRegion(if (cluster != null && shouldCopyCenterMap()) ClusterCopyRegion.load(this@CarlinkConnectionActivity) else null)
+            scheduleFrameCopy(500L)
         }
     }
     private var unsubscribeGlance: (() -> Unit)? = null
@@ -102,24 +79,29 @@ class CarlinkConnectionActivity : Activity() {
         Hs5NavigationOutputs.setHs5ClusterExitListener(clusterExitRequest)
         applySystemBars()
         flyScreenVisible = AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(this)
+        videoRenderer = CarlinkVideoRenderer(bridge.videoWidth, bridge.videoHeight,
+            onReady = { surface ->
+                projectionSurface = surface
+                bridge.setSurface(surface)
+            },
+            onFrame = { bitmap -> cluster?.setCopiedMap(bitmap) },
+            log = { bridge.recordProjectionEvent(it) }).also { it.start() }
         val root = FrameLayout(this)
         surfaceView = TextureView(this).apply {
             isClickable = false
             isFocusable = false
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-                    texture.setDefaultBufferSize(bridge.videoWidth, bridge.videoHeight)
-                    val surface = Surface(texture)
-                    projectionSurface = surface
-                    bridge.setSurface(surface)
-                    bridge.recordProjectionEvent("texture surface=${width}x$height video=${bridge.videoWidth}x${bridge.videoHeight}")
+                    if (centreResumed) videoRenderer?.attach(Surface(texture), width, height)
                     scheduleFrameCopy()
                 }
-                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
+                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+                    if (centreResumed) videoRenderer?.attach(Surface(texture), width, height)
+                }
                 override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
                 override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-                    projectionSurface?.let { bridge.onSurfaceDestroyed(it); it.release() }
-                    projectionSurface = null
+                    // Only detach the visible output. The decoder Surface has independent ownership.
+                    videoRenderer?.attach(null)
                     return true
                 }
             }
@@ -210,10 +192,20 @@ class CarlinkConnectionActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::bridge.isInitialized) {
+        centreResumed = true
+        if (::bridge.isInitialized && ::surfaceView.isInitialized) {
+            surfaceView.surfaceTexture?.let { videoRenderer?.attach(Surface(it), surfaceView.width, surfaceView.height) }
             if (!bridge.snapshot.value.desktopRequested) handlingDesktopRequest = false
             applySystemBars(); updateCluster()
         }
+    }
+
+    override fun onPause() {
+        centreResumed = false
+        // A hidden TextureView may keep its SurfaceTexture but stop consuming buffers.
+        // Detach before stop, otherwise eglSwapBuffers can block the cluster's worker too.
+        videoRenderer?.attach(null)
+        super.onPause()
     }
 
     internal fun updateCluster() {
@@ -258,6 +250,7 @@ class CarlinkConnectionActivity : Activity() {
 
     internal fun closeFlyScreen(): Boolean {
         frameHandler.removeCallbacks(copyCenterFrame)
+        videoRenderer?.setCopyRegion(null)
         val shown = cluster != null || clusterActivityOwned
         flyScreenVisible = false
         val old = cluster; cluster = null; old?.dismiss()
@@ -287,10 +280,10 @@ class CarlinkConnectionActivity : Activity() {
         Hs5NavigationOutputs.clearHs5ClusterExitListener(clusterExitRequest)
         activityScope.cancel()
         frameHandler.removeCallbacksAndMessages(null)
-        frameBitmap = null
-        projectionSurface?.let { bridge.onSurfaceDestroyed(it); it.release() }
+        projectionSurface?.let { bridge.onSurfaceDestroyed(it) }
         projectionSurface = null
-        captureBitmap = null
+        videoRenderer?.close()
+        videoRenderer = null
         super.onDestroy()
     }
 

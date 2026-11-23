@@ -12,6 +12,7 @@ import android.view.TextureView
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import java.util.concurrent.Executors
 
 /** One scene for editor, Presentation and Activity. Parameter edits retain the decoder surface. */
@@ -197,21 +198,34 @@ private class OriginalMediaView(context: Context, val item: OriginalClusterMedia
     private fun startVideo() {
         if (player != null || !isAttachedToWindow) return
         val surfaceTexture = texture.surfaceTexture ?: return
-        output = Surface(surfaceTexture)
-        val next = MediaPlayer(); player = next
         runCatching {
+            // Native player creation can fail when projection and previews exhaust decoders.
+            output = Surface(surfaceTexture)
+            val next = MediaPlayer(); player = next
             next.setDataSource(context, Uri.parse(item.uri)); next.setSurface(output)
             next.setVolume(0f, 0f); next.isLooping = true
-            next.setOnVideoSizeChangedListener { _, _, _ -> fitVideo() }
+            next.setOnVideoSizeChangedListener { current, _, _ -> if (player === current) fitVideo() }
             next.setOnPreparedListener { if (player === it) { prepared = true; updatePlayback() } }
             next.setOnErrorListener { failed, _, _ -> if (player === failed) releaseVideo(); true }
             next.prepareAsync()
-        }.onFailure { releaseVideo() }
+        }.onFailure { error ->
+            releaseVideo()
+            DiagnosticLogging.write {
+                android.util.Log.w("OriginalClusterMedia", "Video initialization failed: ${error.javaClass.simpleName}")
+            }
+        }
     }
-    private fun releaseVideo() { prepared = false; player?.release(); player = null; output?.release(); output = null }
+    private fun releaseVideo() {
+        prepared = false
+        val previous = player; player = null
+        val previousOutput = output; output = null
+        runCatching { previous?.release() }
+        runCatching { previousOutput?.release() }
+    }
     private fun fitVideo() {
         val current = player ?: return
-        val w = current.videoWidth; val h = current.videoHeight
+        val dimensions = runCatching { current.videoWidth to current.videoHeight }.getOrNull() ?: return
+        val (w, h) = dimensions
         if (w <= 0 || h <= 0 || texture.width <= 0 || texture.height <= 0) return
         if (stretchFullScreen) { texture.setTransform(null); return }
         val fit = minOf(texture.width.toFloat() / w, texture.height.toFloat() / h)

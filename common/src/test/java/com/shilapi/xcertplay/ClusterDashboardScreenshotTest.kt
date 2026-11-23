@@ -1,7 +1,6 @@
 package com.shilapi.xcertplay
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.graphics.Canvas
 import android.graphics.Color
@@ -63,7 +62,7 @@ class ClusterDashboardScreenshotTest {
         for ((name, w, h) in listOf(Triple("full-dark", 1920, 720), Triple("compact-dark", 1280, 480),
             Triple("carlink-full", 1920, 720), Triple("carlink-compact", 1280, 480),
             Triple("carlink-arabic", 1920, 720), Triple("full-light", 1920, 720), Triple("waiting", 1920, 720),
-            Triple("reference-fixture-only", 1920, 720), Triple("full-arabic", 1920, 720),
+            Triple("synthetic-map-fixture", 1920, 720), Triple("full-arabic", 1920, 720),
             Triple("vehicle-integration-fixture-only", 1920, 720),
             Triple("vehicle-integration-compact-fixture-only", 1280, 480),
             Triple("vehicle-integration-arabic-fixture-only", 1920, 720),
@@ -99,8 +98,8 @@ class ClusterDashboardScreenshotTest {
                         tireWarnings = listOf(if (name.contains("warning")) 1 else 0, 0, 0, 0)
                             .map { Hs5TimedInt(it, 100) },
                         can = Hs5CanReadings(2100f, 90f), canAt = 100).vehicle(100, true))
-                    // Photo values exist only in this screenshot fixture, never the APK.
-                    name == "reference-fixture-only" -> fixture.copy(vehicle = OemClusterVehicleState(
+                    // Demo values exist only in this screenshot fixture, never the APK.
+                    name == "synthetic-map-fixture" -> fixture.copy(vehicle = OemClusterVehicleState(
                         speedKph = 0f, rpm = 800f, fuelFraction = .35f, coolantCelsius = 90f,
                         gear = "P", driveMode = "舒适", outsideCelsius = 17f, positionLights = true, lowBeam = true,
                         parkingBrake = true, seatBeltWarning = true,
@@ -152,17 +151,14 @@ class ClusterDashboardScreenshotTest {
         mapFixture.recycle()
     }
 
-    @Test fun approvedReferenceCompositeUsesTheRealAndroidRenderer() {
+    @Test fun syntheticMapCompositeUsesTheRealAndroidRenderer() {
         val context = RuntimeEnvironment.getApplication().createConfigurationContext(
             Configuration(RuntimeEnvironment.getApplication().resources.configuration).apply {
                 setLocale(Locale.SIMPLIFIED_CHINESE)
                 fontScale = 1.4f
             })
-        // The supplied image is a test-only backdrop. The APK contains no sample map/route.
-        val reference = javaClass.classLoader!!.getResourceAsStream("cluster/basic-reference.png")!!.use {
-            BitmapFactory.decodeStream(it)
-        }
-        val cover = Bitmap.createBitmap(reference, 1534, 225, 107, 100)
+        val testMap = syntheticMap(640, 360)
+        val cover = syntheticCover(107, 100)
         val state = ClusterDashboardState(
             guidance = CarPlayGlance.Snapshot(connected = true, maneuverType = 2,
                 distanceMeters = 500, road = "到达   红旗路", remainingSeconds = 1080,
@@ -172,18 +168,16 @@ class ClusterDashboardScreenshotTest {
             vehicle = OemClusterVehicleState(speedKph = 0f, rpm = 0f,
                 assistance = OemClusterAssistance(true, 0, true, true),
                 tirePressureBar = List(4) { 2.4f }, tireWarning = List(4) { false }))
-        for ((name, w, h) in listOf(Triple("basic-reference-composite", 2048, 768),
-            Triple("basic-reference-compact", 1280, 480),
+        for ((name, w, h) in listOf(Triple("basic-synthetic-map-composite", 2048, 768),
+            Triple("basic-synthetic-map-compact", 1280, 480),
             Triple("basic-idle-composite", 2048, 768), Triple("basic-idle-compact", 1280, 480),
             Triple("basic-no-maneuver-composite", 2048, 768),
             Triple("basic-tire-warning-composite", 2048, 768))) {
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             canvas.drawColor(Color.rgb(1, 6, 16))
-            // Reuse only the reference's central map. Old dial positions must not leak
-            // through the relocated foreground or masquerade as a second instrument.
-            canvas.drawBitmap(reference, android.graphics.Rect(712, 300, 1310, 516),
-                OemClusterGeometry.mapBounds(w, h), Paint(Paint.FILTER_BITMAP_FLAG))
+            canvas.drawBitmap(testMap, null, OemClusterGeometry.mapBounds(w, h),
+                Paint(Paint.FILTER_BITMAP_FLAG))
             val renderer = OemClusterRenderer(context)
             val fixture = when {
                 name.startsWith("basic-idle") -> state.copy(guidance = CarPlayGlance.Snapshot(connected = true))
@@ -200,6 +194,32 @@ class ClusterDashboardScreenshotTest {
             }
             bitmap.recycle()
         }
-        cover.recycle(); reference.recycle()
+        cover.recycle(); testMap.recycle()
+    }
+
+    private fun syntheticMap(width: Int, height: Int): Bitmap = Bitmap.createBitmap(width, height,
+        Bitmap.Config.ARGB_8888).also { bitmap ->
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.rgb(62, 79, 73))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(183, 183, 164); strokeWidth = 9f }
+        for (i in 0..8) canvas.drawLine(width * .08f, height * i / 8f, width * .92f,
+            height * (i + 1) / 9f, paint)
+        paint.color = Color.rgb(203, 194, 166)
+        paint.strokeWidth = 5f
+        for (i in 0..8) canvas.drawLine(width * i / 8f, height * .08f,
+            width * (i + 1) / 9f, height * .92f, paint)
+        paint.color = Color.rgb(66, 143, 219)
+        paint.strokeWidth = 6f
+        canvas.drawLine(width * .5f, height.toFloat(), width * .58f, 0f, paint)
+    }
+
+    private fun syntheticCover(width: Int, height: Int): Bitmap = Bitmap.createBitmap(width, height,
+        Bitmap.Config.ARGB_8888).also { bitmap ->
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.rgb(84, 38, 114))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(236, 174, 88) }
+        canvas.drawCircle(width * .5f, height * .45f, width * .28f, paint)
+        paint.color = Color.rgb(42, 119, 132)
+        canvas.drawRect(0f, height * .75f, width.toFloat(), height.toFloat(), paint)
     }
 }

@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
-/** Motion tokens from `.superdesign/design-system.md` and v8 HTML prototypes. */
+/** Motion tokens shared by the app's transitions and controls. */
 object NewUiMotion {
     const val ToggleDurationMs = 200
     const val ButtonPressDurationMs = 120

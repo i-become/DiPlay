@@ -190,8 +190,8 @@ class SportClusterRendererTest {
     }
 
     @Test fun nativeScreenshotsAtFullCompactWaitingAndWarningStates() {
-        val reference=javaClass.classLoader!!.getResourceAsStream("cluster/sport-reference.png")!!.use{BitmapFactory.decodeStream(it)}
-        val cover=Bitmap.createBitmap(reference,976,239,96,96)
+        val testMap=syntheticMap()
+        val cover=syntheticCover()
         val state=ClusterDashboardState(
             guidance=CarPlayGlance.Snapshot(connected=true,navigating=true,maneuverType=2,distanceMeters=1200,
                 road="进入 望京西路",remainingMeters=12800,remainingSeconds=1080),
@@ -201,17 +201,15 @@ class SportClusterRendererTest {
                 assistance=OemClusterAssistance(true,0,false,false),
                 tirePressureBar=listOf(2.4f,2.4f,2.5f,2.5f),tireWarning=List(4){false}))
         try {
-            for((name,w,h) in listOf(Triple("sport-reference-composite",2048,768),
-                Triple("sport-reference-compact",1280,480),Triple("sport-idle",2048,768),
+            for((name,w,h) in listOf(Triple("sport-synthetic-composite",2048,768),
+                Triple("sport-synthetic-compact",1280,480),Triple("sport-idle",2048,768),
                 Triple("sport-tire-warning",2048,768),Triple("sport-waiting",2048,768),
                 Triple("sport-carlink-summary",2048,768))) {
                 val image=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888)
                 val canvas=Canvas(image);canvas.drawColor(Color.rgb(2,3,5))
-                // Only the reference's right map is test content; never shipped in APK resources.
+                // The synthetic map is test content and is never shipped in APK resources.
                 if (name != "sport-waiting") {
-                    // A clean 4:3 map-only crop excludes the reference's example guidance card.
-                    val mapSource = Rect(1528,320,1928,620)
-                    canvas.drawBitmap(reference,mapSource,SportClusterGeometry.mapBounds(w,h),Paint(Paint.FILTER_BITMAP_FLAG))
+                    canvas.drawBitmap(testMap,null,SportClusterGeometry.mapBounds(w,h),Paint(Paint.FILTER_BITMAP_FLAG))
                 }
                 val fixture=when(name) {
                     "sport-idle"->state.copy(guidance=CarPlayGlance.Snapshot(connected=true))
@@ -226,7 +224,24 @@ class SportClusterRendererTest {
                 file.outputStream().use{image.compress(Bitmap.CompressFormat.PNG,100,it)};image.recycle()
                 assertTrue(file.length()>10000)
             }
-        }finally{cover.recycle();reference.recycle()}
+        }finally{cover.recycle();testMap.recycle()}
+    }
+
+    private fun syntheticMap():Bitmap=Bitmap.createBitmap(640,480,Bitmap.Config.ARGB_8888).also{bitmap->
+        val canvas=Canvas(bitmap);canvas.drawColor(Color.rgb(64,79,72))
+        val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(184,184,164);strokeWidth=10f}
+        for(i in 0..8)canvas.drawLine(0f,i*60f,640f,(i+1)*54f,paint)
+        paint.color=Color.rgb(207,197,168);paint.strokeWidth=5f
+        for(i in 0..8)canvas.drawLine(i*70f,0f,(i+1)*64f,480f,paint)
+        paint.color=Color.rgb(63,145,218);paint.strokeWidth=7f
+        canvas.drawLine(220f,480f,420f,0f,paint)
+    }
+
+    private fun syntheticCover():Bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888).also{bitmap->
+        val canvas=Canvas(bitmap);canvas.drawColor(Color.rgb(74,38,112))
+        val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(239,180,86)}
+        canvas.drawCircle(48f,43f,29f,paint);paint.color=Color.rgb(42,119,132)
+        canvas.drawRect(0f,72f,96f,96f,paint)
     }
 }
 

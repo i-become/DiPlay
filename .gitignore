@@ -17,8 +17,16 @@ captures/
 
 # Local agent working notes
 /agent_docs/
+/.agents/
+/.claude/
+/.superdesign/
+/artifacts/
+/tools/cluster/
+/AGENTS.md
+/CLAUDE.md
+/skills-lock.json
 
-# Decompiled third-party APK dumps (local reference only; never commit)
+# Local-only research notes and release output. Public license notices live at the repository root.
 docs
 docs/apk/
 dist

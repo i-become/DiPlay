@@ -483,6 +483,7 @@ object AirPlayPersistence {
 
     fun saveSessionLogRecordingEnabled(context: Context, enabled: Boolean) {
         com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(enabled)
+        if (!enabled) CrashDiagnostics.clear(context)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_SESSION_LOG_RECORDING, enabled)
             .apply()

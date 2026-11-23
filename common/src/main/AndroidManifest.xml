@@ -199,7 +199,7 @@
                 android:resource="@xml/navigation_widget_info" />
         </receiver>
 
-        <!-- The live dashboard map for launchers that embed it (docs/LAUNCHER_INTEGRATION.md). -->
+        <!-- The live dashboard map for launchers that embed it. -->
         <service
             android:name="com.shilapi.xcertplay.MapEmbedService"
             android:exported="true"

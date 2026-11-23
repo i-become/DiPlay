@@ -121,11 +121,9 @@ class ClusterLaneGuidanceRendererTest {
     @Test fun nativeLanePreviewsAtFullAndCompactSizes() {
         for (sport in listOf(false, true)) {
             val name = if (sport) "sport" else "urban"
-            val reference = javaClass.classLoader!!.getResourceAsStream(
-                "cluster/${if (sport) "sport" else "basic"}-reference.png")!!.use { BitmapFactory.decodeStream(it) }
+            val reference = syntheticMap()
             val crop = if (sport) Rect(1528,320,1928,620) else Rect(712,300,1310,516)
-            val cover = if (sport) Bitmap.createBitmap(reference,976,239,96,96)
-                else Bitmap.createBitmap(reference,1534,225,107,100)
+            val cover = syntheticCover(if (sport) 96 else 107)
             try {
                 for ((suffix, width, height) in listOf(Triple("full",2048,768), Triple("compact",1280,480),
                     Triple("eight-lanes",1280,480), Triple("no-lanes",1280,480),
@@ -193,5 +191,25 @@ class ClusterLaneGuidanceRendererTest {
                 assertTrue(ClusterLaneStrip().fits(lanes, width - 24f))
             } finally { bitmap.recycle() }
         }
+    }
+
+    private fun syntheticMap(): Bitmap = Bitmap.createBitmap(2048, 768, Bitmap.Config.ARGB_8888).also { bitmap ->
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.rgb(64, 79, 72))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(184, 184, 164); strokeWidth = 10f }
+        for (i in 0..8) canvas.drawLine(0f, i * 96f, 2048f, (i + 1) * 84f, paint)
+        paint.color = Color.rgb(207, 197, 168); paint.strokeWidth = 5f
+        for (i in 0..8) canvas.drawLine(i * 256f, 0f, (i + 1) * 228f, 768f, paint)
+        paint.color = Color.rgb(63, 145, 218); paint.strokeWidth = 7f
+        canvas.drawLine(720f, 768f, 1320f, 0f, paint)
+    }
+
+    private fun syntheticCover(size: Int): Bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.rgb(74, 38, 112))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(239, 180, 86) }
+        canvas.drawCircle(size / 2f, size * .43f, size * .3f, paint)
+        paint.color = Color.rgb(42, 119, 132)
+        canvas.drawRect(0f, size * .75f, size.toFloat(), size.toFloat(), paint)
     }
 }
