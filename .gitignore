@@ -61,7 +61,5 @@ release-signing.properties
 *.der
 *.mobileprovision
 *signing*.properties
-/common/libs/icar-sdk-stubs.jar
-/mobile/libs/icar-sdk-corrected.dex
 **/libovmsink.so
 **/libusbio.so

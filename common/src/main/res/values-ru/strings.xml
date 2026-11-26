@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="new_ui_cluster_copy_region_fullscreen">На весь экран</string>
-    <string name="new_ui_cluster_copy_region_center">По центру</string>
     <string name="new_ui_cluster_only_title">Только приборная панель</string>
     <string name="new_ui_cluster_only_sub">Оставляет приборную панель активной без подключения телефона; сведения о медиа зависят от медиасессии автомобиля.</string>
     <string name="new_ui_phone_protocol">Протокол</string>
-    <string name="new_ui_cluster_copy_region">Копировать область центрального экрана как карту</string>
-    <string name="new_ui_cluster_copy_region_sub">Перетащите рамку для перемещения, а нижний правый угол — для изменения размера. Применяется к активному видео Carlink; для режима только приборов нужен доступ автомобиля к захвату экрана.</string>
-    <string name="new_ui_cluster_copy_region_placeholder">Перетаскивайте рамку за середину, меняйте размер за любой угол. Каждый прибор сохраняет свою область и растягивает её до фиксированного размера карты.</string>
     <string name="existing_wifi_title">Существующая Wi-Fi / Одна LAN</string>
     <string name="existing_wifi_description">Используйте существующий роутер или мобильную точку Wi-Fi. iPhone и автомобиль остаются в одной сети с доступом в Интернет.</string>
     <string name="existing_wifi_hint">Существующая Wi-Fi · Подключите оба устройства к одной Wi-Fi и включите Bluetooth. Точка доступа автомобиля не нужна.</string>
@@ -890,29 +885,4 @@
     <string name="new_ui_about_sec5_title">5. Благодарности</string>
     <string name="new_ui_about_sec5_body">Благодарим пользователя Douyin @YiMeng谁的梦还没醒 (1768868288) за предоставление интерфейса габаритных огней автомобиля.</string>
     <string name="new_ui_diag_log_record_sub">Включите для записи журналов, сбора диагностических данных и создания отчётов. При отключении запись и фоновый сбор диагностических данных прекращаются.</string>
-    <string name="new_ui_carlink_pairing_code">Код сопряжения Carlink</string>
-    <string name="new_ui_carlink_step_sdk_ready">Carlink готов</string>
-    <string name="new_ui_carlink_step_sdk_ready_sub">Подготовка подключения Carlink</string>
-    <string name="new_ui_carlink_step_waiting">Ожидание телефона</string>
-    <string name="new_ui_carlink_step_waiting_sub">Оставьте телефон рядом и откройте Carlink</string>
-    <string name="new_ui_carlink_step_pairing">Сопряжение телефона</string>
-    <string name="new_ui_carlink_step_phone_connected">Телефон подключен</string>
-    <string name="new_ui_carlink_step_phone_connected_sub">Подготовка экрана проекции</string>
-    <string name="new_ui_carlink_step_projection_ready">Проекция готова</string>
-    <string name="new_ui_carlink_step_projection_ready_sub">Запуск проекции Carlink</string>
-    <string name="new_ui_carlink_step_projecting">Carlink передает изображение</string>
-    <string name="new_ui_carlink_step_projecting_sub">Проекция активна</string>
-    <string name="new_ui_carlink_step_failed">Ошибка подключения Carlink</string>
-    <string name="new_ui_carlink_step_failed_sub">Повторите подключение Carlink</string>
-    <string name="new_ui_carlink_name">Carlink</string>
-    <string name="new_ui_carlink_pairing">Сопряжение Carlink</string>
-    <string name="new_ui_carlink_waiting_phone">Ожидание телефона Carlink…</string>
-    <string name="new_ui_carlink_ready">Carlink готов</string>
-    <string name="new_ui_carlink_failure_detail">Ошибка подключения Carlink (%1$s)</string>
-    <string name="new_ui_carlink_connecting">Подключение Carlink…</string>
-    <string name="new_ui_carlink_open">Открыть Carlink</string>
-    <string name="new_ui_carlink_retry">Повторить подключение Carlink</string>
-    <string name="new_ui_carlink_connect">Подключить Carlink</string>
-    <string name="new_ui_carlink_switch_phone">Сменить телефон Carlink · %1$s</string>
-    <string name="new_ui_carlink_pair_phone">Сопрячь и выбрать телефон Carlink</string>
 </resources>

@@ -9,8 +9,29 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class UpdateChecksumsTest {
+    private val abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+    @Test fun acceptsBomBinaryMarkerRelativePathAndBsdFormat() {
+        for (text in listOf("\uFEFF$abc  DiPlay.apk\r\n", "$abc *DiPlay.apk", "$abc  ./DiPlay.apk",
+                "$abc *./DiPlay.apk", "SHA256 (DiPlay.apk) = $abc")) {
+            assertTrue(text, UpdateChecksums.matches(UpdateChecksums.parse(text), "DiPlay.apk", abc))
+        }
+    }
+
+    @Test(expected = java.io.IOException::class)
+    fun refusesConflictingEntriesInsteadOfDependingOnLineOrder() {
+        UpdateChecksums.parse("$abc  DiPlay.apk\n${"0".repeat(64)} *./DiPlay.apk")
+    }
     @get:Rule
     val temporaryFolder = TemporaryFolder()
+
+    @Test fun readsWindowsUtf16AndUtf8ChecksumFiles() {
+        val file = temporaryFolder.newFile("SHA256SUMS.txt")
+        for (charset in listOf(Charsets.UTF_8, Charsets.UTF_16LE, Charsets.UTF_16BE)) {
+            file.writeBytes("\uFEFF$abc *DiPlay.apk\r\n".toByteArray(charset))
+            assertTrue(UpdateChecksums.matches(UpdateChecksums.read(file), "DiPlay.apk", abc))
+        }
+    }
 
     @Test
     fun parsesChecksumLinesWithTwoSpaces() {

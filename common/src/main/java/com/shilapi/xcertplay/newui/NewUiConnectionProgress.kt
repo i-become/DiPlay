@@ -29,10 +29,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.shilapi.xcertplay.CarPlayConnectionProgress
 import com.shilapi.xcertplay.host.R
@@ -52,7 +48,6 @@ fun NewUiConnectionProgressBlock(
     visual: NewUiProgressVisual,
     modifier: Modifier = Modifier,
     stepCount: Int = CarPlayConnectionProgress.STEP_COUNT,
-    pairingCode: String? = null,
 ) {
     val shape = RoundedCornerShape(NewUiLayout.ProgressBlockRadius)
     val borderColor = when (visual) {
@@ -138,41 +133,7 @@ fun NewUiConnectionProgressBlock(
                 }
             }
         }
-        val codeContent: @Composable (Modifier) -> Unit = { codeModifier ->
-            pairingCode?.let { code ->
-                Column(codeModifier
-                    .testTag("carlink-pairing-code"),
-                    verticalArrangement = Arrangement.spacedBy(NewUiLayout.NavTabGap)) {
-                    Text(stringResource(R.string.new_ui_carlink_pairing_code),
-                        style = NewUiTypography.SettingSubtitle, color = NewUiColors.TextSecondary)
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(NewUiLayout.PairingCodeCellGap)) {
-                            code.forEach { digit ->
-                                Box(Modifier.weight(1f).height(NewUiLayout.PairingCodeCellHeight)
-                                    .background(NewUiColors.CardSecondary, RoundedCornerShape(NewUiLayout.NavTabRadius / 2))
-                                    .border(1.dp, NewUiColors.CardBorderTop, RoundedCornerShape(NewUiLayout.NavTabRadius / 2)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text(digit.toString(), style = NewUiTypography.ProgressStepTitle.copy(fontFamily = FontFamily.Monospace),
-                                        color = NewUiColors.TextPrimary, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (pairingCode != null && availableWidth < NewUiLayout.PairingCodeSideBySideMinWidth) {
-            Column(verticalArrangement = Arrangement.spacedBy(NewUiLayout.MainGap), horizontalAlignment = Alignment.End) {
-                progressContent(Modifier.fillMaxWidth())
-                codeContent(Modifier.width(availableWidth.coerceAtMost(NewUiLayout.PairingCodeMaxWidth)))
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(NewUiLayout.MainGap)) {
-                progressContent(Modifier.weight(1f))
-                codeContent(Modifier.width((availableWidth * .46f).coerceAtMost(NewUiLayout.PairingCodeMaxWidth)))
-            }
-        }
+        progressContent(Modifier.fillMaxWidth())
     }
 }
 

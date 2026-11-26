@@ -19,9 +19,6 @@ import com.shilapi.xcertplay.messageResource
 import com.shilapi.xcertplay.network.CarHotspotTethering
 import com.shilapi.xcertplay.DiPlayBootstrap
 import com.shilapi.xcertplay.DiPlayPreferences
-import com.shilapi.xcertplay.carlink.CarlinkBridge
-import com.shilapi.xcertplay.carlink.CarlinkLinkState
-import com.shilapi.xcertplay.carlink.CarlinkConnectionActivity
 import com.shilapi.xcertplay.appDialogBuilder
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
@@ -52,32 +49,14 @@ class NewUiConnectionActions(
     }
 
     fun refreshSetupError() {
-        if (DiPlayPreferences.phoneLinkMode(activity) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            setupError = null
-            return
-        }
         setupError = runCatching {
             DiPlayBootstrap.ensure(activity, AirPlayPersistence.loadMfiTarget(activity))
-        }.exceptionOrNull()?.let {
-            activity.getString(R.string.setup_error_auth)
-        }
+        }.exceptionOrNull()?.let { activity.getString(R.string.setup_error_auth) }
     }
 
     fun openCarPlay() {
         if (AirPlayPersistence.loadClusterOnlyMode(activity)) return
         if (DiPlayPreferences.phoneAddress(activity) == null) return
-        if (DiPlayPreferences.phoneLinkMode(activity) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            if (CarPlayBackgroundSession.hasSession()) {
-                CarPlayBackgroundSession.stop {
-                    activity.runOnUiThread {
-                        if (!activity.isFinishing && !activity.isDestroyed) openCarlink()
-                    }
-                }
-                return
-            }
-            openCarlink()
-            return
-        }
         when {
             CarPlayBackgroundSession.active -> openCarPlayProjection()
             ConnectionProgressUiState.disconnected() -> connect(wireless = true)
@@ -86,64 +65,8 @@ class NewUiConnectionActions(
         }
     }
 
-    private val carlinkPermissions = activity.registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        if (grants.isNotEmpty() && grants.values.all { it }) startCarlinkOnHome()
-        else toast(activity.getString(R.string.new_ui_carlink_step_failed))
-    }
-    private var openedCarlinkSession = -1L
-
-    private fun openCarlink() {
-        startCarlinkOnHome()
-        openReadyCarlinkProjection(manual = true)
-    }
-
-    fun startCarlinkOnHome() {
-        if (DiPlayPreferences.phoneLinkMode(activity) != DiPlayPreferences.PhoneLinkMode.CARLINK) return
-        setupError = null
-        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= 31) permissions.addAll(listOf(
-            Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE))
-        if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        val missing = permissions.filter { activity.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        CarlinkBridge.get(activity).recordPermissions(missing)
-        if (missing.isNotEmpty()) {
-            carlinkPermissions.launch(missing.toTypedArray())
-            return
-        }
-        com.shilapi.xcertplay.Hs5BootSession.cancelPending()
-        if (CarPlayBackgroundSession.hasSession()) {
-            CarPlayBackgroundSession.stop {
-                activity.runOnUiThread {
-                    if (!activity.isFinishing && !activity.isDestroyed) startCarlinkOnHome()
-                }
-            }
-            return
-        }
-        val size = android.graphics.Point()
-        @Suppress("DEPRECATION")
-        activity.windowManager.defaultDisplay.getRealSize(size)
-        CarlinkBridge.get(activity).start(size.x, size.y)
-    }
-
-    fun openReadyCarlinkProjection(manual: Boolean = false) {
-        if (DiPlayPreferences.phoneLinkMode(activity) != DiPlayPreferences.PhoneLinkMode.CARLINK) return
-        val snapshot = CarlinkBridge.get(activity).snapshot.value
-        if (snapshot.state != CarlinkLinkState.CONNECTED || CarlinkConnectionActivity.isForeground) return
-        if (!manual && (openedCarlinkSession == snapshot.sessionId || snapshot.desktopRequested)) return
-        CarlinkBridge.get(activity).resumeProjection()
-        openedCarlinkSession = snapshot.sessionId
-        activity.startActivity(Intent(activity, CarlinkConnectionActivity::class.java))
-    }
-
     fun connect(wireless: Boolean) {
         if (AirPlayPersistence.loadClusterOnlyMode(activity)) return
-        if (DiPlayPreferences.phoneLinkMode(activity) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            openCarlink()
-            return
-        }
-        CarlinkBridge.stopIfStarted()
         if (wireless && pendingCarHotspotSetup) {
             toast(activity.getString(R.string.save_your_hotspot_details_in_connection_setup_first))
             onOpenConnectionMethod()
@@ -218,11 +141,6 @@ class NewUiConnectionActions(
 
     fun disconnect(onComplete: () -> Unit) {
         ConnectionProgressUiState.markDisconnected()
-        if (DiPlayPreferences.phoneLinkMode(activity) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            CarlinkBridge.get(activity).stop()
-            onComplete()
-            return
-        }
         CarPlayBackgroundSession.stop {
             activity.runOnUiThread(onComplete)
         }

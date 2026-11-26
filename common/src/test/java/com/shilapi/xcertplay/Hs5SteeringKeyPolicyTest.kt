@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -15,6 +16,22 @@ import org.robolectric.annotation.Config
 @Config(sdk = [29], manifest = Config.NONE)
 class Hs5SteeringKeyPolicyTest {
     private val context get() = RuntimeEnvironment.getApplication()
+
+    @Before fun disableMapShortcutByDefault() {
+        AirPlayPersistence.saveClusterMapEnabled(context, false)
+    }
+
+    @Test fun mapShortcutRegistersPreviousIndependentlyOfMediaAndBluetooth() {
+        AirPlayPersistence.saveCarPlayWheelMedia(context, false)
+        AirPlayPersistence.saveCarPlayWheelSiri(context, false)
+        AirPlayPersistence.saveCarBluetoothAudio(context, true)
+        AirPlayPersistence.saveClusterMapEnabled(context, true)
+        assertTrue(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context))
+        assertArrayEquals(intArrayOf(KeyEvent.KEYCODE_MEDIA_PREVIOUS),
+            Hs5SteeringKeyPolicy.factoryKeyCodes(context, carPlayCall = false))
+        AirPlayPersistence.saveClusterMapEnabled(context, false)
+        assertFalse(Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context))
+    }
 
     @Test fun registersOnlyEnabledFeatures() {
         AirPlayPersistence.saveCarPlayWheelMedia(context, true)

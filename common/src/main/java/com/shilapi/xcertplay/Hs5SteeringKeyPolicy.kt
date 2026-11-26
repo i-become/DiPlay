@@ -11,15 +11,17 @@ internal object Hs5SteeringKeyPolicy {
     /** The phone key is taken only during a CarPlay call or while CarPlay plays telephony audio. */
     fun factoryKeyCodes(context: Context, carPlayCall: Boolean, flyScreen: Boolean = false): IntArray {
         val codes = LinkedHashSet<Int>()
-        val wheelKeys = shouldRegisterFactoryKeys(context)
+        val wheelKeys = AirPlayPersistence.loadCarPlayWheelSiri(context) ||
+            (!AirPlayPersistence.loadCarBluetoothAudio(context) && AirPlayPersistence.loadCarPlayWheelMedia(context))
         val bluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(context)
         if (wheelKeys && !bluetoothAudio && AirPlayPersistence.loadCarPlayWheelMedia(context)) {
             codes += KeyEvent.KEYCODE_MEDIA_PREVIOUS
             codes += KeyEvent.KEYCODE_MEDIA_NEXT
         }
+        if (AirPlayPersistence.loadClusterMapEnabled(context)) codes += KeyEvent.KEYCODE_MEDIA_PREVIOUS
         if (wheelKeys && AirPlayPersistence.loadCarPlayWheelSiri(context)) {
             codes += QisiSteeringServiceClient.KEYCODE_VOICE_ASSIST
-            codes += QisiSteeringServiceClient.KEYCODE_SDS_CAR_LINK
+            codes += QisiSteeringServiceClient.KEYCODE_SDS_VOICE_ASSIST
         }
         if (wheelKeys && !bluetoothAudio && carPlayCall) codes += KeyEvent.KEYCODE_CALL
         if (wheelKeys) codes += 110
@@ -27,8 +29,11 @@ internal object Hs5SteeringKeyPolicy {
         return codes.toIntArray()
     }
 
+    /** Standalone mode claims only long-press PREVIOUS. OEM fly-screen exit arrives via Qisi callback. */
+    fun standaloneKeyCodes(): IntArray = intArrayOf(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+
     fun shouldRegisterFactoryKeys(context: Context, flyScreen: Boolean = false): Boolean =
-        flyScreen || AirPlayPersistence.loadCarPlayWheelSiri(context) ||
+        flyScreen || AirPlayPersistence.loadClusterMapEnabled(context) || AirPlayPersistence.loadCarPlayWheelSiri(context) ||
             (!AirPlayPersistence.loadCarBluetoothAudio(context) && AirPlayPersistence.loadCarPlayWheelMedia(context))
 
     fun closesFlyScreen(keyCode: Int, action: Int, flyScreen: Boolean): Boolean =

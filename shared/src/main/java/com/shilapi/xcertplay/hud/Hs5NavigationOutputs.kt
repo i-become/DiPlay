@@ -21,7 +21,6 @@ object Hs5NavigationOutputs {
     private val callLock = Any()
     private val calls = CarPlayCallState()
     private var publishedOverlay: ClusterTurnGuidance? = null
-    @Volatile private var externalGuidance: Hs5GuidanceFrame? = null
     private val overlayRoute = Hs5RouteState(
         staleRouteNs = 120_000_000_000L,
         emptyListHideNs = 8_000_000_000L,
@@ -50,7 +49,6 @@ object Hs5NavigationOutputs {
     }
 
     fun onFrame(frame: Iap2Frame) {
-        externalGuidance = null
         if (frame.messageId == CarPlayCallState.CALL_STATE_UPDATE) {
             val changed = synchronized(callLock) { calls.accept(frame) }
             if (changed) callListener?.invoke(carPlayCall())
@@ -64,14 +62,6 @@ object Hs5NavigationOutputs {
         // Cache prefetched events and publish late events for the selected junction.
         updateOverlay(owned)
         hs5Guidance.submit { Hs5GuidanceBridge.onFrame(owned) }
-    }
-
-    /** Sends already-decoded Carlink navigation through the same vehicle output as CarPlay. */
-    fun onExternalNavigation(active: Boolean, icon: Int, distanceMeters: Int, road: String) {
-        externalGuidance = if (active) Hs5GuidanceFrame(icon, 0, distanceMeters.coerceAtLeast(0), road) else null
-        if (!active) hs5Guidance.clear() else hs5Guidance.submit {
-            Hs5GuidanceBridge.onExternalFrame(externalGuidance ?: return@submit)
-        }
     }
 
     fun carPlayCall(): CarPlayCallCard? = synchronized(callLock) { calls.current() }
@@ -121,7 +111,6 @@ object Hs5NavigationOutputs {
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow(preserveTurnOverlay: Boolean = false) {
-        externalGuidance = null
         hs5Guidance.clear()
         // Only a wireless session replacement retains the card. Explicit controller close
         // and wired disconnect still clear it immediately.

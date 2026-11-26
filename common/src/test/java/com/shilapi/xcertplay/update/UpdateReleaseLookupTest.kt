@@ -49,6 +49,11 @@ class UpdateReleaseLookupTest {
         assertEquals(1, requests)
     }
 
+    @Test fun publishedLookupKeepsVersionEvenWhenNoUpgradeIsNeeded() {
+        val found = UpdateReleaseLookup.latestPublished("test") { url -> Reply(url, 200, release()) }
+        assertEquals("v1.0.52", found?.tagName)
+    }
+
     @Test fun rateLimitingFallsBackThroughTheSameNetworkConnectionFactory() {
         val requests = mutableListOf<Reply>()
         val found = UpdateReleaseLookup.latest("1.0.51", "test") { url ->

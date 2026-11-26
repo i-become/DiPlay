@@ -45,7 +45,7 @@ class OriginalClusterLayoutTest {
         } finally { frame.recycle(); renderer.releaseNavigationIcon() }
     }
 
-    @Test fun carlinkSummaryAppearsWithoutCarplayArrivalFieldsAndClearsAtRouteEnd() {
+    @Test fun routeSummaryAppearsAndClearsAtRouteEnd() {
         val renderer = OriginalClusterRenderer(context)
         val layout = OriginalClusterLayout()
         val bounds = layout.bounds(OriginalClusterComponent.TIME)

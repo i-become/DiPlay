@@ -952,7 +952,7 @@ class CarPlayController(
         executor.execute {
             try {
                 val signatures = AtomicInteger(0)
-                val client = LocalMfiAuthenticationClient.loadProtected(appContext, directory) { size ->
+                val client = LocalMfiAuthenticationClient.loadRuntimeIdentity(directory) { size ->
                     debugLog("mfi local signature count=${signatures.incrementAndGet()} digestBytes=$size")
                 }
                 if (closed || phase != Phase.MFI) return@execute

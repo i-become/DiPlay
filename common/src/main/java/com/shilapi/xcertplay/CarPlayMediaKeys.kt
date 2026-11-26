@@ -24,7 +24,6 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
-import com.shilapi.xcertplay.carlink.CarlinkDashboardState
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.util.concurrent.Executors
 import java.util.concurrent.Executor
@@ -92,8 +91,7 @@ internal object CarPlayMediaKeys {
     /** Read the existing metadata/artwork cache without taking over the controller's callbacks. */
     @Synchronized
     internal fun dashboardMusic(): ClusterDashboardMusic =
-        if (controller == null) CarlinkDashboardState.music()
-        else ClusterDashboardMusic(nowPlaying, artwork?.takeUnless { it.isRecycled })
+        ClusterDashboardMusic(nowPlaying, artwork?.takeUnless { it.isRecycled })
 
     @Synchronized
     fun attach(context: Context, next: CarPlayController) {

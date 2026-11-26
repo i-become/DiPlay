@@ -231,7 +231,7 @@ class AndroidMediaSink(
     private val callEchoReferences = ConcurrentHashMap<AudioStreamId, EchoReference>()
     private val appContext = context?.applicationContext
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
-    private val navigationAudioFocus = NavigationAudioFocusCoordinator(
+    private val navigationAudioFocus = Hs5NavigationAudioFocus(
         appContext,
         audioFocusEnabled && appContext != null && Hs5HeadUnit.isHeadUnit(appContext),
         onAudioDiagnostic,
@@ -1753,7 +1753,7 @@ private class AudioRenderer(
     private val mediaChannel: Int,
     private val navigationChannel: Int,
     private val audioFocusCoordinator: AudioFocusCoordinator,
-    private val navigationAudioFocus: NavigationAudioFocusCoordinator,
+    private val navigationAudioFocus: Hs5NavigationAudioFocus,
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,

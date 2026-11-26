@@ -20,11 +20,11 @@ import org.robolectric.annotation.LooperMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28, 33], manifest = Config.NONE)
 @LooperMode(LooperMode.Mode.PAUSED)
-class NavigationAudioFocusCoordinatorTest {
+class Hs5NavigationAudioFocusTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
     private val manager get() = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val main get() = shadowOf(Looper.getMainLooper())
-    private val owners = mutableListOf<NavigationAudioFocusCoordinator>()
+    private val owners = mutableListOf<Hs5NavigationAudioFocus>()
 
     @Before fun setup() {
         DiagnosticLogging.setEnabled(false)
@@ -73,7 +73,7 @@ class NavigationAudioFocusCoordinatorTest {
         val original = manager.getStreamVolume(stream)
         val maximum = manager.getStreamMaxVolume(stream)
         val target = if (original == maximum) original - 1 else original + 1
-        val owner = NavigationAudioFocusCoordinator(context, true, diagnostics::add).also(owners::add)
+        val owner = Hs5NavigationAudioFocus(context, true, diagnostics::add).also(owners::add)
         val token = NavigationPlaybackTracker().open()
         try {
             DiagnosticLogging.setEnabled(true)
@@ -169,5 +169,5 @@ class NavigationAudioFocusCoordinatorTest {
         assertSame(granted, shadowOf(manager).lastAudioFocusRequest)
     }
 
-    private fun owner(enabled: Boolean = true) = NavigationAudioFocusCoordinator(context, enabled).also(owners::add)
+    private fun owner(enabled: Boolean = true) = Hs5NavigationAudioFocus(context, enabled).also(owners::add)
 }

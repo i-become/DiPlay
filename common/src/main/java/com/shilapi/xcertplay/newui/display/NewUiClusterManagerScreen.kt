@@ -40,7 +40,7 @@ fun NewUiClusterManagerScreen(
             Text(stringResource(R.string.settings_cluster_manager_description),
                 color = NewUiColors.TextSecondary, style = NewUiTypography.SettingSubtitle)
             ClusterStyle.entries.forEach { style ->
-                ClusterStyleCard(style, style == selectedStyle, onConfigureOriginal, onConfigureCopyRegion) { onApply(style) }
+                ClusterStyleCard(style, style == selectedStyle, onConfigureOriginal, { onConfigureCopyRegion(style) }) { onApply(style) }
             }
         }
         NewUiSubpageBottomBar(backLabelRes = R.string.new_ui_back_to_display, onBack = onBack)
@@ -48,8 +48,7 @@ fun NewUiClusterManagerScreen(
 }
 
 @Composable
-private fun ClusterStyleCard(style: ClusterStyle, selected: Boolean, onConfigureOriginal: () -> Unit,
-    onConfigureCopyRegion: (ClusterStyle) -> Unit, onApply: () -> Unit) {
+private fun ClusterStyleCard(style: ClusterStyle, selected: Boolean, onConfigureOriginal: () -> Unit, onConfigureCopyRegion: () -> Unit, onApply: () -> Unit) {
     val shape = RoundedCornerShape(NewUiLayout.PageCardRadius)
     BoxWithConstraints(
         Modifier.fillMaxWidth().clip(shape).background(NewUiColors.CardNormal)
@@ -88,7 +87,7 @@ private fun ClusterStylePreviewImage(style: ClusterStyle, modifier: Modifier) {
 }
 
 @Composable
-private fun ClusterStyleDetails(style: ClusterStyle, selected: Boolean, onApply: () -> Unit, onConfigureOriginal: () -> Unit, onConfigureCopyRegion: (ClusterStyle) -> Unit, modifier: Modifier) {
+private fun ClusterStyleDetails(style: ClusterStyle, selected: Boolean, onApply: () -> Unit, onConfigureOriginal: () -> Unit, onConfigureCopyRegion: () -> Unit, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(NewUiLayout.RowGap)) {
         Text(stringResource(style.titleRes), color = NewUiColors.TextPrimary,
             style = NewUiTypography.ActionTitle)
@@ -105,12 +104,10 @@ private fun ClusterStyleDetails(style: ClusterStyle, selected: Boolean, onApply:
             enabled = !selected, onClick = onApply,
             modifier = Modifier.testTag("cluster-apply-" + style.preferenceValue),
         )
+        NewUiSecondaryActionButton(label = stringResource(R.string.cluster_copy_enable), onClick = onConfigureCopyRegion)
         if (style == ClusterStyle.ORIGINAL) NewUiSecondaryActionButton(
             label = stringResource(R.string.settings_original_cluster_config),
             onClick = onConfigureOriginal, modifier = Modifier.testTag("cluster-configure-original"))
-        NewUiSecondaryActionButton(
-            label = stringResource(R.string.new_ui_cluster_copy_region), onClick = { onConfigureCopyRegion(style) },
-            modifier = Modifier.testTag("cluster-copy-region-config-${style.preferenceValue}"))
     }
 }
 

@@ -27,11 +27,11 @@ internal fun resolveAppNight(
 ): Boolean = when (appearance) {
     AppAppearance.DARK -> true
     AppAppearance.LIGHT -> false
-    AppAppearance.AUTO -> hostNight ?: when (carPlayMode) {
+    AppAppearance.AUTO -> when (carPlayMode) {
         CarPlayNightMode.DAY -> false
         CarPlayNightMode.NIGHT -> true
         CarPlayNightMode.SCHEDULE -> schedule.isNight(minuteOfDay)
-        CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> vehicleNight ?: systemNight
+        CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT -> vehicleNight ?: hostNight ?: systemNight
     }
 }
 

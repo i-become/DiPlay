@@ -10,6 +10,8 @@ internal object Hs5HongqiStartupWarmup {
 
     fun schedule(context: Context) {
         val app = context.applicationContext
+        if (AirPlayPersistence.loadClusterOnlyMode(app)) return
+        if (HongqiScreenStatus.screenOff || ConnectionProgressUiState.disconnected()) return
         if (!Hs5HeadUnit.isHeadUnit(app)) return
         if (!started.compareAndSet(false, true)) return
         Hs5BootBluetoothWarmup.scheduleIfNeeded(app)

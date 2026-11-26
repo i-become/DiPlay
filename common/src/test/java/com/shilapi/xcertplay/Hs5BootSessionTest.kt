@@ -97,6 +97,28 @@ class Hs5BootSessionTest {
         assertEquals(CarPlayConnectionProgress.STEP_COUNT, ConnectionProgressUiState.litCount())
     }
 
+    @Test fun selectedPhoneWakeDoesNotRequireBootLaunchAndStillCreatesOnlyOneController() {
+        AirPlayPersistence.saveAutoStartOnBoot(app, false)
+        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        Hs5BootSession.schedule(app, phoneWake = true)
+        Hs5BootSession.schedule(app, phoneWake = true)
+        await { CarPlayBackgroundSession.hasSession() }
+        assertEquals(1, controllers.constructed().size)
+        verify(controllers.constructed().single()).start()
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
+
+    @Test fun phoneWakeCannotBypassOptInOrManualDisconnect() {
+        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, false)
+        Hs5BootSession.schedule(app, phoneWake = true)
+        assertFalse(Hs5BootSession.isPreparing())
+        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        ConnectionProgressUiState.markDisconnected()
+        Hs5BootSession.schedule(app, phoneWake = true)
+        assertFalse(CarPlayBackgroundSession.hasSession())
+        assertTrue(controllers.constructed().isEmpty())
+    }
+
     @Test fun disconnectBeforeUiAdoptionReleasesTheOwnerAndAllowsTheNextConnection() {
         Hs5BootSession.schedule(app)
         await { CarPlayBackgroundSession.snapshot() != null }

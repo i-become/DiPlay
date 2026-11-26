@@ -10,6 +10,11 @@ class PairingStore(private val onSave: ((String, ByteArray) -> Unit)? = null) {
         onSave?.invoke(identifier, copy)
     }
 
+    /** Hydrate an already persisted pairing without scheduling another persistence write. */
+    fun restore(identifier: String, longTermPublicKey: ByteArray) {
+        entries[identifier] = longTermPublicKey.copyOf()
+    }
+
     fun get(identifier: String): ByteArray? = entries[identifier]?.copyOf()
 
     fun clear() = entries.clear()

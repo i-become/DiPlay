@@ -95,6 +95,11 @@ fun NewUiDisplayScreen(
                 )
             },
             right = {
+                NewUiCompactToggleRow(
+                    title = stringResource(R.string.new_ui_cluster_only_title),
+                    subtitle = stringResource(R.string.new_ui_cluster_only_sub),
+                    checked = clusterOnlyMode, onCheckedChange = onClusterOnlyModeChanged,
+                )
                 // Style selection and static previews are available without vehicle hardware.
                 NewUiCompactValueRow(
                     title = stringResource(R.string.settings_cluster_manager),

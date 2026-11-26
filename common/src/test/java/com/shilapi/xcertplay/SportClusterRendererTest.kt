@@ -66,7 +66,7 @@ class SportClusterRendererTest {
         val top = SportClusterGeometry.offsetY(2048, 768) + 52 * SportClusterGeometry.scale(2048, 768)
         val bottom = SportClusterGeometry.offsetY(2048, 768) + 700 * SportClusterGeometry.scale(2048, 768)
         assertTrue(top > 72)
-        assertTrue(bottom <= 700)
+        assertTrue("lower information row remains inside the display with room below it", bottom <= 718)
     }
 
     @Test fun speedCardIsAbsentAndFuelCoolantStayOwnedByTheCar() {
@@ -75,7 +75,7 @@ class SportClusterRendererTest {
             gear="D",fuelFraction=.75f,coolantCelsius=96f,seatBeltWarning=true,outsideCelsius=30f)))
         try {
             assertSameRegion(empty,live,75,129,580,269)
-            assertSameRegion(empty,live,100,710,1948,768)
+            assertSameRegion(empty,live,100,710,1948,750)
             // Bright demo digits/bevel must not survive in the OEM speed rectangle.
             for(y in 144..254) for(x in 135..545) {
                 val color=pixel(empty, x,y)
@@ -167,6 +167,20 @@ class SportClusterRendererTest {
         } finally { renderer.release() }
     }
 
+    @Test fun longDestinationIsEllipsizedWithoutHidingRouteDistanceOrTime() {
+        val renderer = SportClusterRenderer(context)
+        try {
+            val nav = CarPlayGlance.Snapshot(connected = true, navigating = true,
+                routeSummary = "目的地 ${"特别长的目的地名称".repeat(12)} · 距离 10.8公里 · 用时 13分钟 · 到达 18:01")
+            val lines = renderer.navigationSummaryLines(nav)
+            assertEquals(2, lines.size)
+            assertTrue(lines[0].endsWith("…"))
+            assertTrue(lines[1].contains("距离 10.8公里"))
+            assertTrue(lines[1].contains("用时 13分钟"))
+            assertTrue(lines[1].contains("到达 18:01"))
+        } finally { renderer.release() }
+    }
+
     @Test fun onlyTheWarnedTireAndItsPressureTurnRed() {
         for(warned in 0..3) {
             val image=render(ClusterDashboardState(vehicle=OemClusterVehicleState(
@@ -204,7 +218,7 @@ class SportClusterRendererTest {
             for((name,w,h) in listOf(Triple("sport-synthetic-composite",2048,768),
                 Triple("sport-synthetic-compact",1280,480),Triple("sport-idle",2048,768),
                 Triple("sport-tire-warning",2048,768),Triple("sport-waiting",2048,768),
-                Triple("sport-carlink-summary",2048,768))) {
+                Triple("sport-route-summary",2048,768))) {
                 val image=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888)
                 val canvas=Canvas(image);canvas.drawColor(Color.rgb(2,3,5))
                 // The synthetic map is test content and is never shipped in APK resources.
@@ -215,7 +229,7 @@ class SportClusterRendererTest {
                     "sport-idle"->state.copy(guidance=CarPlayGlance.Snapshot(connected=true))
                     "sport-tire-warning"->state.copy(vehicle=state.vehicle.copy(tireWarning=listOf(true,false,false,true)))
                     "sport-waiting"->ClusterDashboardState()
-                    "sport-carlink-summary"->state.copy(guidance=state.guidance.copy(routeSummary="18:20 到达   剩余 12.8 公里"))
+                    "sport-route-summary"->state.copy(guidance=state.guidance.copy(routeSummary="18:20 到达   剩余 12.8 公里"))
                     else->state
                 }
                 val renderer=SportClusterRenderer(context)

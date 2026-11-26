@@ -3,6 +3,7 @@ package com.shilapi.xcertplay
 import android.app.Activity
 import android.content.Context
 import android.content.ServiceConnection
+import android.media.AudioManager
 import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
@@ -18,7 +19,6 @@ import com.shilapi.xcertplay.hud.CarPlayCallCard
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.media.CarPlayTelephonyAudio
 import com.shilapi.xcertplay.orchestration.CarPlayController
-import com.shilapi.xcertplay.carlink.CarlinkBridge
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
@@ -30,7 +30,8 @@ import java.util.concurrent.Executors
  * [ltd.qisi.systemservice.QisiSystemService], not as foreground [KeyEvent]s, so
  * [CarPlayMediaKeys]' MediaSession never sees them while DiPlay plays CarPlay audio.
  * With [AirPlayPersistence.loadCarBluetoothAudio] on, AVRCP on the car Bluetooth link
- * already drives the iPhone; media keys are not claimed then. Custom voice routing is independent.
+ * already drives the iPhone; only PREVIOUS is claimed for fly-screen long presses when enabled,
+ * with short presses forwarded to the system media owner. Custom voice routing is independent.
  * SystemService BACK is registered independently while a CarPlay projection is visible.
  */
 internal object Hs5SteeringKeys {
@@ -47,7 +48,6 @@ internal object Hs5SteeringKeys {
     }
     @Volatile private var appContext: Context? = null
     @Volatile private var controller: CarPlayController? = null
-    @Volatile private var carlinkBridge: CarlinkBridge? = null
     @Volatile private var controllerGeneration = 0L
     @Volatile private var hostRef = WeakReference<Activity>(null)
     private var hostGeneration = 0L
@@ -64,6 +64,7 @@ internal object Hs5SteeringKeys {
     @Volatile private var viewFocusSuppressed = false
     private var viewFocusCooldownUntil = 0L
     private var phoneKeyHeld = false
+    private var mediaLeftHeld = false
     private var mediaRightHeld = false
     private var shuttingDown = false
 
@@ -130,25 +131,6 @@ internal object Hs5SteeringKeys {
         scheduleRefresh(force = true)
     }
 
-    /** Reuses the existing QiSi/NWD hard-key registration while a Carlink session owns the phone. */
-    fun attachCarlink(context: Context, bridge: CarlinkBridge) {
-        if (!supported(context)) return
-        appContext = context.applicationContext
-        carlinkBridge = bridge
-        mediaRightHeld = false
-        controller = null
-        SteeringWheelEvents.attachCarlink(context, bridge)
-        scheduleRefresh(force = true)
-    }
-
-    fun detachCarlink(bridge: CarlinkBridge) {
-        if (carlinkBridge !== bridge) return
-        carlinkBridge = null
-        mediaRightHeld = false
-        SteeringWheelEvents.detachCarlink(bridge)
-        scheduleRefresh(force = true)
-    }
-
     fun detach(expected: CarPlayController?) {
         if (expected != null && controller !== expected) return
         fawKeys?.close()
@@ -158,9 +140,11 @@ internal object Hs5SteeringKeys {
         hostGeneration++
         phoneKeyHeld = false
         hostRef = WeakReference(null)
+        mediaLeftHeld = false
         mediaRightHeld = false
         VoiceAssistantKeyController.reset()
         releaseAll()
+        if (CarPlayHostSettingsBridge.standaloneCluster() != null) scheduleRefresh(force = true)
     }
 
     fun hostResumed(host: Activity) {
@@ -178,6 +162,15 @@ internal object Hs5SteeringKeys {
         }
         scheduleRefresh(force = true)
     }
+
+    fun standaloneChanged(context: Context) {
+        if (!supported(context)) return
+        appContext = context.applicationContext
+        scheduleRefresh(force = true)
+    }
+
+    private fun standaloneReady(context: Context): Boolean =
+        CarPlayHostSettingsBridge.standaloneCluster() != null && AirPlayPersistence.loadClusterMapEnabled(context)
 
     fun applySettings(context: Context) {
         if (!supported(context)) return
@@ -248,11 +241,10 @@ internal object Hs5SteeringKeys {
 
     private fun shouldClaimHardKeys(context: Context): Boolean {
         if (!Hs5SteeringKeyPolicy.shouldRegisterFactoryKeys(context, wheelBackShown())) return false
-        return carlinkBridge != null || sessionReady(controller)
+        return standaloneReady(context) || sessionReady(controller)
     }
 
-    private fun wheelBackShown(): Boolean = CarPlayHostSettingsBridge.wheelBackTargetShown() ||
-        com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.flyScreenShown() == true
+    private fun wheelBackShown(): Boolean = CarPlayHostSettingsBridge.wheelBackTargetShown()
 
     private fun shouldHoldViewFocus(): Boolean {
         if (viewFocusSuppressed || (hostRef.get() == null && !CarPlayHostSettingsBridge.flyScreenShown())) return false
@@ -311,7 +303,9 @@ internal object Hs5SteeringKeys {
         val phoneCall = Hs5NavigationOutputs.carPlayCall() != null || CarPlayTelephonyAudio.active()
         val flyScreen = wheelBackShown()
         val desiredKeys = if (claimKeys) {
-            Hs5SteeringKeyPolicy.factoryKeyCodes(context, phoneCall, flyScreen)
+            if (standaloneReady(context)) {
+                Hs5SteeringKeyPolicy.standaloneKeyCodes()
+            } else Hs5SteeringKeyPolicy.factoryKeyCodes(context, phoneCall, flyScreen)
         } else {
             intArrayOf()
         }
@@ -348,7 +342,7 @@ internal object Hs5SteeringKeys {
         if (holdFocus && !viewFocusHeld && SystemClock.uptimeMillis() >= viewFocusCooldownUntil) {
             viewFocusCooldownUntil = SystemClock.uptimeMillis() + VIEW_FOCUS_COOLDOWN_MS
             val otherType = if (preferredViewFocusType == QisiSteeringServiceClient.VIEW_FOCUS_CARPLAY) {
-                QisiSteeringServiceClient.VIEW_FOCUS_CARLINK
+                QisiSteeringServiceClient.VIEW_FOCUS_HS5_PROJECTION
             } else QisiSteeringServiceClient.VIEW_FOCUS_CARPLAY
             for (type in intArrayOf(preferredViewFocusType, otherType)) {
                 val result = runCatching {
@@ -477,6 +471,7 @@ internal object Hs5SteeringKeys {
         viewFocusListener = ViewFocusListener()
         viewFocusSuppressed = false
         phoneKeyHeld = false
+        mediaLeftHeld = false
         mediaRightHeld = false
     }
 
@@ -505,6 +500,7 @@ internal object Hs5SteeringKeys {
         registeredKeyCodes = intArrayOf()
         hardKeyListener = null
         phoneKeyHeld = false
+        if (!standaloneReady(context)) mediaLeftHeld = false
         mediaRightHeld = false
     }
 
@@ -522,54 +518,35 @@ internal object Hs5SteeringKeys {
         viewFocusCooldownUntil = 0L
     }
 
-    private fun onHardKey(keyCode: Int, action: Int, receivedAt: Long, backTarget: CarPlayHostActivity?,
-        carlinkTarget: com.shilapi.xcertplay.carlink.CarlinkConnectionActivity?) {
+    private fun onHardKey(keyCode: Int, action: Int, receivedAt: Long, backTarget: CarPlayHostActivity?) {
         val context = appContext ?: return
         val active = controller
-        val carlink = carlinkBridge
-        if (carlink != null && active == null) {
-            if (carlinkTarget != null && keyCode == QisiSteeringServiceClient.KEYCODE_BACK) {
-                if (action == HARD_KEY_ACTION_DOWN &&
-                    com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get() === carlinkTarget) {
-                    val closed = carlinkTarget.closeFlyScreen()
-                    recordEvent { "Carlink BACK fly screen close=$closed" }
-                }
-                return
-            }
-            if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) {
-                if (action == 1) {
-                    if (!mediaRightHeld && AirPlayPersistence.loadCarPlayWheelMedia(context) &&
-                        !AirPlayPersistence.loadCarBluetoothAudio(context) &&
-                        Hs5NavigationOutputs.carPlayCall() == null && !CarPlayTelephonyAudio.active()) {
-                        carlink.sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN)
-                        carlink.sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP)
-                    }
-                    mediaRightHeld = true
-                    return
-                }
-                if (action == 2) { mediaRightHeld = false; return }
-                if (mediaRightHeld) return
-            }
-            val mapped = when (keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> KeyEvent.KEYCODE_MEDIA_PREVIOUS.takeIf { AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context) }
-                KeyEvent.KEYCODE_MEDIA_NEXT -> KeyEvent.KEYCODE_MEDIA_NEXT.takeIf { AirPlayPersistence.loadCarPlayWheelMedia(context) && !AirPlayPersistence.loadCarBluetoothAudio(context) }
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK -> keyCode
-                else -> null
-            }
-            if (mapped != null && action == HARD_KEY_ACTION_DOWN) {
-                carlink.sendKey(mapped, KeyEvent.ACTION_DOWN)
-                carlink.sendKey(mapped, KeyEvent.ACTION_UP)
-            }
-            recordEvent { "Carlink key=$keyCode action=$action sent=${mapped != null}" }
-            return
-        }
-        if (active == null || !shouldClaimHardKeys(context)) {
+        if (!shouldClaimHardKeys(context)) {
             scheduleRefresh(force = true)
             return
         }
+        if (standaloneReady(context)) {
+            val target = CarPlayHostSettingsBridge.standaloneCluster() ?: return
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+                when (action) {
+                    1 -> {
+                        if (!mediaLeftHeld) {
+                            val shown = target.show()
+                            recordEvent { "PREVIOUS long press standalone fly screen show=$shown" }
+                        }
+                        mediaLeftHeld = true
+                    }
+                    2 -> mediaLeftHeld = false
+                    HARD_KEY_ACTION_DOWN -> if (!mediaLeftHeld) {
+                        val audio = context.getSystemService(AudioManager::class.java)
+                        audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                        audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                    }
+                }
+            }
+            return
+        }
+        if (active == null) return
         if (keyCode in Hs5SteeringKeyPolicy.FLY_SCREEN_BACK_CODES) {
             if (Hs5SteeringKeyPolicy.closesFlyScreen(keyCode, action, CarPlayHostSettingsBridge.wheelBackTargetShown())) {
                 val closed = backTarget != null && CarPlayHostSettingsBridge.closeFromWheel(backTarget, "Qisi BACK short click")
@@ -579,11 +556,36 @@ internal object Hs5SteeringKeys {
         }
         // A previous registration may already have queued a media event before settings changed.
         if (keyCode == QisiSteeringServiceClient.KEYCODE_VOICE_ASSIST ||
-            keyCode == QisiSteeringServiceClient.KEYCODE_SDS_CAR_LINK) {
+            keyCode == QisiSteeringServiceClient.KEYCODE_SDS_VOICE_ASSIST) {
             if (action == HARD_KEY_ACTION_DOWN && AirPlayPersistence.loadCarPlayWheelSiri(context)) {
                 VoiceAssistantKeyController.onFactoryVoiceKeyDown(context, keyCode, receivedAt)
             }
             return
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+            if (action == 1) {
+                if (!mediaLeftHeld && AirPlayPersistence.loadClusterMapEnabled(context)) {
+                    val shown = CarPlayHostSettingsBridge.showFlyScreenFromWheel()
+                    recordEvent { "PREVIOUS long press fly screen show=$shown" }
+                }
+                mediaLeftHeld = true
+                return
+            }
+            if (action == 2) { mediaLeftHeld = false; return }
+            if (mediaLeftHeld) return
+            if (action == HARD_KEY_ACTION_DOWN &&
+                (AirPlayPersistence.loadCarBluetoothAudio(context) || !AirPlayPersistence.loadCarPlayWheelMedia(context))) {
+                // Claimed solely for fly-screen long presses: send short presses to the
+                // current system media owner, including the OEM Bluetooth player.
+                if (AirPlayPersistence.loadClusterMapEnabled(context)) {
+                    runCatching {
+                        val audio = context.getSystemService(AudioManager::class.java)
+                        audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                        audio?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                    }.onFailure { error -> recordEvent { "PREVIOUS short press dispatch failed: ${error.javaClass.simpleName}" } }
+                }
+                return
+            }
         }
         if (AirPlayPersistence.loadCarBluetoothAudio(context)) return
         if (keyCode == 110) {
@@ -719,16 +721,14 @@ internal object Hs5SteeringKeys {
             val backTarget = if (keyCode == QisiSteeringServiceClient.KEYCODE_BACK) {
                 CarPlayHostSettingsBridge.wheelBackTarget()
             } else null
+            val standaloneTarget = CarPlayHostSettingsBridge.standaloneCluster()
             val backSession = if (backTarget != null) controller?.activeAirPlaySessionToken() else null
-            val capturedCarlink = carlinkBridge
-            val carlinkTarget = if (keyCode == QisiSteeringServiceClient.KEYCODE_BACK)
-                com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.takeIf { it.flyScreenShown() }
-                else null
             mainHandler.post {
                 recordEvent { "hard key raw code=$keyCode action=$action listener=$generation current=$hardKeyGeneration" }
+                if (standaloneTarget !== CarPlayHostSettingsBridge.standaloneCluster()) return@post
                 if (generation == hardKeyGeneration && (backTarget == null ||
                         controller?.activeAirPlaySessionToken() === backSession)) {
-                    if (capturedCarlink === carlinkBridge) onHardKey(keyCode, action, receivedAt, backTarget, carlinkTarget)
+                    onHardKey(keyCode, action, receivedAt, backTarget)
                 }
             }
             reply?.writeNoException()

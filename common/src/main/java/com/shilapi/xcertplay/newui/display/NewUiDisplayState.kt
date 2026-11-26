@@ -153,7 +153,10 @@ internal object NewUiDisplayActions {
             else -> CarPlayNightMode.SYSTEM
         }
         AirPlayPersistence.saveCarPlayNightMode(context, mode)
+        // This selector controls both projection and app chrome, including older installs.
+        AirPlayPersistence.saveAppAppearance(context, com.shilapi.xcertplay.AppAppearance.AUTO)
         CarPlayHostSettingsBridge.notifyCarPlayNightModeChanged(context)
+        com.shilapi.xcertplay.AppAppearanceRuntime.invalidateVehicleLight()
     }
 
     fun saveClusterMap(context: Context, enabled: Boolean) {
@@ -162,6 +165,7 @@ internal object NewUiDisplayActions {
             AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(context, true)
         }
         CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
+        com.shilapi.xcertplay.Hs5SteeringKeys.applySettings(context)
     }
 
     fun saveClusterNavMarker(context: Context, xPercent: Int, yPercent: Int) {

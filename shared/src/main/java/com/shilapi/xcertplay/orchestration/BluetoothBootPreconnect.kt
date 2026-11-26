@@ -12,6 +12,9 @@ import java.util.concurrent.TimeUnit
 /** One bounded boot connection, handed to the controller without opening a second RFCOMM link. */
 object BluetoothBootPreconnect {
     const val IAP2_SERVICE_UUID = "00000000-deca-fade-deca-deafdecacafe"
+    const val SOCKET_CONNECT_TIMEOUT_MILLIS = 15_000L
+    // Covers the 35s observed cold-boot radio wait, RFCOMM connection, and a small handoff margin.
+    const val BOOT_CONNECTION_DEADLINE_MILLIS = 55_000L
     private val gate = Any()
     private var pending: Pair<String, Attempt>? = null
     private val timer = Executors.newSingleThreadScheduledExecutor { task ->
@@ -64,7 +67,7 @@ object BluetoothBootPreconnect {
                     }
                     socket = candidate
                     deadline?.cancel(false)
-                    deadline = timer.schedule({ closeWithReason("socket-deadline") }, 15_000, TimeUnit.MILLISECONDS)
+                    deadline = timer.schedule({ closeWithReason("socket-deadline") }, SOCKET_CONNECT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
                 }
                 stage = "rfcomm-connect"
                 log("connecting")
@@ -85,10 +88,10 @@ object BluetoothBootPreconnect {
         }
 
         internal fun start() {
-            // Allows the slowest known Hongqi cold boot radio transition (18s) and 15s for RFCOMM,
+            // Allows the slowest observed Hongqi cold boot radio transition and 15s for RFCOMM,
             // with a small startup margin. The prepare callback exits earlier on normal boots.
             // Also releases a connected socket if the boot UI/controller never starts.
-            deadline = timer.schedule({ closeWithReason("boot-deadline") }, 36_000, TimeUnit.MILLISECONDS)
+            deadline = timer.schedule({ closeWithReason("boot-deadline") }, BOOT_CONNECTION_DEADLINE_MILLIS, TimeUnit.MILLISECONDS)
             Thread(task, "diplay-boot-bt-connect").apply { isDaemon = true; start() }
         }
 

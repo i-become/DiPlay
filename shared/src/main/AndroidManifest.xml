@@ -58,7 +58,6 @@
         <package android:name="ltd.qisi.navi" />
         <package android:name="ltd.qisi.adapterservice" />
         <package android:name="faw.system.viewservice" />
-        <package android:name="com.neusoft.carlink" />
         <intent>
             <action android:name="AUTONAVI_STANDARD_BROADCAST_SEND" />
         </intent>

@@ -67,7 +67,6 @@ object Hs5HeadUnit {
         "ltd.qisi.navi",
         "ltd.qisi.settings",
         "faw.system.viewservice",
-        "com.neusoft.carlink",
     )
 
 

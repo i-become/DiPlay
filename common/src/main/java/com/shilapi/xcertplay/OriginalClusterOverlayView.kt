@@ -31,7 +31,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
     private var nav = CarPlayGlance.Snapshot()
     private val refresh = Runnable {
         vehicle = HongqiClusterVehicleData.snapshot()
-        nav = CarPlayGlance.snapshot()
+        nav = ClusterInstrumentData.guidance(context)
         invalidate()
         onDataInvalidated?.invoke()
     }
@@ -64,8 +64,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
             subscribeVehicle()
             invalidate()
         }
-        subscriptions += CarPlayGlance.subscribe { scheduleRefresh() }
-        subscriptions += CarPlayMediaKeys.subscribeDashboard { scheduleMusicRefresh() }
+        subscriptions += ClusterInstrumentData.subscribe(context) { scheduleRefresh(); scheduleMusicRefresh() }
         subscribeVehicle()
         scheduleRefresh()
     }
@@ -105,7 +104,7 @@ internal class OriginalClusterOverlayView(context: Context, private val preview:
             if (preview) previewVehicle else vehicle, if (preview) previewNav else nav,
             editing = editing, only = component,
             musicState = if (preview) previewMusic else if (component == OriginalClusterComponent.MUSIC)
-                CarPlayMediaKeys.dashboardMusic() else emptyMusic)
+                ClusterInstrumentData.music(context) else emptyMusic)
     }
     fun shouldAnimate(component: OriginalClusterComponent) = observing && component == OriginalClusterComponent.MUSIC &&
         layout[component].visible && renderer.lyricAnimating

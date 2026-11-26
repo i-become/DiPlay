@@ -6,9 +6,12 @@ import android.content.Context
 internal object UpdateAvailability {
     private const val PREFERENCES = "diplay_update_availability"
     private const val TAG = "tag"
+    private const val CATALOG_SCHEMA = "catalog_schema"
     private const val APK_NAME = "apk_name"
     private const val APK_URL = "apk_url"
     private const val CHECKSUMS_URL = "checksums_url"
+    private const val TITLE = "title"
+    private const val DESCRIPTION = "description"
     private const val LAST_ATTEMPT_MILLIS = "last_attempt_millis"
     private const val BACKGROUND_CHECKS = "background_checks"
     private const val LAST_RESULT = "last_result"
@@ -30,11 +33,17 @@ internal object UpdateAvailability {
 
     fun available(context: Context, installedVersion: String): UpdateRelease? {
         val values = preferences(context)
+        if (values.getInt(CATALOG_SCHEMA, 0) != 3) {
+            clear(context)
+            return null
+        }
         val release = UpdateRelease(
             tagName = values.getString(TAG, null) ?: return null,
             apkName = values.getString(APK_NAME, null) ?: return null,
             apkUrl = values.getString(APK_URL, null) ?: return null,
             checksumsUrl = values.getString(CHECKSUMS_URL, null) ?: return null,
+            title = values.getString(TITLE, "").orEmpty(),
+            description = values.getString(DESCRIPTION, "").orEmpty(),
         )
         if (UpdateVersion.isNewer(release.tagName, installedVersion)) return release
         clear(context)
@@ -43,19 +52,25 @@ internal object UpdateAvailability {
 
     fun save(context: Context, release: UpdateRelease) {
         preferences(context).edit()
+            .putInt(CATALOG_SCHEMA, 3)
             .putString(TAG, release.tagName)
             .putString(APK_NAME, release.apkName)
             .putString(APK_URL, release.apkUrl)
             .putString(CHECKSUMS_URL, release.checksumsUrl)
+            .putString(TITLE, release.title.take(160))
+            .putString(DESCRIPTION, release.description.take(12_000))
             .apply()
     }
 
     fun clear(context: Context) {
         preferences(context).edit()
             .remove(TAG)
+            .remove(CATALOG_SCHEMA)
             .remove(APK_NAME)
             .remove(APK_URL)
             .remove(CHECKSUMS_URL)
+            .remove(TITLE)
+            .remove(DESCRIPTION)
             .apply()
     }
 

@@ -9,6 +9,37 @@ import java.lang.ref.WeakReference
 internal object CarPlayHostSettingsBridge {
     private var hostRef: WeakReference<CarPlayHostActivity>? = null
     private var clusterExitRequest: (() -> Unit)? = null
+    internal interface StandaloneCluster {
+        fun enabled(): Boolean
+        fun shown(): Boolean
+        fun show(): Boolean
+        fun close(reason: String): Boolean
+        fun settingsChanged()
+    }
+    private var standaloneRef = WeakReference<StandaloneCluster>(null)
+    private var standaloneExitRequest: (() -> Unit)? = null
+    fun standaloneCluster(): StandaloneCluster? = standaloneRef.get()?.takeIf { it.enabled() }
+
+    fun registerStandalone(context: Context, target: StandaloneCluster) {
+        if (standaloneRef.get() !== target) {
+            standaloneExitRequest?.let(com.shilapi.xcertplay.hud.Hs5NavigationOutputs::clearHs5ClusterExitListener)
+            standaloneRef = WeakReference(target)
+            val reference = WeakReference(target)
+            val request: () -> Unit = { reference.get()?.takeIf { it.enabled() }?.close("Qisi full-screen navigation exit"); Unit }
+            standaloneExitRequest = request
+            com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setHs5ClusterExitListener(request)
+        }
+        Hs5SteeringKeys.standaloneChanged(context)
+    }
+
+    fun unregisterStandalone(context: Context, target: StandaloneCluster) {
+        if (standaloneRef.get() !== target) return
+        standaloneRef.clear()
+        standaloneExitRequest?.let(com.shilapi.xcertplay.hud.Hs5NavigationOutputs::clearHs5ClusterExitListener)
+        standaloneExitRequest = null
+        Hs5SteeringKeys.standaloneChanged(context)
+    }
+
     private val vehicleNightCommands by lazy {
         java.util.concurrent.Executors.newSingleThreadExecutor { task ->
             Thread(task, "DiPlay-VehicleNight").apply { isDaemon = true }
@@ -46,7 +77,7 @@ internal object CarPlayHostSettingsBridge {
 
     fun notifyClusterMapSettingsChanged() {
         hostRef?.get()?.reloadClusterMapFromSettings()
-        com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.updateCluster()
+        standaloneCluster()?.settingsChanged()
     }
 
     fun notifyVehicleNightChanged(context: Context, night: Boolean?) {
@@ -68,11 +99,16 @@ internal object CarPlayHostSettingsBridge {
         }
     }
 
-    fun flyScreenShown(): Boolean = hostRef?.get()?.flyScreenShown() == true
+    fun showFlyScreenFromWheel(): Boolean = standaloneCluster()?.show() ?: (hostRef?.get()?.showFlyScreenFromWheel() == true)
+
+    fun flyScreenShown(): Boolean = standaloneCluster()?.shown() ?: (hostRef?.get()?.flyScreenShown() == true)
 
     /** A wheel key closes the fly screen as the three-finger gesture does; the gesture reopens it. */
-    fun closeFlyScreen(reason: String): Boolean = hostRef?.get()?.closeFlyScreen(reason) == true ||
-        com.shilapi.xcertplay.carlink.CarlinkConnectionActivity.current?.get()?.closeFlyScreen() == true
+    fun closeFlyScreen(reason: String): Boolean {
+        val standalone = standaloneCluster()
+        if (standalone != null) return standalone.close(reason)
+        return hostRef?.get()?.closeFlyScreen(reason) == true
+    }
 
     internal fun closeFlyScreenFromVehicle(expected: CarPlayHostActivity): Boolean =
         hostRef?.get() === expected && expected.closeFlyScreen("Qisi full-screen navigation exit")
@@ -82,7 +118,7 @@ internal object CarPlayHostSettingsBridge {
         it.projectionShown() || it.flyScreenShown()
     }
 
-    fun wheelBackTargetShown(): Boolean = wheelBackTarget() != null
+    fun wheelBackTargetShown(): Boolean = standaloneCluster()?.shown() == true || wheelBackTarget() != null
 
     fun closeFromWheel(expected: CarPlayHostActivity, reason: String): Boolean {
         if (hostRef?.get() !== expected) return false

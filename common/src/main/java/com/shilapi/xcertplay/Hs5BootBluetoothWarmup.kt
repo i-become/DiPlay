@@ -24,7 +24,8 @@ internal object Hs5BootBluetoothWarmup {
 
     fun scheduleIfNeeded(context: Context) {
         val app = context.applicationContext
-        if (DiPlayPreferences.phoneLinkMode(app) == DiPlayPreferences.PhoneLinkMode.CARLINK) return
+        if (AirPlayPersistence.loadClusterOnlyMode(app)) return
+        if (HongqiScreenStatus.screenOff || ConnectionProgressUiState.disconnected()) return
         if (!Hs5HeadUnit.isHeadUnit(app)) return
         if (!DiPlayPreferences.autoConnectWireless(app)) { record("skip=wireless_disabled"); return }
         if (!DiPlayPreferences.autoConnect(app)) { record("skip=auto_connect_disabled"); return }
@@ -37,6 +38,7 @@ internal object Hs5BootBluetoothWarmup {
         if (!address.isNullOrBlank()) {
             CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.BLUETOOTH_PRECONNECT_STARTED)
             BluetoothBootPreconnect.schedule(address, prepareSocket = {
+                if (AirPlayPersistence.loadClusterOnlyMode(app)) throw IOException("Instrument-only mode")
                 val adapter = BluetoothAdapter.getDefaultAdapter()
                     ?: throw IOException("Bluetooth adapter is unavailable")
                 val allowBootWait = SystemClock.elapsedRealtime() <
@@ -47,6 +49,7 @@ internal object Hs5BootBluetoothWarmup {
                 val deadline = System.nanoTime() + radioWaitMillis * 1_000_000L
                 var lastState = adapter.state
                 while (!adapter.isEnabled && System.nanoTime() < deadline) {
+                    if (AirPlayPersistence.loadClusterOnlyMode(app)) throw IOException("Instrument-only mode")
                     if (Thread.currentThread().isInterrupted) throw InterruptedException("Bluetooth boot cancelled")
                     val state = adapter.state
                     if (state != lastState) {
@@ -73,6 +76,7 @@ internal object Hs5BootBluetoothWarmup {
                 record("stage=discovery-cancel")
                 cancelBluetoothDiscoveryForConnection(app, adapter)
                 record("stage=socket-create")
+                if (AirPlayPersistence.loadClusterOnlyMode(app)) throw IOException("Instrument-only mode")
                 device.createRfcommSocketToServiceRecord(UUID.fromString(BluetoothBootPreconnect.IAP2_SERVICE_UUID))
             }, log = { event ->
                 record(event)

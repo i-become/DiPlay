@@ -32,7 +32,7 @@ class AudioRebufferCapacityTest {
             val renderer = type.declaredConstructors.single { !it.isSynthetic }
                 .apply { isAccessible = true }.newInstance(
                     AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 96, "media"), false, false, 0, 0,
-                    AudioFocusCoordinator(null, false, false), NavigationAudioFocusCoordinator(null, false),
+                    AudioFocusCoordinator(null, false, false), Hs5NavigationAudioFocus(null, false),
                     0, millis, { _: String -> }, 0L, false, null, false)
             fun set(name: String, value: Any) = type.getDeclaredField(name).apply { isAccessible = true }.set(renderer, value)
             fun get(name: String) = type.getDeclaredField(name).apply { isAccessible = true }.get(renderer)

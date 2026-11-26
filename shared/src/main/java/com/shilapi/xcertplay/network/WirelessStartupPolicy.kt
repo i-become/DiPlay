@@ -20,11 +20,11 @@ object WirelessStartupPolicy {
     private const val HONGQI_BOOT_GRACE_MILLIS = 180_000L
     private const val GENERIC_BOOT_GRACE_MILLIS = 120_000L
     /**
-     * Some Hongqi firmware keeps Bluetooth OFF for more than twelve seconds after accepting
-     * enable(). Keep the first boot connection alive long enough to observe the later
-     * TURNING_ON -> ON change instead of tearing down the Wi-Fi/P2P stack and starting over.
+     * In observed HS5 cold boots, Bluetooth may stay OFF for about 26 seconds after enable()
+     * is accepted. Keep the boot connection alive long enough to observe TURNING_ON -> ON;
+     * polling exits immediately when the radio is ready, so this adds no delay on fast boots.
      */
-    private const val HONGQI_BOOT_BLUETOOTH_READY_MILLIS = 18_000L
+    const val HONGQI_BOOT_BLUETOOTH_READY_MILLIS = 35_000L
     private const val DEFAULT_BLUETOOTH_READY_MILLIS = 8_000L
     const val INTERFACE_POLL_MILLIS = 250L
     private const val HONGQI_INTERFACE_POLL_MILLIS = 100L

@@ -31,8 +31,13 @@ import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.ConnectionProgressUiState
 import com.shilapi.xcertplay.DiPlayWindowFullscreen
 import com.shilapi.xcertplay.Hs5HongqiStartupWarmup
+import com.shilapi.xcertplay.Hs5BootSession
 import com.shilapi.xcertplay.Hs5SteeringKeys
 import com.shilapi.xcertplay.Hs5ClusterActivityOutput
+import com.shilapi.xcertplay.ClusterScreenCaptureService
+import com.shilapi.xcertplay.ClusterScreenFrames
+import com.shilapi.xcertplay.ClusterStyle
+import com.shilapi.xcertplay.newui.display.NewUiClusterCopyRegionScreen
 import com.shilapi.xcertplay.ClusterMapPresentation
 import androidx.core.content.FileProvider
 import com.shilapi.xcertplay.AppLocale
@@ -51,6 +56,7 @@ import com.shilapi.xcertplay.AudioChannelPreview
 import com.shilapi.xcertplay.DiagnosticExportStore
 import com.shilapi.xcertplay.DiagnosticRemovableVolumes
 import com.shilapi.xcertplay.RemovableStorageVolume
+import com.shilapi.xcertplay.CarPlayStartupDiagnostics
 import com.shilapi.xcertplay.ImageCropActivity
 import com.shilapi.xcertplay.InterfaceSize
 import com.shilapi.xcertplay.host.R
@@ -85,7 +91,6 @@ import com.shilapi.xcertplay.newui.display.NewUiDisplayActions
 import com.shilapi.xcertplay.newui.display.NewUiDisplayFpsScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayIconSizeScreen
 import com.shilapi.xcertplay.newui.display.NewUiClusterManagerScreen
-import com.shilapi.xcertplay.newui.display.NewUiClusterCopyRegionScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayNavMarkerScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayScreen
 import com.shilapi.xcertplay.newui.display.NewUiDisplayState
@@ -113,13 +118,87 @@ import java.util.Date
 import java.util.Locale
 
 /** Primary Hongqi head-unit shell for connection, display, settings and diagnostics. */
-class NewUiActivity : ComponentActivity() {
+open class NewUiActivity : ComponentActivity() {
     private var interfaceOverride: Configuration? = null
     private val handler = Handler(Looper.getMainLooper())
     private var unsubscribeAppearance: (() -> Unit)? = null
     private lateinit var connectionActions: NewUiConnectionActions
     private var snapshot by mutableStateOf(NewUiConnectionSnapshot.placeholder)
     private var displayState by mutableStateOf(NewUiDisplayState.placeholder)
+    private var copyRegionStyle by mutableStateOf(ClusterStyle.ORIGINAL)
+    @Volatile private var clusterOnlyDismissed = false
+    private var screenCaptureConsentPending = false
+    private var screenCaptureConsentAttempted = false
+    private var screenCaptureConsentRetries = 0
+    private var screenCaptureRecoveryRetried = false
+    private var clusterOnlyBootLaunch = false
+    private var returnedHomeForClusterOnlyBoot = false
+    private var observedCaptureStopGeneration = 0L
+    private var captureStopRecoveryAttempted = false
+    private var clusterOnlyOutputFailure: String? = null
+    private var clusterOutputWaitTask: Runnable? = null
+    private val standaloneCluster = object : CarPlayHostSettingsBridge.StandaloneCluster {
+        override fun enabled() = AirPlayPersistence.loadClusterOnlyMode(this@NewUiActivity)
+        override fun shown() = enabled() && Hs5ClusterActivityOutput.isOpen()
+        override fun show(): Boolean {
+            if (!enabled() || !AirPlayPersistence.loadClusterMapEnabled(this@NewUiActivity)) return false
+            clusterOnlyDismissed = false
+            startClusterOnlyOutput()
+            return shown()
+        }
+        override fun close(reason: String): Boolean {
+            if (!shown()) return false
+            clusterOnlyDismissed = true
+            Hs5ClusterActivityOutput.close(reason, clusterOnlyHost)
+            com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
+            Hs5SteeringKeys.applySettings(this@NewUiActivity)
+            return true
+        }
+        override fun settingsChanged() {
+            clusterOnlyDismissed = false
+            syncClusterOnlyOutput()
+        }
+    }
+    private val clusterOnlyHost = object : Hs5ClusterActivityOutput.Host {
+        override fun onClusterWindowSurface(surface: android.view.Surface?) {
+            CarPlayStartupDiagnostics.capture("cluster-only window surface=${surface?.isValid == true}")
+        }
+        override fun onClusterWindowClosed(reason: String) {
+            clusterOnlyDismissed = true
+            Hs5SteeringKeys.applySettings(this@NewUiActivity)
+            CarPlayStartupDiagnostics.capture("cluster-only window closed reason=$reason")
+            if (AirPlayPersistence.loadClusterOnlyMode(this@NewUiActivity)) {
+                com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
+            }
+        }
+    }
+    private val screenCapturePermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        screenCaptureConsentPending = false
+        screenCaptureConsentAttempted = true
+        CarPlayStartupDiagnostics.capture("cluster-only screen-capture permission-result resultCode=${result.resultCode} dataPresent=${result.data != null} mode=${AirPlayPersistence.loadClusterOnlyMode(this)}")
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.logcat {
+            android.util.Log.i("DiPlay-ScreenCopy", "permission result=${result.resultCode} data=${result.data != null} enabled=${AirPlayPersistence.loadClusterOnlyMode(this)}")
+        }
+        if (result.resultCode == RESULT_OK && result.data != null && AirPlayPersistence.loadClusterOnlyMode(this)) {
+            runCatching {
+                ClusterScreenCaptureService.start(this, result.data!!)
+                waitForScreenCopyBeforeOpeningInstrument()
+            }.onFailure {
+                screenCaptureConsentAttempted = false
+                CarPlayStartupDiagnostics.capture("cluster-only capture service request failed type=${it.javaClass.simpleName} message=${it.message}")
+                com.shilapi.xcertplay.diagnostics.DiagnosticLogging.logcat {
+                    android.util.Log.e("DiPlay-ScreenCopy", "service start failed ${it.javaClass.simpleName}")
+                }
+                Toast.makeText(this, R.string.cluster_copy_error, Toast.LENGTH_LONG).show()
+                startClusterOnlyOutput()
+            }
+        } else {
+            CarPlayStartupDiagnostics.capture("cluster-only screen-capture permission denied-or-obsolete resultCode=${result.resultCode} dataPresent=${result.data != null}")
+            Toast.makeText(this, R.string.cluster_copy_denied, Toast.LENGTH_LONG).show()
+            startClusterOnlyOutput()
+        }
+    }
+
     private var clusterOnlyMode by mutableStateOf(false)
     private var settingsState by mutableStateOf(NewUiSettingsState.placeholder)
     private var diagnosticReports by mutableStateOf(emptyList<NewUiDiagnosticFile>())
@@ -131,7 +210,6 @@ class NewUiActivity : ComponentActivity() {
     private var destination by mutableStateOf(NewUiDestination.CONNECTION)
     private var connectionSubpage by mutableStateOf(NewUiConnectionSubpage.MAIN)
     private var settingsSubpage by mutableStateOf(NewUiSettingsSubpage.MAIN)
-    private var copyRegionStyle by mutableStateOf(com.shilapi.xcertplay.ClusterStyle.ORIGINAL)
     private var displaySubpage by mutableStateOf(NewUiDisplaySubpage.MAIN)
     private var clusterNavMarkerX by mutableStateOf(50)
     private var clusterNavMarkerY by mutableStateOf(45)
@@ -200,9 +278,18 @@ class NewUiActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (intent.getBooleanExtra(EXTRA_CLUSTER_ONLY_BOOT, false) ||
+            AirPlayPersistence.loadClusterOnlyMode(this)) {
+            setTheme(R.style.Theme_Xcertplay_ConnectionHub)
+        }
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) && CarPlayBackgroundSession.active &&
-            DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARPLAY) {
+        screenCaptureConsentPending = savedInstanceState?.getBoolean("screen_copy_consent_pending") ?: false
+        clusterOnlyBootLaunch = savedInstanceState?.getBoolean(EXTRA_CLUSTER_ONLY_BOOT)
+            ?: intent.getBooleanExtra(EXTRA_CLUSTER_ONLY_BOOT, false)
+        observedCaptureStopGeneration = ClusterScreenCaptureService.stoppedGeneration
+        applyClusterOnlyBootWindow(clusterOnlyBootLaunch)
+        if (savedInstanceState == null && DiPlayLauncher.isLauncherIntent(intent) &&
+            !AirPlayPersistence.loadClusterOnlyMode(this) && CarPlayBackgroundSession.active) {
             DiPlayLauncher.openCarPlayProjection(this)
             finish()
             return
@@ -242,16 +329,21 @@ class NewUiActivity : ComponentActivity() {
             applyIntentNavigation(intent)
         }
         refreshAll()
+        if (AirPlayPersistence.loadClusterOnlyMode(this) && !clusterOnlyBootLaunch) handler.post { requestScreenCopy() }
         if (consumeBluetoothAutoConnectIntent(intent)) {
             handler.post { connectionActions.connect(wirelessForAutoConnect()) }
-        } else if (savedInstanceState == null && shouldAutoConnectOnColdStart(intent)) {
-            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
+        } else if (savedInstanceState == null &&
+            shouldAutoConnectOnColdStart(intent)
+        ) {
+            startColdStartConnectionWhenBootPreparationSettles()
         }
         setContent {
             val activity = this@NewUiActivity
             NewUiTheme {
-                if (destination == NewUiDestination.DISPLAY && displaySubpage == NewUiDisplaySubpage.CLUSTER_COPY_REGION) {
-                    NewUiClusterCopyRegionScreen(style = copyRegionStyle, onBack = { popDisplaySubpage() })
+                if (destination == NewUiDestination.DISPLAY && displaySubpage == NewUiDisplaySubpage.COPY_REGION) {
+                    NewUiClusterCopyRegionScreen(copyRegionStyle,
+                        onBack = { displaySubpage = NewUiDisplaySubpage.CLUSTER_MANAGER; syncSubpageBackCallback() },
+                        onStartCapture = { requestScreenCopy() })
                 } else NewUiShell(
                     destination = destination,
                     showHs5Branding = true,
@@ -298,13 +390,6 @@ class NewUiActivity : ComponentActivity() {
                                 connectAfterSave = connectPhoneAfterSave,
                                 onBack = { popConnectionSubpage() },
                                 onConfirm = { confirmConnectPhone(it) },
-                                onModeChange = { address, mode ->
-                                    DiPlayPreferences.savePhoneLinkMode(this@NewUiActivity, address, mode)
-                                    if (address == DiPlayPreferences.phoneAddress(this@NewUiActivity) && mode == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-                                        connectionActions.startCarlinkOnHome()
-                                    }
-                                    refreshAll()
-                                },
                                 onRequestBluetoothPermission = {
                                     connectionActions.requestBluetoothPermissionForPhone()
                                 },
@@ -316,13 +401,6 @@ class NewUiActivity : ComponentActivity() {
                                 state = phoneSelectionState,
                                 onBack = { popConnectionSubpage() },
                                 onSelectPhone = { switchPhone(it) },
-                                onModeChange = { address, mode ->
-                                    DiPlayPreferences.savePhoneLinkMode(this@NewUiActivity, address, mode)
-                                    if (address == DiPlayPreferences.phoneAddress(this@NewUiActivity) && mode == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-                                        connectionActions.startCarlinkOnHome()
-                                    }
-                                    refreshAll()
-                                },
                                 onAddPhone = { connectionActions.openBluetoothSettings() },
                                 onRequestBluetoothPermission = {
                                     connectionActions.requestBluetoothPermissionForPhone()
@@ -342,6 +420,7 @@ class NewUiActivity : ComponentActivity() {
                             )
                         }
                         NewUiDestination.DISPLAY -> when (displaySubpage) {
+                            NewUiDisplaySubpage.COPY_REGION -> Unit
                             NewUiDisplaySubpage.ICON_SIZE -> NewUiDisplayIconSizeScreen(
                                 selectedSize = displayState.carPlaySize,
                                 reconnectNeeded = displayState.iconSizeReconnectNeeded,
@@ -395,18 +474,24 @@ class NewUiActivity : ComponentActivity() {
                             )
                             NewUiDisplaySubpage.CLUSTER_MANAGER -> NewUiClusterManagerScreen(
                                 selectedStyle = displayState.clusterStyle,
+                                onConfigureCopyRegion = { style ->
+                                    copyRegionStyle = style
+                                    displaySubpage = NewUiDisplaySubpage.COPY_REGION
+                                    syncSubpageBackCallback()
+                                },
                                 onBack = { popDisplaySubpage() },
                                 onConfigureOriginal = {
                                     displaySubpage = NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG
                                     syncSubpageBackCallback()
                                 },
-                                onConfigureCopyRegion = { style ->
-                                    copyRegionStyle = style
-                                    displaySubpage = NewUiDisplaySubpage.CLUSTER_COPY_REGION
-                                    syncSubpageBackCallback()
-                                },
                                 onApply = { style ->
-                                    if (style != displayState.clusterStyle) {
+                                    if (clusterOnlyMode && style != displayState.clusterStyle) {
+                                        Hs5ClusterActivityOutput.close("cluster-only style changed")
+                                        NewUiDisplayActions.saveClusterStyle(activity, style)
+                                        clusterOnlyDismissed = false
+                                        refreshAll()
+                                        waitForScreenCopyBeforeOpeningInstrument()
+                                    } else if (style != displayState.clusterStyle) {
                                         applyWithReconnectConfirm(
                                             title = getString(R.string.settings_cluster_manager),
                                             message = getString(R.string.settings_cluster_style_reconnect),
@@ -424,33 +509,39 @@ class NewUiActivity : ComponentActivity() {
                                 onBack = { closeOriginalClusterConfig() },
                                 registerExitGuard = { originalClusterExitGuard = it },
                             )
-                            NewUiDisplaySubpage.CLUSTER_COPY_REGION -> NewUiClusterCopyRegionScreen(
-                                style = copyRegionStyle,
-                                onBack = { popDisplaySubpage() },
-                            )
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
                                 clusterOnlyMode = clusterOnlyMode,
                                 onClusterOnlyModeChanged = { enabled ->
                                     AirPlayPersistence.saveClusterOnlyMode(activity, enabled)
                                     clusterOnlyMode = enabled
+                                    clusterOnlyDismissed = false
+                                    screenCaptureConsentAttempted = false
+                                    screenCaptureConsentRetries = 0
+                                    screenCaptureRecoveryRetried = false
+                                    CarPlayStartupDiagnostics.capture("cluster-only mode changed enabled=$enabled carPlaySession=${CarPlayBackgroundSession.hasSession()}")
                                     if (enabled) {
-                                        com.shilapi.xcertplay.carlink.CarlinkBridge.get(activity).stop()
+                                        com.shilapi.xcertplay.Hs5BootSession.cancelPending()
+                                        com.shilapi.xcertplay.orchestration.BluetoothBootPreconnect.cancel()
                                         if (CarPlayBackgroundSession.hasSession()) {
                                             CarPlayBackgroundSession.stop {
                                                 activity.runOnUiThread {
                                                     if (!activity.isFinishing && !activity.isDestroyed) {
                                                         refreshAll()
-                                                        startClusterOnlyOutput()
+                                                        requestScreenCopy()
                                                     }
                                                 }
                                             }
                                         } else {
                                             refreshAll()
-                                            startClusterOnlyOutput()
+                                            requestScreenCopy()
                                         }
                                     } else {
+                                        clusterOutputWaitTask?.let(handler::removeCallbacks)
+                                        clusterOutputWaitTask = null
+                                        ClusterScreenCaptureService.stop(activity)
                                         Hs5ClusterActivityOutput.close("cluster-only disabled")
+                                        com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
                                         refreshAll()
                                     }
                                 },
@@ -762,11 +853,18 @@ class NewUiActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_CLUSTER_ONLY_BOOT, false)) {
+            clusterOnlyBootLaunch = true
+            returnedHomeForClusterOnlyBoot = false
+            applyClusterOnlyBootWindow(true)
+        } else if (DiPlayLauncher.isLauncherIntent(intent)) {
+            clusterOnlyBootLaunch = false
+            applyClusterOnlyBootWindow(false)
+        }
         if (DiPlayLauncher.isLauncherIntent(intent)) {
             popAllSubpages()
             destination = NewUiDestination.CONNECTION
-            if (CarPlayBackgroundSession.active &&
-                DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARPLAY) {
+            if (CarPlayBackgroundSession.active) {
                 DiPlayLauncher.openCarPlayProjection(this)
                 return
             }
@@ -775,12 +873,16 @@ class NewUiActivity : ComponentActivity() {
         refreshAll()
         if (!AirPlayPersistence.loadClusterOnlyMode(this) && consumeBluetoothAutoConnectIntent(intent)) {
             handler.post { connectionActions.connect(wirelessForAutoConnect()) }
-        } else if (!AirPlayPersistence.loadClusterOnlyMode(this) && shouldAutoConnectOnColdStart(intent)) {
-            handler.post { connectionActions.connect(wirelessForAutoConnect()) }
+        } else if (!AirPlayPersistence.loadClusterOnlyMode(this) &&
+            shouldAutoConnectOnColdStart(intent)
+        ) {
+            startColdStartConnectionWhenBootPreparationSettles()
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("screen_copy_consent_pending", screenCaptureConsentPending)
+        outState.putBoolean(EXTRA_CLUSTER_ONLY_BOOT, clusterOnlyBootLaunch)
         outState.putString(DiPlayLauncher.EXTRA_PAGE, navigationPageExtra())
         outState.putBoolean("original_cluster_editor", destination == NewUiDestination.DISPLAY &&
             displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG)
@@ -815,6 +917,11 @@ class NewUiActivity : ComponentActivity() {
         enforceInterfaceSize()
         DiPlayWindowFullscreen.apply(this)
         refreshAll()
+        if (AirPlayPersistence.loadClusterOnlyMode(this) && !ClusterScreenCaptureService.isRunning &&
+            !screenCaptureConsentPending && !screenCaptureConsentAttempted) {
+            CarPlayStartupDiagnostics.capture("cluster-only resume recovery requesting screen-capture permission")
+            handler.post { if (!isFinishing && !isDestroyed) requestScreenCopy() }
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -837,8 +944,7 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun refreshAppearance() {
-        // The car's position lights remain the source of truth even without a phone.
-        NewUiColors.night = HongqiPositionLights.night() ?: resolveAppNightNow()
+        NewUiColors.night = resolveAppNightNow()
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = !NewUiColors.night
             isAppearanceLightNavigationBars = !NewUiColors.night
@@ -854,7 +960,8 @@ class NewUiActivity : ComponentActivity() {
             ConnectionProgressUiState.reset()
         }
         val carPlayNowActive = CarPlayBackgroundSession.active
-        if (AirPlayPersistence.loadClusterOnlyMode(this) && !carPlayNowActive) startClusterOnlyOutput()
+        syncClusterOnlyOutput()
+        recoverStoppedClusterCapture()
         snapshot = NewUiConnectionSnapshotReader.read(this, connectionActions.setupError)
         if (
             !carPlayWasActive &&
@@ -865,10 +972,6 @@ class NewUiActivity : ComponentActivity() {
             DiPlayLauncher.openCarPlayProjection(this)
         }
         carPlayWasActive = carPlayNowActive
-        if (DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK &&
-            destination == NewUiDestination.CONNECTION && connectionSubpage == NewUiConnectionSubpage.MAIN) {
-            connectionActions.openReadyCarlinkProjection()
-        }
         topBarStatus = NewUiTopBarStatusReader.read(this)
         displayState = NewUiDisplayStateReader.read(this)
         clusterOnlyMode = AirPlayPersistence.loadClusterOnlyMode(this)
@@ -887,13 +990,152 @@ class NewUiActivity : ComponentActivity() {
         }
     }
 
+    private fun syncClusterOnlyOutput() {
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) {
+            CarPlayHostSettingsBridge.registerStandalone(this, standaloneCluster)
+            if (AirPlayPersistence.loadClusterMapEnabled(this)) {
+                com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(Hs5ClusterActivityOutput.isOpen())
+                if (!clusterOnlyDismissed) startClusterOnlyOutput()
+            } else {
+                com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
+                Hs5ClusterActivityOutput.close("cluster map disabled", clusterOnlyHost)
+            }
+        } else {
+            // In normal mode CarPlayHostActivity owns instrument visibility. Do not let
+            // NewUi refreshes send a competing global hide while CarPlay is active.
+            CarPlayHostSettingsBridge.unregisterStandalone(this, standaloneCluster)
+        }
+    }
+
     private fun startClusterOnlyOutput() {
-        if (Hs5ClusterActivityOutput.isOpen()) return
-        val display = ClusterMapPresentation.findDisplay(this) ?: return
-        Hs5ClusterActivityOutput.open(this, display, object : Hs5ClusterActivityOutput.Host {
-            override fun onClusterWindowSurface(surface: android.view.Surface?) = Unit
-            override fun onClusterWindowClosed(reason: String) = Unit
-        })
+        val enabled = AirPlayPersistence.loadClusterOnlyMode(this)
+        if (!enabled || !AirPlayPersistence.loadClusterMapEnabled(this) || CarPlayBackgroundSession.hasSession() || clusterOnlyDismissed || com.shilapi.xcertplay.HongqiScreenStatus.screenOff || Hs5ClusterActivityOutput.isOpen()) return
+        val display = ClusterMapPresentation.findDisplay(this)
+        if (display == null) {
+            if (clusterOnlyOutputFailure != "no-display") {
+                clusterOnlyOutputFailure = "no-display"
+                CarPlayStartupDiagnostics.capture("cluster-only output failed: no presentation display")
+            }
+            return
+        }
+        val opened = Hs5ClusterActivityOutput.open(this, display, clusterOnlyHost)
+        clusterOnlyOutputFailure = null
+        com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(Hs5ClusterActivityOutput.isOpen())
+        Hs5SteeringKeys.applySettings(this)
+        CarPlayStartupDiagnostics.capture("cluster-only output open requested displayId=${display.displayId} result=$opened")
+    }
+
+    private fun returnToVehicleHomeAfterBootFlyScreen() {
+        if (!clusterOnlyBootLaunch || returnedHomeForClusterOnlyBoot || !ClusterScreenFrames.hasFrame() ||
+            !Hs5ClusterActivityOutput.isOpen() || !AirPlayPersistence.loadClusterOnlyMode(this)) return
+        returnedHomeForClusterOnlyBoot = true
+        clusterOnlyBootLaunch = false
+        CarPlayStartupDiagnostics.capture("cluster-only boot first frame visible; centre host remains transparent behind instrument")
+        applyClusterOnlyBootWindow(true)
+    }
+
+    private fun applyClusterOnlyBootWindow(hidden: Boolean) {
+        if (hidden) {
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+            window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+            window.setFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+            window.attributes = window.attributes.apply { alpha = 0f }
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+            window.attributes = window.attributes.apply { alpha = 1f }
+        }
+    }
+
+    private fun recoverStoppedClusterCapture() {
+        val stoppedAt = ClusterScreenCaptureService.stoppedGeneration
+        if (stoppedAt == observedCaptureStopGeneration) return
+        observedCaptureStopGeneration = stoppedAt
+        if (!AirPlayPersistence.loadClusterOnlyMode(this) || captureStopRecoveryAttempted ||
+            isFinishing || isDestroyed) return
+        captureStopRecoveryAttempted = true
+        screenCaptureConsentAttempted = false
+        screenCaptureConsentPending = false
+        CarPlayStartupDiagnostics.capture("cluster-only capture stopped after start; scheduling one recovery authorization generation=$stoppedAt")
+        handler.postDelayed({
+            if (!isFinishing && !isDestroyed && AirPlayPersistence.loadClusterOnlyMode(this) &&
+                !ClusterScreenCaptureService.isRunning && !screenCaptureConsentPending) requestScreenCopy()
+        }, 500L)
+    }
+
+    /** Observe capture recovery independently of the instrument window. */
+    private fun waitForScreenCopyBeforeOpeningInstrument() {
+        startClusterOnlyOutput()
+        clusterOutputWaitTask?.let(handler::removeCallbacks)
+        val startedAt = android.os.SystemClock.uptimeMillis()
+        val task = object : Runnable {
+            override fun run() {
+                clusterOutputWaitTask = null
+                if (isFinishing || isDestroyed || !AirPlayPersistence.loadClusterOnlyMode(this@NewUiActivity)) return
+                val hasFrame = ClusterScreenFrames.hasFrame()
+                val serviceRunning = ClusterScreenCaptureService.isRunning
+                val elapsed = android.os.SystemClock.uptimeMillis() - startedAt
+                if (hasFrame) {
+                    screenCaptureConsentRetries = 0
+                    screenCaptureRecoveryRetried = false
+                                    captureStopRecoveryAttempted = false
+                                    observedCaptureStopGeneration = ClusterScreenCaptureService.stoppedGeneration
+                    CarPlayStartupDiagnostics.capture("cluster-only output gate released frame=$hasFrame ${ClusterScreenFrames.status()} elapsedMs=$elapsed")
+                    startClusterOnlyOutput()
+                    returnToVehicleHomeAfterBootFlyScreen()
+                } else if (elapsed >= 3_000L && !screenCaptureRecoveryRetried) {
+                    screenCaptureRecoveryRetried = true
+                    screenCaptureConsentRetries++
+                    CarPlayStartupDiagnostics.capture("cluster-only first-frame timeout; restarting capture with fresh consent retry=$screenCaptureConsentRetries serviceRunning=$serviceRunning ${ClusterScreenFrames.status()}")
+                    if (serviceRunning) ClusterScreenCaptureService.stop(this@NewUiActivity)
+                    screenCaptureConsentAttempted = false
+                    handler.postDelayed({
+                        if (!isFinishing && !isDestroyed && AirPlayPersistence.loadClusterOnlyMode(this@NewUiActivity)) {
+                            CarPlayStartupDiagnostics.capture("cluster-only requesting one fresh screen-capture authorization")
+                            requestScreenCopy()
+                        }
+                    }, 700L)
+                } else if (!serviceRunning || elapsed >= 6_000L) {
+                    CarPlayStartupDiagnostics.capture("cluster-only output gate timed out frame=false ${ClusterScreenFrames.status()} elapsedMs=$elapsed")
+                    startClusterOnlyOutput()
+                } else {
+                    clusterOutputWaitTask = this
+                    handler.postDelayed(this, 100L)
+                }
+            }
+        }
+        clusterOutputWaitTask = task
+        handler.post(task)
+    }
+
+    private fun requestScreenCopy() {
+        if (!AirPlayPersistence.loadClusterOnlyMode(this)) {
+            Toast.makeText(this, R.string.cluster_copy_description, Toast.LENGTH_LONG).show()
+            return
+        }
+        // Switching styles only changes the crop; keep the same full-screen capture session.
+        if (screenCaptureConsentPending || ClusterScreenCaptureService.isRunning || screenCaptureConsentAttempted) return
+        val manager = getSystemService(android.media.projection.MediaProjectionManager::class.java)
+        val consent = if (Build.VERSION.SDK_INT >= 34)
+            manager.createScreenCaptureIntent(android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay())
+            else manager.createScreenCaptureIntent()
+        screenCaptureConsentPending = true
+        screenCaptureConsentAttempted = true
+        CarPlayStartupDiagnostics.capture("cluster-only screen-capture permission requested api=${Build.VERSION.SDK_INT}")
+        com.shilapi.xcertplay.diagnostics.DiagnosticLogging.logcat {
+            android.util.Log.i("DiPlay-ScreenCopy", "request launched api=${Build.VERSION.SDK_INT}")
+        }
+        try { screenCapturePermission.launch(consent) }
+        catch (error: Exception) {
+            screenCaptureConsentPending = false
+            screenCaptureConsentAttempted = false
+            CarPlayStartupDiagnostics.capture("cluster-only screen-capture permission launch failed type=${error.javaClass.simpleName} message=${error.message}")
+            com.shilapi.xcertplay.diagnostics.DiagnosticLogging.logcat {
+                android.util.Log.e("DiPlay-ScreenCopy", "permission launch failed ${error.javaClass.simpleName}")
+            }
+            Toast.makeText(this, R.string.cluster_copy_error, Toast.LENGTH_LONG).show()
+            startClusterOnlyOutput()
+        }
     }
 
     /** Saving a display preference never interrupts a running session. */
@@ -995,6 +1237,11 @@ class NewUiActivity : ComponentActivity() {
     }
 
     private fun popDisplaySubpage() {
+        if (displaySubpage == NewUiDisplaySubpage.COPY_REGION) {
+            displaySubpage = NewUiDisplaySubpage.CLUSTER_MANAGER
+            syncSubpageBackCallback()
+            return
+        }
         if (displaySubpage == NewUiDisplaySubpage.ORIGINAL_CLUSTER_CONFIG) {
             leaveOriginalClusterConfig { closeOriginalClusterConfig() }
             return
@@ -1116,6 +1363,19 @@ class NewUiActivity : ComponentActivity() {
             autoConnectEnabled = DiPlayPreferences.autoConnect(this),
         )
 
+    private fun startColdStartConnectionWhenBootPreparationSettles() {
+        if (isFinishing || isDestroyed || AirPlayPersistence.loadClusterOnlyMode(this)) return
+        if (Hs5BootSession.isPreparing()) {
+            // Let the headless boot session win if its cached profile is ready. If preparation
+            // falls back, begin the ordinary UI-owned connection without blocking the Home page.
+            handler.postDelayed({ startColdStartConnectionWhenBootPreparationSettles() }, 150L)
+            return
+        }
+        if (shouldAutoConnectOnColdStart(intent)) {
+            handler.post { if (!isFinishing && !isDestroyed) connectionActions.connect(wirelessForAutoConnect()) }
+        }
+    }
+
     private fun wirelessForAutoConnect(): Boolean = DiPlayPreferences.autoConnectWireless(this)
 
     private fun defaultDiagnosticDirectory(): String {
@@ -1126,11 +1386,7 @@ class NewUiActivity : ComponentActivity() {
     private fun openSettingsUpdatePage() {
         val cached = UpdateAvailability.available(this, settingsState.versionName)
         updateController.bindCachedRelease(cached)
-        updateUiState = if (cached != null) {
-            NewUiUpdateUiState(stage = NewUiUpdateStage.AVAILABLE, releaseTag = cached.tagName)
-        } else {
-            NewUiUpdateUiState()
-        }
+        updateUiState = updateController.uiState
         pushSettingsSubpage(NewUiSettingsSubpage.UPDATE)
     }
 
@@ -1211,15 +1467,10 @@ class NewUiActivity : ComponentActivity() {
     private fun confirmConnectPhone(phone: NewUiBondedPhone) {
         val shouldConnect = connectPhoneAfterSave
         connectionActions.selectBondedPhone(phone.address, phone.displayName)
-        if (DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            connectionActions.startCarlinkOnHome()
-        }
         popConnectionSubpage()
         Toast.makeText(this, R.string.saved_for_your_next_connection, Toast.LENGTH_LONG).show()
         refreshAll()
-        if (shouldConnect && DiPlayPreferences.phoneLinkMode(this) == DiPlayPreferences.PhoneLinkMode.CARLINK) {
-            connectionActions.openCarPlay()
-        }
+        if (shouldConnect) connectionActions.openCarPlay()
     }
 
     private fun switchPhone(phone: NewUiBondedPhone) {
@@ -1291,6 +1542,12 @@ class NewUiActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        clusterOutputWaitTask?.let(handler::removeCallbacks)
+        CarPlayHostSettingsBridge.unregisterStandalone(this, standaloneCluster)
+        Hs5ClusterActivityOutput.close("cluster-only host destroyed", clusterOnlyHost)
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) {
+            com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
+        }
         stopDiagnosticShareSession()
         audioChannelPreview?.close()
         audioChannelPreview = null
@@ -1301,6 +1558,8 @@ class NewUiActivity : ComponentActivity() {
         get() = destination
 
     companion object {
+        const val EXTRA_CLUSTER_ONLY_BOOT = "com.shihab.diplay.CLUSTER_ONLY_BOOT"
+
         fun open(context: Context) {
             context.startActivity(Intent(context, NewUiActivity::class.java))
         }

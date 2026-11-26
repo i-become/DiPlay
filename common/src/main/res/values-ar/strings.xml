@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="new_ui_cluster_copy_region_fullscreen">ملء الشاشة</string>
-    <string name="new_ui_cluster_copy_region_center">توسيط</string>
     <string name="new_ui_cluster_only_title">لوحة العدادات فقط</string>
     <string name="new_ui_cluster_only_sub">إبقاء لوحة العدادات نشطة من دون توصيل هاتف؛ تعتمد تفاصيل الوسائط على جلسة وسائط السيارة.</string>
     <string name="new_ui_phone_protocol">البروتوكول</string>
-    <string name="new_ui_cluster_copy_region">نسخ منطقة من الشاشة الوسطى كخريطة</string>
-    <string name="new_ui_cluster_copy_region_sub">اسحب الإطار لتحريكه واسحب زاويته السفلية اليمنى لتغيير حجمه. يُطبّق على فيديو Carlink النشط؛ يتطلب وضع لوحة العدادات فقط دعم السيارة لالتقاط الشاشة.</string>
-    <string name="new_ui_cluster_copy_region_placeholder">اسحب داخل الإطار لتحريكه واسحب أي زاوية لتغيير حجمه. تحفظ كل لوحة منطقتها وتُمدّد الصورة لملء مساحة الخريطة الثابتة.</string>
     <string name="existing_wifi_title">شبكة Wi-Fi موجودة / نفس الشبكة المحلية</string>
     <string name="existing_wifi_description">استخدم جهاز توجيه أو Wi-Fi محمولاً موجوداً. أبقِ iPhone والسيارة على الشبكة نفسها مع اتصال بالإنترنت.</string>
     <string name="existing_wifi_hint">Wi-Fi موجودة · أبقِ الجهازين على شبكة Wi-Fi نفسها والبلوتوث قيد التشغيل. لا تحتاج إلى نقطة اتصال السيارة.</string>
@@ -890,29 +885,4 @@
     <string name="new_ui_about_sec5_title">5. شكر وتقدير</string>
     <string name="new_ui_about_sec5_body">شكرًا لحساب Douyin @YiMeng谁的梦还没醒 (1768868288) على توفير واجهة أضواء الموضع في السيارة.</string>
     <string name="new_ui_diag_log_record_sub">فعّل الخيار لتسجيل السجلات وجمع بيانات التشخيص وإنشاء التقارير. عند إيقافه يتوقف التسجيل وجمع بيانات التشخيص في الخلفية.</string>
-    <string name="new_ui_carlink_pairing_code">رمز إقران Carlink</string>
-    <string name="new_ui_carlink_step_sdk_ready">نظام Carlink جاهز</string>
-    <string name="new_ui_carlink_step_sdk_ready_sub">جارٍ تجهيز اتصال Carlink</string>
-    <string name="new_ui_carlink_step_waiting">بانتظار الهاتف</string>
-    <string name="new_ui_carlink_step_waiting_sub">أبقِ الهاتف قريبًا وافتح Carlink</string>
-    <string name="new_ui_carlink_step_pairing">إقران الهاتف</string>
-    <string name="new_ui_carlink_step_phone_connected">تم توصيل الهاتف</string>
-    <string name="new_ui_carlink_step_phone_connected_sub">جارٍ تجهيز شاشة العرض</string>
-    <string name="new_ui_carlink_step_projection_ready">العرض جاهز</string>
-    <string name="new_ui_carlink_step_projection_ready_sub">جارٍ بدء عرض Carlink</string>
-    <string name="new_ui_carlink_step_projecting">يعرض Carlink الآن</string>
-    <string name="new_ui_carlink_step_projecting_sub">العرض نشط</string>
-    <string name="new_ui_carlink_step_failed">تعذر اتصال Carlink</string>
-    <string name="new_ui_carlink_step_failed_sub">أعد محاولة اتصال Carlink</string>
-    <string name="new_ui_carlink_name">Carlink</string>
-    <string name="new_ui_carlink_pairing">جارٍ إقران Carlink</string>
-    <string name="new_ui_carlink_waiting_phone">بانتظار هاتف Carlink…</string>
-    <string name="new_ui_carlink_ready">Carlink جاهز</string>
-    <string name="new_ui_carlink_failure_detail">تعذر اتصال Carlink (%1$s)</string>
-    <string name="new_ui_carlink_connecting">جارٍ الاتصال بـ Carlink…</string>
-    <string name="new_ui_carlink_open">فتح Carlink</string>
-    <string name="new_ui_carlink_retry">إعادة محاولة اتصال Carlink</string>
-    <string name="new_ui_carlink_connect">الاتصال بـ Carlink</string>
-    <string name="new_ui_carlink_switch_phone">تبديل هاتف Carlink · %1$s</string>
-    <string name="new_ui_carlink_pair_phone">إقران هاتف Carlink واختياره</string>
 </resources>

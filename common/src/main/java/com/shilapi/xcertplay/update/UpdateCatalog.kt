@@ -8,6 +8,8 @@ internal data class UpdateRelease(
     val apkName: String,
     val apkUrl: String,
     val checksumsUrl: String,
+    val title: String = "",
+    val description: String = "",
 )
 
 internal object UpdateCatalog {
@@ -19,12 +21,11 @@ internal object UpdateCatalog {
         var newest: UpdateRelease? = null
         for (index in 0 until releases.length()) {
             val release = releases.optJSONObject(index) ?: continue
-            if (release.optBoolean("draft")) continue
+            if (release.optBoolean("draft") || release.optBoolean("prerelease")) continue
             val tagName = release.optString("tag_name")
-            if (UpdateVersion.parse(tagName) == null) continue
+            if (!UpdateVersion.isStable(tagName)) continue
             val assets = release.optJSONArray("assets") ?: continue
-            var apkName = ""
-            var apkUrl = ""
+            val apks = mutableListOf<Pair<String, String>>()
             var checksumsUrl = ""
             for (assetIndex in 0 until assets.length()) {
                 val asset = assets.optJSONObject(assetIndex) ?: continue
@@ -32,17 +33,29 @@ internal object UpdateCatalog {
                 val url = asset.optString("browser_download_url")
                 if (url.isBlank()) continue
                 if (name.contains('/') || name.contains('\\')) continue
-                if (name.endsWith(".apk")) {
-                    apkName = name
-                    apkUrl = url
-                }
+                if (name.endsWith(".apk", ignoreCase = true) && matchesApkName(name, tagName)) apks += name to url
                 if (name.equals(CHECKSUMS_FILE, ignoreCase = true)) checksumsUrl = url
             }
-            if (apkUrl.isEmpty() || checksumsUrl.isEmpty()) continue
+            // Never let API asset ordering choose between debug, old or alternate builds.
+            val apk = apks.singleOrNull() ?: continue
+            if (checksumsUrl.isEmpty()) continue
             if (newest == null || UpdateVersion.isNewer(tagName, newest.tagName)) {
-                newest = UpdateRelease(tagName, apkName, apkUrl, checksumsUrl)
+                newest = UpdateRelease(
+                    tagName = tagName,
+                    apkName = apk.first,
+                    apkUrl = apk.second,
+                    checksumsUrl = checksumsUrl,
+                    title = release.optString("name").trim().take(160),
+                    description = release.optString("body").trim().take(12_000),
+                )
             }
         }
         return newest
+    }
+
+    internal fun matchesApkName(name: String, tag: String): Boolean {
+        val version = tag.trim().removePrefix("v").removePrefix("V")
+        return name.equals("DiPlay-$version.apk", ignoreCase = true) ||
+            name.equals("DiPlay-v$version.apk", ignoreCase = true)
     }
 }

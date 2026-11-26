@@ -18,6 +18,8 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         if (intent.action != BluetoothDevice.ACTION_ACL_CONNECTED ||
             !DiPlayPreferences.connectOnPhoneBluetooth(context) ||
             CarPlayBackgroundSession.hasSession()) return
+        if (AirPlayPersistence.loadClusterOnlyMode(context) || HongqiScreenStatus.screenOff ||
+            ConnectionProgressUiState.disconnected()) return
         val selected = DiPlayPreferences.phoneAddress(context) ?: return
         if (Build.VERSION.SDK_INT >= 31 &&
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
@@ -30,14 +32,17 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         val address = runCatching { device.address }.getOrNull() ?: return
         if (!address.equals(selected, ignoreCase = true)) return
 
-        // The car can send several ACL events during one wake-up. Commit before launching so
-        // another receiver instance cannot open a second connection from the same event burst.
+        // Receivers run serially in this process. apply updates memory immediately without
+        // forcing a disk sync in front of the radio/session workers.
         val prefs = context.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE)
         val now = SystemClock.elapsedRealtime()
         val previous = prefs.getLong("last_launch_elapsed", 0)
         if (prefs.contains("last_launch_elapsed") && now >= previous && now - previous < 15_000) return
-        prefs.edit().putLong("last_launch_elapsed", now).commit()
+        prefs.edit().putLong("last_launch_elapsed", now).apply()
         PhoneWakeDiagnostics.record(context, "matched")
+        // A cached headless session does not need the Activity to inflate or measure first.
+        Hs5BootSession.schedule(context, phoneWake = true)
+        Hs5HongqiStartupWarmup.schedule(context)
         val launch = Intent(context, com.shilapi.xcertplay.newui.NewUiActivity::class.java).apply {
             putExtra(EXTRA_AUTO_CONNECT, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)

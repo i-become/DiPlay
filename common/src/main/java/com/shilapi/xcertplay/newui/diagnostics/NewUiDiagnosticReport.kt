@@ -15,7 +15,6 @@ import com.shilapi.xcertplay.WheelKeyService
 import com.shilapi.xcertplay.Hs5SteeringKeys
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.update.UpdateDiagnostics
-import com.shilapi.xcertplay.carlink.CarlinkBridge
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -31,11 +30,10 @@ internal object NewUiDiagnosticReport {
         appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
         appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(context)) "wireless" else "USB"}")
         appendLine("Phone: ${DiPlayPreferences.phoneName(context)} (${DiPlayPreferences.phoneAddress(context) ?: "none"})")
-        appendLine("Phone link mode: ${DiPlayPreferences.phoneLinkMode(context).key}")
-        appendLine("Carlink: ${CarlinkBridge.get(context).diagnosticSummary()}")
-        appendLine("--- Carlink connection events ---")
-        appendLine(CarlinkBridge.get(context).diagnosticTrace())
         appendLine("Cluster map: ${AirPlayPersistence.loadClusterMapEnabled(context)}")
+        appendLine("Standalone instrument: ${AirPlayPersistence.loadClusterOnlyMode(context)}")
+        appendLine("Standalone screen copy: ${com.shilapi.xcertplay.ClusterScreenFrames.status()}")
+        appendLine("HS5 DataSync music/navigation reader: ${com.shilapi.xcertplay.Hs5SystemMedia.diagnosticStatus()}")
         appendLine(
             "Cluster fly screen default on connect: ${AirPlayPersistence.loadClusterFlyScreenDefaultOnConnect(context)}",
         )

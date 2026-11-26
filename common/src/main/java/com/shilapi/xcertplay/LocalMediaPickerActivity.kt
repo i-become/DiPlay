@@ -75,7 +75,7 @@ class LocalMediaPickerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         DiPlayWindowFullscreen.apply(this)
         directory = savedInstanceState?.getString("directory")?.let(::File)
-        NewUiColors.night = HongqiPositionLights.night() ?: resolveAppNightNow()
+        NewUiColors.night = resolveAppNightNow()
         setContent {
             NewUiTheme {
                 BackHandler { back() }

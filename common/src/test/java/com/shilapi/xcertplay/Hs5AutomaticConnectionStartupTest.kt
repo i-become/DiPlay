@@ -18,6 +18,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowBuild
 import org.robolectric.util.ReflectionHelpers
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
@@ -45,18 +47,49 @@ class Hs5AutomaticConnectionStartupTest {
         ReflectionHelpers.setStaticField(HongqiScreenStatus::class.java, "screenOff", false)
     }
 
-    @Test fun bootStartsConnectionBehindHomeAndUsesTheSelectedDefaultTransport() {
+    private fun launchBootUiAndWait() {
+        val finished = CountDownLatch(1)
+        DiPlayBootStartup.launchUi(app) { finished.countDown() }
+        assertTrue("boot activity launch worker should finish", finished.await(5, TimeUnit.SECONDS))
+    }
+
+    @Test fun localAuthenticationPreparationDoesNotBlockUiOrReviveAfterDisconnect() {
+        AirPlayPersistence.saveMfiTarget(app, MfiTarget.LOCAL)
+        val wasReady = ReflectionHelpers.getField<Boolean>(DiPlayBootstrap, "ready")
+        try {
+            synchronized(DiPlayBootstrap) {
+                ReflectionHelpers.setField(DiPlayBootstrap, "ready", false)
+                // The worker cannot enter ensure while this lock is held. The launch request
+                // must still return, allowing the caller to draw the home screen immediately.
+                assertTrue(DiPlayLauncher.startAutomaticConnection(app, fromBoot = true))
+                assertNull(shadowOf(app).nextStartedActivity)
+                ConnectionProgressUiState.markDisconnected()
+                // Simulate completion without using any local authentication materials.
+                ReflectionHelpers.setField(DiPlayBootstrap, "ready", true)
+            }
+            val pending = ReflectionHelpers.getField<java.util.concurrent.atomic.AtomicBoolean>(DiPlayLauncher, "authenticationPreparing")
+            val deadline = System.nanoTime() + 3_000_000_000L
+            while (pending.get() && System.nanoTime() < deadline) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                Thread.sleep(5)
+            }
+            assertFalse(pending.get())
+            assertNull(shadowOf(app).nextStartedActivity)
+            assertFalse(CarPlayBackgroundSession.hasSession())
+        } finally {
+            ReflectionHelpers.setField(DiPlayBootstrap, "ready", wasReady)
+        }
+    }
+
+    @Test fun bootShowsHomeWithoutCreatingAnActivityBoundConnection() {
+        ReflectionHelpers.setField(Hs5BootSession, "preparing", false)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         DiPlayPreferences.saveDefaultConnectionMode(app, DefaultConnectionMode.WIRELESS)
-        DiPlayBootStartup.launchUi(app)
-        // Robolectric pops started activities in reverse launch order: home is on top.
-        assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
-        val launch = shadowOf(app).nextStartedActivity!!
-        assertEquals(CarPlayHostActivity::class.java.name, launch.component?.className)
-        assertTrue(launch.getBooleanExtra(EXTRA_BOOT_AUTO_START, false))
-        assertTrue(launch.getBooleanExtra(DiPlayLauncher.EXTRA_NEW_UI_CONNECTION_HUB, false))
-        assertTrue(AirPlayPersistence.loadWirelessEnabled(app))
+        launchBootUiAndWait()
+        val home = shadowOf(app).nextStartedActivity!!
+        assertEquals(NewUiActivity::class.java.name, home.component?.className)
         assertNull(shadowOf(app).nextStartedActivity)
+        assertFalse(CarPlayBackgroundSession.hasSession())
     }
 
     @Test fun configuredColdLauncherShowsHomeWhileConnectionIsPending() {
@@ -73,16 +106,20 @@ class Hs5AutomaticConnectionStartupTest {
         DiPlayPreferences.saveAutoConnect(app, false)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         DiPlayPreferences.saveDefaultConnectionMode(app, DefaultConnectionMode.WIRELESS)
-        DiPlayBootStartup.launchUi(app)
+        launchBootUiAndWait()
         assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
         assertFalse(AirPlayPersistence.loadWirelessEnabled(app))
     }
 
-    @Test fun carlinkBootOpensHomeWithoutStartingCarPlay() {
-        DiPlayPreferences.savePhoneLinkMode(app, DiPlayPreferences.phoneAddress(app)!!,
-            DiPlayPreferences.PhoneLinkMode.CARLINK)
-        DiPlayBootStartup.launchUi(app)
-        assertEquals(NewUiActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
+    @Test fun bootUsesTheSavedClusterOnlyModeWithoutStartingCarPlay() {
+        AirPlayPersistence.saveClusterOnlyMode(app, true)
+
+        launchBootUiAndWait()
+
+        val launch = shadowOf(app).nextStartedActivity!!
+        assertEquals(com.shilapi.xcertplay.newui.ClusterOnlyBootActivity::class.java.name,
+            launch.component?.className)
+        assertTrue(launch.getBooleanExtra(NewUiActivity.EXTRA_CLUSTER_ONLY_BOOT, false))
         assertNull(shadowOf(app).nextStartedActivity)
     }
 

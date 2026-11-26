@@ -1,10 +1,15 @@
 package com.shilapi.xcertplay.newui.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -55,12 +60,63 @@ fun NewUiSettingsUpdateScreen(
                 .padding(bottom = NewUiLayout.RowGap),
         ) {
             NewUiPanel {
-                Text(
-                    stringResource(R.string.new_ui_update_current_version, versionName),
-                    style = NewUiTypography.SettingTitle,
-                    color = NewUiColors.TextPrimary,
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                )
+                Column(Modifier.padding(horizontal = 22.dp, vertical = 18.dp)) {
+                    val hasUpdate = state.stage == NewUiUpdateStage.AVAILABLE
+                    val latest = state.releaseTag
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.new_ui_update_current_version, versionName),
+                            style = NewUiTypography.SettingSubtitle,
+                            color = NewUiColors.TextSecondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (hasUpdate) {
+                            Text(
+                                stringResource(R.string.update_available_home),
+                                style = NewUiTypography.SettingSubtitle,
+                                color = NewUiColors.TextPrimary,
+                                modifier = Modifier
+                                    .background(
+                                        NewUiColors.HongqiRed.copy(alpha = if (NewUiColors.night) 0.78f else 0.14f),
+                                        RoundedCornerShape(50),
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        if (hasUpdate && latest != null) stringResource(R.string.new_ui_update_available, latest)
+                        else stringResource(R.string.new_ui_update_latest_version, when {
+                            state.stage == NewUiUpdateStage.CHECKING -> stringResource(R.string.update_checking)
+                            latest != null -> latest
+                            else -> stringResource(R.string.new_ui_update_latest_unknown)
+                        }),
+                        style = if (hasUpdate) NewUiTypography.PrimaryActionTitle else NewUiTypography.SettingTitle,
+                        color = if (hasUpdate) NewUiColors.HongqiRed else NewUiColors.TextPrimary,
+                    )
+                    val releaseTitle = state.releaseTitle?.takeIf { it.isNotBlank() }
+                    if (latest != null && releaseTitle != null) {
+                        Text(
+                            releaseTitle,
+                            style = NewUiTypography.ActionTitle,
+                            color = NewUiColors.TextPrimary,
+                            modifier = Modifier.padding(top = 14.dp),
+                        )
+                    }
+                    state.releaseDescription?.takeIf { it.isNotBlank() }?.let { description ->
+                        Text(
+                            description,
+                            style = NewUiTypography.SettingSubtitle,
+                            color = NewUiColors.TextSecondary,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
             }
             NewUiPanel(modifier = Modifier.padding(top = NewUiLayout.RowGap)) {
                 NewUiToggleRow(

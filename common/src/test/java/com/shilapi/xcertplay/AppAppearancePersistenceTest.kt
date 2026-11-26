@@ -31,4 +31,15 @@ class AppAppearancePersistenceTest {
             assertEquals(60, AirPlayPersistence.loadFps(context))
         }
     }
+
+    @Test fun displaySelectorReplacesLegacyAppearanceAndImmediatelyResolvesTheChosenMode() {
+        AirPlayPersistence.saveAppAppearance(context, AppAppearance.DARK)
+        com.shilapi.xcertplay.newui.display.NewUiDisplayActions.saveCarPlayNightMode(context, 1)
+        assertEquals(AppAppearance.AUTO, AirPlayPersistence.loadAppAppearance(context))
+        assertEquals(false, context.resolveAppNightNow(hostNight = true))
+
+        AirPlayPersistence.saveAppAppearance(context, AppAppearance.LIGHT)
+        com.shilapi.xcertplay.newui.display.NewUiDisplayActions.saveCarPlayNightMode(context, 2)
+        assertEquals(true, context.resolveAppNightNow(hostNight = false))
+    }
 }

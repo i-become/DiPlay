@@ -59,6 +59,7 @@ class SmoothVideoHostLifecycleTest {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         AirPlayPersistence.saveAdaptPipResolution(activity, false)
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
+        AirPlayPersistence.saveDirectVideoOutput(activity, false)
         // Host startup without vendor-service workers or real transports.
         controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, _ ->
             org.mockito.Mockito.`when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
@@ -66,6 +67,7 @@ class SmoothVideoHostLifecycleTest {
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
         setField("activeDisplaySize", size(1920, 990))
+        setField("directVideoOutput", false)
         activity.sinkReleaseWaitMillis = 25
     }
 
@@ -88,10 +90,8 @@ class SmoothVideoHostLifecycleTest {
         controllerConstruction.close()
     }
 
-    // (1) The maintainer's sequence: Smooth video turned on, the reconnect stopped at a prerequisite, so
-    // the old host still runs a session whose sink does not pace. A new host built with smooth video must
-    // stop that session, not adopt it, and then start its own.
-    @Test fun aNewSmoothHostStopsANonPacingBackgroundSessionOnceAndThenStartsItsOwn() {
+    // (1) Smooth video may still select SurfaceView, but it never adds a presentation queue delay.
+    @Test fun smoothVideoKeepsImmediateFramesAndAdoptsAnImmediateBackgroundSession() {
         AirPlayPersistence.saveSmoothVideo(activity, true)
         setField("smoothVideo", true)
         allowStartup()
@@ -101,30 +101,11 @@ class SmoothVideoHostLifecycleTest {
         val stop = DeferredStop()
         CarPlayBackgroundSession.store(oldController, oldSink, 1920, 990, Any(), display, stop::invoke)
 
-        assertEquals(false, invoke("adoptBackgroundSession"))
-        assertNull("A non-pacing sink must not be adopted by a smooth video view", getField("sink"))
-        assertNull(getField("controller"))
-        assertEquals(1, stop.calls)
-
-        // The non-owner path polls every 500 ms while the other host is still stopping.
-        invoke("maybeStartCarPlay")
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(2_100))
-        assertEquals("One stop request per retained session, however often the host retries", 1, stop.calls)
-        assertNull(getField("sink"))
-        assertNull(getField("controller"))
-        assertTrue(CarPlayBackgroundSession.hasSession())
-
-        // The old host finishes its shutdown (which clears the slot) and completes the stop.
-        stop.complete()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        val started = getField("sink") as? AndroidMediaSink
-        assertNotNull("Once the old session stops, this host starts its own", started)
-        assertNotSame(oldSink, started)
-        assertTrue("The new session paces, matching this host's view", started!!.videoPacingEnabled)
-        assertNotNull(getField("controller"))
-        assertNotSame(oldController, getField("controller"))
-        assertEquals(1, stop.calls)
+        assertTrue(invoke("adoptBackgroundSession") as Boolean)
+        assertSame(oldSink, getField("sink"))
+        assertSame(oldController, getField("controller"))
+        assertFalse((getField("sink") as AndroidMediaSink).videoPacingEnabled)
+        assertEquals(0, stop.calls)
     }
 
     @Test fun aBackgroundSessionWhosePacingMatchesTheViewIsAdopted() {
@@ -136,7 +117,7 @@ class SmoothVideoHostLifecycleTest {
             setField("smoothVideo", smooth)
             val controller = mock(CarPlayController::class.java)
             `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
-            val sink = sink(pacingDelayMillis = if (smooth) smoothVideoDelayMillis(60) else 0)
+            val sink = sink(pacingDelayMillis = 0)
             val stop = DeferredStop()
             CarPlayBackgroundSession.store(controller, sink, 1920, 990, Any(), display, stop::invoke)
 
@@ -181,11 +162,12 @@ class SmoothVideoHostLifecycleTest {
             setField(rebuilt, "teardownExecutor", PausedExecutorService())
             setField(rebuilt, "activeDisplaySize", size(1920, 990))
             setField(rebuilt, "smoothVideo", true)
+            setField(rebuilt, "directVideoOutput", false)
             allowStartup(rebuilt)
             invoke(rebuilt, "maybeStartCarPlay")
             val started = getField(rebuilt, "sink") as? AndroidMediaSink
             assertNotNull(started)
-            assertTrue(started!!.videoPacingEnabled)
+            assertFalse(started!!.videoPacingEnabled)
             assertTrue(CarPlayBackgroundSession.isOwner(rebuilt))
         } finally {
             (getField(rebuilt, "shuttingDown") as AtomicBoolean).set(true)

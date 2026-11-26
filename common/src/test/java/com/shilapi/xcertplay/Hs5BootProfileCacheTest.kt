@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowBuild
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
@@ -81,6 +82,15 @@ class Hs5BootProfileCacheTest {
         assertNotNull(Hs5BootProfileCache.load(app))
     }
 
+    @Test fun overlayAppearanceKeepsTheCacheButClusterStreamChangesInvalidateIt() {
+        save()
+        AirPlayPersistence.saveClusterTurnCardTheme(app, 1)
+        AirPlayPersistence.saveClusterTurnCardOpacityPercent(app, 40)
+        assertNotNull(Hs5BootProfileCache.load(app))
+        AirPlayPersistence.saveClusterMapEnabled(app, false)
+        assertNull(Hs5BootProfileCache.load(app))
+    }
+
     @Test fun missingCorruptOrMismatchedSizeSafelyFallsBackToTheUi() {
         assertNull(Hs5BootProfileCache.load(app))
         assertTrue(Hs5BootProfileCache.save(app, Hs5BootProfileCache.Profile(Hs5BootProfileCache.stamp(app),
@@ -88,6 +98,17 @@ class Hs5BootProfileCacheTest {
             CarPlaySessionDisplay(960, 720, 0, true, true, 1920, 720), 1920, 720)))
         assertNull(Hs5BootProfileCache.load(app))
         File(app.filesDir, "hs5-boot-display-v1").writeBytes(byteArrayOf(0, 1, 2))
+        assertNull(Hs5BootProfileCache.load(app))
+    }
+
+    @Test fun hs5BootCacheRejectsAStreamProfileThatIsNotTheFixedCanvas() {
+        ShadowBuild.setManufacturer("HONG QI")
+        ShadowBuild.setModel("HS5")
+        val config = AirPlayConfig("DiPlay", "id", "", "1", AirPlayDisplayConfig(1600, 600))
+        val profile = Hs5BootProfileCache.Profile(Hs5BootProfileCache.stamp(app), config,
+            CarPlaySessionDisplay(1600, 600, 0, true, true, 1600, 600), 1600, 600)
+
+        assertTrue(Hs5BootProfileCache.save(app, profile))
         assertNull(Hs5BootProfileCache.load(app))
     }
 

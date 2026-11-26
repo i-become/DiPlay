@@ -20,11 +20,3 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/speexdsp $(LOCAL_PATH)/speexdsp/include
 LOCAL_CFLAGS := -O2 -DFLOATING_POINT -DUSE_KISS_FFT -DEXPORT= -Wno-unused-parameter
 LOCAL_LDLIBS := -lm
 include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-DIPLAY_ENFORCE ?= 1
-LOCAL_MODULE := diplay_integrity
-LOCAL_SRC_FILES := diplay_integrity.c
-LOCAL_CFLAGS := -O2 -Wall -Wextra -Werror -fvisibility=hidden -fstack-protector-strong -DDIPLAY_ENFORCE=$(DIPLAY_ENFORCE)
-LOCAL_LDFLAGS := -Wl,-z,relro,-z,now
-include $(BUILD_SHARED_LIBRARY)

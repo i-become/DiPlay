@@ -20,10 +20,17 @@ class UpdateAvailabilityTest {
     @After fun clear() = UpdateAvailability.clearAllForTest(context)
 
     @Test fun persistsAReleaseThatIsNewerThanTheInstalledBuild() {
-        val release = release("v0.2.16")
+        val release = release("v0.2.16").copy(title = "稳定性优化", description = "修复若干连接问题")
         UpdateAvailability.save(context, release)
 
         assertEquals(release, UpdateAvailability.available(context, "0.2.15"))
+    }
+
+    @Test fun discardsCachedReleasesSelectedByTheOldCatalogRules() {
+        UpdateAvailability.save(context, release("v9.0.0"))
+        context.getSharedPreferences("diplay_update_availability", Context.MODE_PRIVATE)
+            .edit().remove("catalog_schema").commit()
+        assertNull(UpdateAvailability.available(context, "1.4.3"))
     }
 
     @Test fun removesAReleaseAfterTheAppCatchesUp() {

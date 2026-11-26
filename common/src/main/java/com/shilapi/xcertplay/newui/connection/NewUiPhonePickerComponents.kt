@@ -77,9 +77,7 @@ fun NewUiPhoneHintPanel(
 internal fun NewUiPhoneDeviceList(
     phones: List<NewUiBondedPhone>,
     selectedAddress: String?,
-    linkModes: Map<String, DiPlayPreferences.PhoneLinkMode> = emptyMap(),
     onSelect: (NewUiBondedPhone) -> Unit,
-    onModeChange: (NewUiBondedPhone, DiPlayPreferences.PhoneLinkMode) -> Unit = { _, _ -> },
 ) {
     if (phones.isEmpty()) return
     NewUiPanel {
@@ -88,8 +86,6 @@ internal fun NewUiPhoneDeviceList(
                 phone = phone,
                 selected = phone.address == selectedAddress,
                 onClick = { onSelect(phone) },
-                linkMode = linkModes[phone.address] ?: DiPlayPreferences.PhoneLinkMode.CARPLAY,
-                onModeChange = { onModeChange(phone, it) },
             )
             if (index < phones.lastIndex) {
                 HorizontalDivider(color = NewUiColors.Divider)
@@ -103,8 +99,6 @@ internal fun NewUiPhoneDeviceRow(
     phone: NewUiBondedPhone,
     selected: Boolean,
     onClick: () -> Unit,
-    linkMode: DiPlayPreferences.PhoneLinkMode = DiPlayPreferences.PhoneLinkMode.CARPLAY,
-    onModeChange: (DiPlayPreferences.PhoneLinkMode) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -156,42 +150,8 @@ internal fun NewUiPhoneDeviceRow(
                 )
             }
         }
-        var protocolMenuOpen by remember(phone.address) { mutableStateOf(false) }
-        Box(Modifier.padding(start = 14.dp)) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(NewUiColors.ButtonNormal.copy(alpha = 0.35f))
-                    .border(1.dp, NewUiColors.Divider, RoundedCornerShape(10.dp))
-                    .clickable { protocolMenuOpen = true }
-                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(protocolLabel(linkMode), style = NewUiTypography.SettingSubtitle,
-                    color = NewUiColors.TextPrimary)
-                Icon(painterResource(R.drawable.new_ui_ic_chevron_right), contentDescription = null,
-                    tint = NewUiColors.TextSecondary,
-                    modifier = Modifier.padding(start = 4.dp).size(16.dp).rotate(90f))
-            }
-            DropdownMenu(expanded = protocolMenuOpen,
-                onDismissRequest = { protocolMenuOpen = false }) {
-                DiPlayPreferences.PhoneLinkMode.entries.forEach { mode ->
-                    DropdownMenuItem(
-                        text = { Text(protocolLabel(mode), color = if (mode == linkMode)
-                            NewUiColors.Accent else NewUiColors.TextPrimary) },
-                        onClick = {
-                            protocolMenuOpen = false
-                            if (mode != linkMode) onModeChange(mode)
-                        },
-                    )
-                }
-            }
-        }
     }
 }
-
-@Composable
-private fun protocolLabel(mode: DiPlayPreferences.PhoneLinkMode): String = mode.label
 
 @Composable
 fun NewUiPhonePrimaryFooter(

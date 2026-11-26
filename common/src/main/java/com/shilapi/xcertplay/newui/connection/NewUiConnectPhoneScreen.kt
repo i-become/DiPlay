@@ -24,7 +24,6 @@ internal fun NewUiConnectPhoneScreen(
     connectAfterSave: Boolean,
     onBack: () -> Unit,
     onConfirm: (NewUiBondedPhone) -> Unit,
-    onModeChange: (String, DiPlayPreferences.PhoneLinkMode) -> Unit = { _, _ -> },
     onRequestBluetoothPermission: () -> Unit,
     onOpenBluetoothSettings: () -> Unit,
 ) {
@@ -67,9 +66,7 @@ internal fun NewUiConnectPhoneScreen(
                     NewUiPhoneDeviceList(
                         phones = state.bondedPhones,
                         selectedAddress = pickedAddress,
-                        linkModes = state.linkModes,
                         onSelect = { pickedAddress = it.address },
-                        onModeChange = { phone, mode -> onModeChange(phone.address, mode) },
                     )
                     NewUiPhoneSecondaryLink(
                         label = stringResource(R.string.new_ui_phone_pair_another),

@@ -74,7 +74,7 @@ class CarPlayHostDisplaySizeTest {
         setField("activeDisplaySize", size(1920, 990))
     }
 
-    @Test fun hongqiStartsBeforeBuildingUiAndKeepsThatSessionWhenUiMeasuresTheSameWindow() {
+    @Test fun hongqiShowsUiBeforeStartingAndKeepsThatSessionWhenTheWindowIsMeasured() {
         assertStartupBeforeUi(1920, 720)
     }
 
@@ -93,8 +93,40 @@ class CarPlayHostDisplaySizeTest {
         }
     }
 
-    @Test fun hongqiEarlyStartupUsesTheActualNarrowWindowInsteadOfTheWholeDisplay() {
+    @Test fun hongqiColdStartupUsesTheFixedCarPlayCanvasWithoutWaitingForWindowLayout() {
         assertStartupBeforeUi(700, 720)
+    }
+
+    @Test fun hs5IgnoresSavedResolutionScalingAndKeepsThe1920By720Canvas() {
+        ShadowBuild.setManufacturer("HONG QI")
+        ShadowBuild.setModel("HS5")
+        AirPlayPersistence.saveDisplayScalePercent(activity, 140)
+
+        invoke("loadPersistedSettings")
+
+        assertEquals(100, getField("displayScalePercent"))
+        setField("activeDisplaySize", size(1280, 720))
+        applySize(1280, 720)
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+    }
+
+    @Test fun hs5TemporaryViewportMeasurementKeepsTheFixedCanvasAndLiveSession() {
+        ShadowBuild.setManufacturer("HONG QI")
+        ShadowBuild.setModel("HS5")
+        setField("activeDisplaySize", size(1920, 720))
+        val display = startSession(windowWidth = 1920, windowHeight = 720)
+
+        applySize(1280, 720)
+
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+
+        applySize(1920, 720)
+
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
     }
 
     @Test fun rememberedWindowStartsWithoutLayoutAndTheUiKeepsTheSameController() {
@@ -105,8 +137,8 @@ class CarPlayHostDisplaySizeTest {
         invoke("prepareConnectionBeforeUi")
 
         // No layout or main-loop traversal has happened in this launch.
-        assertTrue(controllerStartedBeforeUi)
-        assertNull(getField("videoView"))
+        assertFalse(controllerStartedBeforeUi)
+        assertNotNull(getField("videoView"))
         assertEquals(size(1920, 720), getField("activeDisplaySize"))
         val controller = controllerConstruction.constructed().single()
         shadowOf(Looper.getMainLooper()).idle()
@@ -132,7 +164,7 @@ class CarPlayHostDisplaySizeTest {
         assertNotNull(getField("videoView"))
     }
 
-    @Test fun changingSystemBarsRequiresANewWindowMeasurement() {
+    @Test fun changingSystemBarsDoesNotDelayTheFixedColdStartupCanvas() {
         rememberWindowForStartup(1920, 720)
         setField("hideTopBar", !(getField("hideTopBar") as Boolean))
         allowStartup()
@@ -140,36 +172,33 @@ class CarPlayHostDisplaySizeTest {
 
         invoke("prepareConnectionBeforeUi")
 
-        assertNull(getField("activeDisplaySize"))
-        assertTrue(controllerConstruction.constructed().isEmpty())
-        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
-        probe.layout(0, 0, 1920, 680)
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        assertFalse(controllerConstruction.constructed().isEmpty())
         shadowOf(Looper.getMainLooper()).idle()
-        assertTrue(controllerStartedBeforeUi)
-        assertEquals(size(1920, 680), getField("activeDisplaySize"))
-        val configuration = invoke("startupDisplayConfiguration") as String
-        assertEquals(1920 to 680, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+        assertFalse(controllerStartedBeforeUi)
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
     }
 
-    @Test fun aTemporaryCameraWindowDoesNotReplaceTheRememberedNormalWindow() {
+    @Test fun hs5CameraWindowDoesNotReplaceTheFixedCarPlayCanvas() {
         rememberWindowForStartup(1920, 720)
         applySize(700, 680)
         val configuration = invoke("startupDisplayConfiguration") as String
         assertEquals(1920 to 720, AirPlayPersistence.loadStartupDisplay(activity, configuration))
 
         applySize(1920, 990)
-        assertEquals(1920 to 990, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+        assertEquals(1920 to 720, AirPlayPersistence.loadStartupDisplay(activity, configuration))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
     }
 
-    @Test fun anIncompleteRememberedWindowFallsBackToMeasurement() {
+    @Test fun incompleteRememberedWindowDoesNotBlockFixedCanvasStartup() {
         rememberWindowForStartup(1920, 720)
         activity.getSharedPreferences("xcertplay_airplay", 0).edit()
             .remove("startup_display_height").commit()
 
         invoke("prepareConnectionBeforeUi")
 
-        assertNull(getField("activeDisplaySize"))
-        assertNull(getField("videoView"))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        assertNotNull(getField("videoView"))
         assertNotNull(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
     }
 
@@ -185,35 +214,27 @@ class CarPlayHostDisplaySizeTest {
         assertTrue(controllerConstruction.constructed().isEmpty())
     }
 
-    @Test fun earlyWindowMeasurementDoesNotBypassStartupPermissions() {
+    @Test fun fixedCanvasDoesNotBypassStartupPermissions() {
         invoke("loadPersistedSettings")
         setField("activeDisplaySize", null)
         setField("microphonePermissionResolved", false)
         invoke("prepareConnectionBeforeUi")
-        activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0).layout(0, 0, 1920, 720)
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(controllerConstruction.constructed().isEmpty())
         assertNotNull(getField("videoView"))
         assertEquals(size(1920, 720), getField("activeDisplaySize"))
     }
 
-    @Test fun repeatedConnectionIntentDoesNotOpenHomeBeforeTheWindowIsMeasured() {
+    @Test fun repeatedConnectionIntentReturnsHomeWithoutWaitingForWindowMeasurement() {
         invoke("loadPersistedSettings")
         setField("activeDisplaySize", null)
         setField("lastHubReturnUptime", -1000L)
         invoke("prepareConnectionBeforeUi")
-        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
         val repeat = android.content.Intent(activity, CarPlayHostActivity::class.java)
             .putExtra(DiPlayLauncher.EXTRA_NEW_UI_CONNECTION_HUB, true)
         activity.javaClass.getDeclaredMethod("onNewIntent", android.content.Intent::class.java)
             .apply { isAccessible = true }.invoke(activity, repeat)
         shadowOf(Looper.getMainLooper()).idle()
-        assertNull(shadowOf(activity).nextStartedActivity)
-        assertNull(getField("videoView"))
-
-        probe.layout(0, 0, 1920, 720)
-        shadowOf(Looper.getMainLooper()).idle()
-
         assertNotNull(getField("videoView"))
         assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name,
             shadowOf(activity).nextStartedActivity?.component?.className)
@@ -226,21 +247,18 @@ class CarPlayHostDisplaySizeTest {
         setField("wirelessEnabled", false)
         setField("activeDisplaySize", null)
         invoke("prepareConnectionBeforeUi")
-        val probe = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
-        assertNull(getField("videoView"))
-        assertTrue(controllerConstruction.constructed().isEmpty())
-
-        probe.layout(0, 0, width, height)
-        // No 500ms resize debounce is needed for the first actual window measurement.
+        assertNotNull(getField("videoView"))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
+        assertFalse(controllerConstruction.constructed().isEmpty())
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertTrue(controllerStartedBeforeUi)
+        assertFalse(controllerStartedBeforeUi)
         assertNotNull(getField("videoView"))
-        assertEquals(size(width, height), getField("activeDisplaySize"))
+        assertEquals(size(1920, 720), getField("activeDisplaySize"))
         val controller = controllerConstruction.constructed().single()
         assertSame(controller, getField("controller"))
         assertSame(controller, CarPlayBackgroundSession.snapshot()?.controller)
-        scheduleSize(width, height)
+        scheduleSize(1920, 720)
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(0, getField("restartGeneration"))
         assertNull(getField("pendingDisplaySize"))
@@ -441,6 +459,22 @@ class CarPlayHostDisplaySizeTest {
         invoke("applyFullscreenMode")
 
         assertEquals(0x080e, activity.window.decorView.systemUiVisibility)
+    }
+
+    @Suppress("DEPRECATION")
+    @Test fun hs5AlwaysUsesTheOemFullscreenCanvasEvenWhenSavedOptionIsOff() {
+        ShadowBuild.setManufacturer("HONG QI")
+        ShadowBuild.setModel("HS5")
+        setField("harmanFullscreenEnabled", false)
+        setField("restoreBootForeground", false)
+        setField("hideTopBar", false)
+        setField("hideBottomBar", false)
+
+        invoke("applyFullscreenMode")
+
+        assertEquals(0x080e, activity.window.decorView.systemUiVisibility)
+        assertEquals(1920, activity.window.attributes.width)
+        assertEquals(720, activity.window.attributes.height)
     }
 
     @Suppress("DEPRECATION")

@@ -94,6 +94,27 @@ class CarPlayProjectionExitTest {
         verify(controller, never()).close()
     }
 
+    @Test fun explicitColdBootProjectionDoesNotWaitForAnActiveSessionToLeaveHubMode() {
+        CarPlayBackgroundSession.active = false
+        val bootIntent = android.content.Intent(host, CarPlayHostActivity::class.java)
+            .putExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, true)
+
+        ReflectionHelpers.callInstanceMethod<Unit>(host, "readNewUiLaunchMode",
+            ReflectionHelpers.ClassParameter.from(android.content.Intent::class.java, bootIntent))
+
+        assertFalse(ReflectionHelpers.getField(host, "newUiConnectionHub"))
+    }
+
+    @Test fun connectionHubIntentStillUsesHubMode() {
+        val hubIntent = android.content.Intent(host, CarPlayHostActivity::class.java)
+            .putExtra(DiPlayLauncher.EXTRA_NEW_UI_CONNECTION_HUB, true)
+
+        ReflectionHelpers.callInstanceMethod<Unit>(host, "readNewUiLaunchMode",
+            ReflectionHelpers.ClassParameter.from(android.content.Intent::class.java, hubIntent))
+
+        assertTrue(ReflectionHelpers.getField(host, "newUiConnectionHub"))
+    }
+
     @Test fun oemFullScreenNavigationExitClosesOnlyTheClusterAndKeepsCarPlayRunning() {
         shadowOf(host.packageManager).installPackage(PackageInfo().apply {
             packageName = "ltd.qisi.navi"

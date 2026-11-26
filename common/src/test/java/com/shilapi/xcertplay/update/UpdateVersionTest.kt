@@ -5,6 +5,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateVersionTest {
+    @Test fun unrelatedNumbersAndOverflowAreNotVersions() {
+        for (remote in listOf("backup-1.9.0", "1.9.0.apk", "1.9.0/old", "999999999999.0.0")) {
+            assertFalse(UpdateVersion.isNewer(remote, "1.4.3"))
+        }
+        assertFalse(UpdateVersion.isStable("1.5.0-beta.1"))
+        assertTrue(UpdateVersion.isStable("v1.5.0"))
+    }
     @Test
     fun newerTagIsAnUpdate() {
         assertTrue(UpdateVersion.isNewer("v0.2.15", "0.2.14"))

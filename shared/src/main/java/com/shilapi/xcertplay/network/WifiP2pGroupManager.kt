@@ -81,6 +81,7 @@ class WifiP2pGroupManager(
     private var channel: WifiP2pManager.Channel? = null
     private var callbackThread: HandlerThread? = null
     private var created = false
+    private var activeHotspot: WirelessHotspotInfo? = null
     private var closed = false
     private var startAttempt: StartAttempt? = null
     @Volatile private var observedCreatedName: String? = null
@@ -340,6 +341,7 @@ class WifiP2pGroupManager(
             synchronized(stateLock) {
                 ensureStartActiveLocked(attempt)
                 created = true
+                activeHotspot = group
                 startAttempt = null
                 // Manual experiments must not replace the proven automatic configuration.
                 pendingSuccess = if (!legacyChannels && preferredChannel == WifiP2pChannels.AUTO) {
@@ -368,6 +370,55 @@ class WifiP2pGroupManager(
             cleanupFailedStart(attempt)
             throw failure
         }
+    }
+
+    /** Recheck the exact group and interface immediately before publishing Wi-Fi credentials. */
+    override fun validateReady() {
+        val (activeChannel, expected, expectedCreatedName) = synchronized(stateLock) {
+            if (closed || !created) throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi P2P group is no longer active",
+            )
+            Triple(channel ?: throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi P2P channel is unavailable",
+            ), activeHotspot ?: throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi P2P group details are unavailable",
+            ), observedCreatedName)
+        }
+        val current = AtomicReference<WifiP2pGroup?>()
+        val latch = CountDownLatch(1)
+        try {
+            p2pManager.requestGroupInfo(activeChannel) { group -> current.set(group); latch.countDown() }
+        } catch (error: RuntimeException) {
+            throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY,
+                "Could not verify the active Wi-Fi P2P group: ${error.javaClass.simpleName}",
+            )
+        }
+        if (!latch.await(500, TimeUnit.MILLISECONDS)) {
+            throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY, "Timed out verifying the active Wi-Fi P2P group",
+            )
+        }
+        val group = current.get()
+        val networkInterface = expected.interfaceName?.let(::networkInterface)
+        val addresses = networkInterface?.let { Collections.list(it.inetAddresses) }.orEmpty()
+        val failure = P2pHotspotReadiness.failure(
+            expected = expected,
+            groupOwner = group?.isGroupOwner,
+            groupName = group?.networkName,
+            createdGroupName = expectedCreatedName,
+            groupInterface = runCatching { group?.getInterface() }.getOrNull(),
+            interfaceUp = runCatching { networkInterface?.isUp == true }.getOrDefault(false),
+            interfaceAddresses = addresses,
+        )
+        if (failure != null) {
+            diagnostic("Wi-Fi P2P pre-publication validation failed reason=$failure")
+            throw WirelessStartupException(
+                WirelessStartupFailure.HOTSPOT_NOT_READY,
+                "Wi-Fi P2P group changed before CarPlay publication: $failure",
+            )
+        }
+        diagnostic("Wi-Fi P2P pre-publication validation passed groupOwner=true sameGroup=true interfaceUp=true publishedAddressPresent=true")
     }
 
     override fun onCarPlayConfirmed() = synchronized(stateLock) {
@@ -401,6 +452,7 @@ class WifiP2pGroupManager(
             removeGroup = created || attempt?.createSucceeded == true
             channel = null
             callbackThread = null
+            activeHotspot = null
             startAttempt = null
         }
 
@@ -941,6 +993,7 @@ class WifiP2pGroupManager(
             failedThread = attempt.thread
             removeGroup = attempt.createSucceeded
             created = false
+            activeHotspot = null
             if (channel === failedChannel) channel = null
             if (callbackThread === failedThread) callbackThread = null
         }

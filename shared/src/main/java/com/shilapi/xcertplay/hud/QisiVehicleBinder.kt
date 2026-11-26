@@ -172,6 +172,16 @@ internal object QisiVehicleBinder {
         }
     }
 
+    /** HUD's parallel next-cross field is shown at the same precision as its unit/value pair. */
+    fun hudNextCrossDistanceMeters(meters: Int): Int {
+        val distance = meters.coerceAtLeast(0)
+        return when {
+            distance < 1_000 -> distance
+            distance < 10_000 -> distance / 100 * 100
+            else -> distance / 1_000 * 1_000
+        }
+    }
+
     private fun ensureSuccess(code: Int) {
         if (code >= 0) return
         throw RemoteException("navigation result $code")

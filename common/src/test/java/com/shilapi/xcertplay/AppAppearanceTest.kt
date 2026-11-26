@@ -51,9 +51,19 @@ class AppAppearanceTest {
         }
     }
 
-    @Test fun autoUsesTheLiveHostResultWhenAvailable() {
-        assertTrue(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.DAY, schedule, false, 12 * 60, true))
-        assertFalse(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.NIGHT, schedule, true, 23 * 60, false))
+    @Test fun manualSelectionOverridesStaleHostAndVehicleState() {
+        assertFalse(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.DAY, schedule, false, 12 * 60, true, true))
+        assertTrue(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.NIGHT, schedule, true, 23 * 60, false, false))
+        assertFalse(resolveAppNight(AppAppearance.AUTO, CarPlayNightMode.SCHEDULE, schedule, true, 12 * 60, true, true))
+    }
+
+    @Test fun automaticModeUsesVehicleThenHostThenSystem() {
+        for (mode in listOf(CarPlayNightMode.SYSTEM, CarPlayNightMode.AMBIENT)) {
+            assertFalse(resolveAppNight(AppAppearance.AUTO, mode, schedule, true, 12 * 60, true, false))
+            assertTrue(resolveAppNight(AppAppearance.AUTO, mode, schedule, false, 12 * 60, false, true))
+            assertTrue(resolveAppNight(AppAppearance.AUTO, mode, schedule, false, 12 * 60, true))
+            assertFalse(resolveAppNight(AppAppearance.AUTO, mode, schedule, true, 12 * 60, false))
+        }
     }
 
     @Test fun autoFallsBackToTheSavedCarPlayPolicyOutsideTheHost() {

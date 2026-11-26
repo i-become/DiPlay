@@ -10,7 +10,7 @@ class CarPlayVideoSurfaceTest {
         assertEquals(CarPlayVideoSurfaceMode.SURFACE, carPlayVideoSurfaceMode(false))
     }
 
-    @Test fun smoothVideoAlwaysSelectsTheSurfaceViewItsTimestampsNeed() {
+    @Test fun smoothVideoSelectsTheSurfaceViewOutput() {
         assertEquals(CarPlayVideoSurfaceMode.SURFACE, carPlayVideoSurfaceMode(true, smoothVideo = true))
         assertEquals(CarPlayVideoSurfaceMode.SURFACE, carPlayVideoSurfaceMode(false, smoothVideo = true))
     }
@@ -26,13 +26,6 @@ class CarPlayVideoSurfaceTest {
         assertFalse(backgroundSessionMatchesView(sinkPaces = true, viewSmoothVideo = false))
         assertTrue(backgroundSessionMatchesView(sinkPaces = true, viewSmoothVideo = true))
         assertTrue(backgroundSessionMatchesView(sinkPaces = false, viewSmoothVideo = false))
-    }
-
-    @Test fun smoothVideoDelayCoversThreeFramesPlusAMargin() {
-        assertEquals(90, smoothVideoDelayMillis(60))
-        assertEquals(140, smoothVideoDelayMillis(30))
-        assertEquals(90, smoothVideoDelayMillis(120)) // clamped to the 60 fps the stream tops out at
-        assertEquals(140, smoothVideoDelayMillis(0))
     }
 
     @Test fun replacingTextureDetachesBeforeReleaseAndDoesNotReleaseHolderSurface() {

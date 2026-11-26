@@ -15,14 +15,14 @@ class DiPlayBootInitProvider : ContentProvider() {
         val app = context?.applicationContext ?: return true
         com.shilapi.xcertplay.diagnostics.DiagnosticLogging.setEnabled(AirPlayPersistence.loadSessionLogRecordingEnabled(app))
         CrashDiagnostics.install(app)
-        InstallationIntegrity.install(app as android.app.Application)
         CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.PROCESS_READY)
         if (!Hs5HeadUnit.isHeadUnit(app)) return true
         CarPlayStartupDiagnostics.initialize(app)
         HongqiScreenStatus.initialize(app)
+        if (AirPlayPersistence.loadAutoStartOnBoot(app)) {
+            DiPlayBootStartup.runPrewarm(app, launchEnabled = true)
+        }
         HongqiPositionLights.initialize(app)
-        if (!AirPlayPersistence.loadAutoStartOnBoot(app)) return true
-        DiPlayBootStartup.runPrewarm(app, launchEnabled = true)
         return true
     }
 

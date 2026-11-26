@@ -1,10 +1,12 @@
 package com.shilapi.xcertplay
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.content.Context
 import android.content.res.Configuration
 import android.view.View
 import com.shilapi.xcertplay.glance.CarPlayGlance
@@ -23,6 +25,47 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
 class ClusterDashboardScreenshotTest {
+    @Test fun standaloneScreenCaptureReachesTheVisibleMapApertureForEveryDashboardStyle() {
+        val context = RuntimeEnvironment.getApplication()
+        val source = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        val bytes = java.nio.ByteBuffer.allocateDirect(640 * 360 * 4)
+        source.copyPixelsToBuffer(bytes); bytes.rewind()
+        try {
+            ClusterScreenFrames.clear()
+            ClusterScreenFrames.update(640, 360, 4, 640 * 4, bytes)
+            AirPlayPersistence.saveClusterOnlyMode(context, true)
+            for (style in ClusterStyle.entries) {
+                val prefs = context.getSharedPreferences("cluster_copy_region_${style.preferenceValue}", Context.MODE_PRIVATE)
+                prefs.edit().putFloat("left", 0f).putFloat("top", 0f).putFloat("right", 1f).putFloat("bottom", 1f).commit()
+                val view = if (style.customDashboard) ClusterDashboardView(context, style = style,
+                    readState = { ClusterDashboardState(standalone = true) }) else null
+                val original = if (style == ClusterStyle.ORIGINAL) OriginalClusterScene(context) else null
+                val target: View = view ?: original!!
+                target.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+                target.layout(0, 0, 1920, 720)
+                val output = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
+                try {
+                    target.draw(Canvas(output))
+                    val aperture = view?.mapViewport ?: original!!.getChildAt(0)
+                    val bounds = if (view != null) Rect(aperture.left, aperture.top, aperture.right, aperture.bottom)
+                        else Rect(100, 100, 1820, 620)
+                    var magenta = 0
+                    for (y in bounds.top.coerceAtLeast(0) until bounds.bottom.coerceAtMost(720) step 3) {
+                        for (x in bounds.left.coerceAtLeast(0) until bounds.right.coerceAtMost(1920) step 3) {
+                            if (output.getPixel(x, y) == Color.MAGENTA) magenta++
+                        }
+                    }
+                    assertTrue("$style standalone copy must be visible above the map layer (magenta=$magenta)", magenta > 100)
+                } finally { output.recycle() }
+            }
+        } finally {
+            source.recycle()
+            ClusterScreenFrames.clear()
+            AirPlayPersistence.saveClusterOnlyMode(context, false)
+        }
+    }
+
     @Test fun copiedMapPixelsReachEveryCustomInstrumentWithoutNavigationMetadata() {
         val context = RuntimeEnvironment.getApplication()
         for (style in listOf(ClusterStyle.BASIC, ClusterStyle.SPORT)) {
@@ -60,8 +103,7 @@ class ClusterDashboardScreenshotTest {
                 elapsedMillis = 64000, durationMillis = 240000, playing = true)),
         )
         for ((name, w, h) in listOf(Triple("full-dark", 1920, 720), Triple("compact-dark", 1280, 480),
-            Triple("carlink-full", 1920, 720), Triple("carlink-compact", 1280, 480),
-            Triple("carlink-arabic", 1920, 720), Triple("full-light", 1920, 720), Triple("waiting", 1920, 720),
+            Triple("full-light", 1920, 720), Triple("waiting", 1920, 720),
             Triple("synthetic-map-fixture", 1920, 720), Triple("full-arabic", 1920, 720),
             Triple("vehicle-integration-fixture-only", 1920, 720),
             Triple("vehicle-integration-compact-fixture-only", 1280, 480),
@@ -106,9 +148,7 @@ class ClusterDashboardScreenshotTest {
                         assistance = OemClusterAssistance(true, 5, true, true)))
                     else -> fixture
                 }
-            }, externalNavigation = if (name.startsWith("carlink-")) ({
-                com.shilapi.xcertplay.hud.ClusterTurnGuidance(3, 0, 300, "沿人民大街行驶")
-            }) else null)
+            }, externalNavigation = null)
             view.setNightMode(name != "full-light")
             view.refreshState()
             view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),

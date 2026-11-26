@@ -2,7 +2,9 @@ package com.shilapi.xcertplay.newui.display
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -14,6 +16,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -26,7 +29,7 @@ import com.shilapi.xcertplay.newui.*
 // The editor occupies the entire application window, outside the shell and its padding.
 // Controls float over the same coordinate space that is captured from the centre screen.
 @Composable
-fun NewUiClusterCopyRegionScreen(style: ClusterStyle, onBack: () -> Unit) {
+fun NewUiClusterCopyRegionScreen(style: ClusterStyle, onBack: () -> Unit, onStartCapture: () -> Unit = {}) {
     val context = LocalContext.current
     var region by remember(style) { mutableStateOf(ClusterCopyRegion.load(context, style)) }
     val accent = NewUiColors.TextPrimary
@@ -36,19 +39,22 @@ fun NewUiClusterCopyRegionScreen(style: ClusterStyle, onBack: () -> Unit) {
     fun save() = ClusterCopyRegion.save(context, region, style)
     Box(Modifier.fillMaxSize().background(background).testTag("copy-region-editor")) {
         Canvas(Modifier.fillMaxSize().testTag("copy-region-canvas").pointerInput(style) {
-            var corner = -2
-            detectDragGestures(
-                onDragStart = { point ->
-                    corner = ClusterCopyRegionGesture.hit(region, point.x, point.y,
-                        size.width.toFloat(), size.height.toFloat(), 48.dp.toPx())
-                },
-                onDragEnd = { save() },
-                onDragCancel = { save() },
-            ) { change, delta ->
+            awaitEachGesture {
+                // Hit-test the finger-down position, before touch slop or a fast first
+                // movement can turn a corner resize into an interior move.
+                val down = awaitFirstDown()
+                val corner = ClusterCopyRegionGesture.hit(region, down.position.x, down.position.y,
+                    size.width.toFloat(), size.height.toFloat(), 48.dp.toPx())
                 if (corner != -2) {
-                    change.consume()
-                    region = ClusterCopyRegionGesture.drag(region, corner,
-                        delta.x / size.width, delta.y / size.height)
+                    down.consume()
+                    try {
+                        drag(down.id) { change ->
+                            val delta = change.positionChange()
+                            region = ClusterCopyRegionGesture.drag(region, corner,
+                                delta.x / size.width, delta.y / size.height)
+                            change.consume()
+                        }
+                    } finally { save() }
                 }
             }
         }) {
@@ -68,9 +74,14 @@ fun NewUiClusterCopyRegionScreen(style: ClusterStyle, onBack: () -> Unit) {
             drawLine(accent.copy(alpha = .6f), c - Offset(12.dp.toPx(), 0f), c + Offset(12.dp.toPx(), 0f), 2.dp.toPx())
             drawLine(accent.copy(alpha = .6f), c - Offset(0f, 12.dp.toPx()), c + Offset(0f, 12.dp.toPx()), 2.dp.toPx())
         }
+        Column(Modifier.align(Alignment.TopCenter).widthIn(max = 880.dp).background(hintFill)) {
+            Text(stringResource(R.string.cluster_copy_description), color = NewUiColors.TextPrimary,
+                style = NewUiTypography.SettingSubtitle, modifier = Modifier.padding(NewUiLayout.MainGap))
+            NewUiSecondaryActionButton(stringResource(R.string.cluster_copy_authorize), onStartCapture)
+        }
         Text(stringResource(R.string.new_ui_cluster_copy_region_placeholder),
             color = NewUiColors.TextPrimary, style = NewUiTypography.SettingSubtitle,
-            modifier = Modifier.align(Alignment.TopCenter).padding(NewUiLayout.MainGap)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(NewUiLayout.MainGap)
                 .background(hintFill, RoundedCornerShape(NewUiLayout.RowGap))
                 .padding(NewUiLayout.MainGap))
         Row(Modifier.align(Alignment.Center).padding(NewUiLayout.MainGap)

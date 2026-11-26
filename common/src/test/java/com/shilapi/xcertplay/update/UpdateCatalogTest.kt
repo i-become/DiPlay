@@ -22,8 +22,10 @@ class UpdateCatalogTest {
           },
           {
             "tag_name": "v0.2.14",
+            "name": "连接稳定性优化",
+            "body": "修复连接问题。\n\n新增仪表信息。",
             "draft": false,
-            "prerelease": true,
+            "prerelease": false,
             "assets": [
               {"name": "DiPlay-0.2.14.apk", "browser_download_url": "https://github.com/shihabal3amri/DiPlay/releases/download/v0.2.14/DiPlay-0.2.14.apk"},
               {"name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/shihabal3amri/DiPlay/releases/download/v0.2.14/SHA256SUMS.txt"}
@@ -37,6 +39,8 @@ class UpdateCatalogTest {
         val release = UpdateCatalog.parse(releaseJson)
         assertEquals("v0.2.14", release?.tagName)
         assertEquals("DiPlay-0.2.14.apk", release?.apkName)
+        assertEquals("连接稳定性优化", release?.title)
+        assertEquals("修复连接问题。\n\n新增仪表信息。", release?.description)
         assertEquals(
             "https://github.com/shihabal3amri/DiPlay/releases/download/v0.2.14/DiPlay-0.2.14.apk",
             release?.apkUrl,
@@ -101,6 +105,41 @@ class UpdateCatalogTest {
             .put(assetRelease("1.0.99").put("tag_name", "unversioned"))
             .put(assetRelease("1.0.52"))
         assertEquals("v1.0.52", UpdateCatalog.parse(releases.toString())?.tagName)
+    }
+
+    @Test fun ignoresPrereleaseTagsEvenWithoutThePrereleaseFlag() {
+        val releases = org.json.JSONArray()
+            .put(assetRelease("2.0.0").put("prerelease", true))
+            .put(assetRelease("1.9.0-beta.1"))
+            .put(assetRelease("1.4.3"))
+        assertEquals("v1.4.3", UpdateCatalog.parse(releases.toString())?.tagName)
+    }
+
+    @Test fun choosesMatchingProductionApkRegardlessOfAttachmentOrder() {
+        val release = assetRelease("1.4.3")
+        val assets = release.getJSONArray("assets")
+        for (name in listOf("DiPlay-1.4.2.apk", "DiPlay-1.4.3-debug.apk", "other.apk")) {
+            assets.put(org.json.JSONObject().put("name", name).put("browser_download_url", "https://example.com/$name"))
+        }
+        assertEquals("DiPlay-1.4.3.apk", UpdateCatalog.parse(org.json.JSONArray().put(release).toString())?.apkName)
+    }
+
+    @Test fun refusesAmbiguousProductionAttachments() {
+        val release = assetRelease("1.4.3")
+        release.getJSONArray("assets").put(org.json.JSONObject()
+            .put("name", "DiPlay-v1.4.3.apk").put("browser_download_url", "https://example.com/alternate.apk"))
+        assertNull(UpdateCatalog.parse(org.json.JSONArray().put(release).toString()))
+    }
+
+    @Test fun releaseNotesAreBoundedAndMissingNotesRemainEmpty() {
+        val release = assetRelease("1.4.3")
+        release.put("name", "  标题  ").put("body", "  说明  ")
+        val parsed = UpdateCatalog.parse(org.json.JSONArray().put(release).toString())
+        assertEquals("标题", parsed?.title)
+        assertEquals("说明", parsed?.description)
+        val withoutNotes = UpdateCatalog.parse(org.json.JSONArray().put(assetRelease("1.4.4")).toString())
+        assertEquals("", withoutNotes?.title)
+        assertEquals("", withoutNotes?.description)
     }
 
     private fun assetRelease(version: String) = org.json.JSONObject("""

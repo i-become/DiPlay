@@ -19,7 +19,6 @@ internal enum class Hs5NavPackages(val packageName: String) {
     NEUSOFT_HQ_NAVI("com.neusoft.hongqi.navigation"),
     NEUSOFT_IVI_NAVI("com.neusoft.ivi.navigation"),
     NEUSOFT_AMAP("com.neusoft.amapauto"),
-    NEUSOFT_CARLINK("com.neusoft.carlink"),
     NEUSOFT_SSP_AMAP("com.neusoft.ssp.ces.hongqi.amap"),
     HQ_NAVI("com.hongqi.navigation"),
     ;
@@ -106,7 +105,7 @@ internal enum class Hs5NavPackages(val packageName: String) {
             if (lower.contains("autonavi") || lower.contains("amapauto") || lower.contains("gaode")) return true
             if (lower.contains("amap") && !lower.contains("example")) return true
             if (lower.contains("neusoft") &&
-                (lower.contains("navi") || lower.contains("map") || lower.contains("amap") || lower.contains("carlink"))
+                (lower.contains("navi") || lower.contains("map") || lower.contains("amap"))
             ) return true
             if (lower.contains("hongqi") && (lower.contains("navi") || lower.contains("map"))) return true
             if (lower.contains("faw") && (lower.contains("navi") || lower.contains("map") || lower.contains("view"))) {

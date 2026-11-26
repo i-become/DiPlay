@@ -1469,9 +1469,9 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadHarmanFullscreen(context: Context): Boolean =
+    fun loadHarmanFullscreen(context: Context, defaultEnabled: Boolean = false): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HARMAN_FULLSCREEN, false)
+            .getBoolean(KEY_HARMAN_FULLSCREEN, defaultEnabled)
 
     fun saveHarmanFullscreen(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -1575,7 +1575,7 @@ object AirPlayPersistence {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val store = PairingStore(onSave)
         for (identifier in prefs.getStringSet(KEY_PAIRING_IDS, emptySet()).orEmpty()) {
-            prefs.getString("pairing.$identifier", null)?.let { store.save(identifier, it.decodeHex()) }
+            prefs.getString("pairing.$identifier", null)?.let { store.restore(identifier, it.decodeHex()) }
         }
         return store
     }

@@ -13,10 +13,10 @@ import android.os.Build
 import com.shilapi.xcertplay.hud.Hs5HeadUnit
 
 internal object DiPlayLauncher {
+    private val authenticationPreparing = java.util.concurrent.atomic.AtomicBoolean(false)
     /** Start the configured Hongqi connection before constructing either full UI. */
     fun startAutomaticConnection(context: Context, fromBoot: Boolean = false): Boolean {
         if (AirPlayPersistence.loadClusterOnlyMode(context)) return false
-        if (DiPlayPreferences.phoneLinkMode(context) == DiPlayPreferences.PhoneLinkMode.CARLINK) return false
         if (ConnectionProgressUiState.disconnected() || HongqiScreenStatus.screenOff) return false
         if (Hs5BootSession.isPreparing()) {
             val app = context.applicationContext
@@ -43,11 +43,27 @@ internal object DiPlayLauncher {
             DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=policy_skipped elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
             return false
         }
-        if (!CarPlayBackgroundSession.hasSession() && runCatching {
-                DiPlayBootstrap.ensure(context, AirPlayPersistence.loadMfiTarget(context))
-            }.onFailure {
-                DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=bootstrap_failed failureClass=${it.javaClass.simpleName}") }
-            }.isFailure) return false
+        if (!CarPlayBackgroundSession.hasSession() &&
+            !DiPlayBootstrap.isReady(AirPlayPersistence.loadMfiTarget(context))) {
+            // Let the home screen render while first-use asset validation runs. Concurrent boot,
+            // launcher and ACL triggers share one worker rather than blocking the main thread.
+            if (authenticationPreparing.compareAndSet(false, true)) {
+                val app = context.applicationContext
+                Thread({
+                    val ready = runCatching {
+                        DiPlayBootstrap.ensure(app, AirPlayPersistence.loadMfiTarget(app))
+                    }.onFailure {
+                        DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch result=bootstrap_failed failureClass=${it.javaClass.simpleName}") }
+                    }.isSuccess
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        authenticationPreparing.set(false)
+                        // Recheck phone, power, disconnect and connection policy after preparation.
+                        if (ready) startAutomaticConnection(app, fromBoot)
+                    }
+                }, "diplay-auto-auth-prepare").apply { isDaemon = true; start() }
+            }
+            return true
+        }
         AirPlayPersistence.saveWirelessEnabled(context, wireless)
         DiagnosticLogging.record { CarPlayStartupDiagnostics.capture("automatic-launch request=CarPlayHostActivity wireless=$wireless " +
             "elapsedMs=${android.os.SystemClock.elapsedRealtime() - diagnosticStarted}") }
@@ -68,6 +84,7 @@ internal object DiPlayLauncher {
             !intent.hasExtra(EXTRA_PAGE)
 
     fun openCarPlayProjection(context: Context) {
+        if (AirPlayPersistence.loadClusterOnlyMode(context)) return
         context.startActivity(
             Intent(context, CarPlayHostActivity::class.java)
                 .putExtra(EXTRA_ENTER_CARPLAY_PROJECTION, true)
@@ -78,6 +95,7 @@ internal object DiPlayLauncher {
 
     /** Starts [CarPlayHostActivity] for connection while [NewUiActivity] stays visible on top. */
     fun startConnectionHub(activity: Activity) {
+        if (AirPlayPersistence.loadClusterOnlyMode(activity)) return
         activity.startActivity(
             Intent(activity, CarPlayHostActivity::class.java)
                 .putExtra(EXTRA_NEW_UI_CONNECTION_HUB, true)

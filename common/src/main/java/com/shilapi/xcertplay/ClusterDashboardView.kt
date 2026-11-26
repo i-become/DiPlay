@@ -33,9 +33,10 @@ internal data class ClusterDashboardState(
     val guidance: CarPlayGlance.Snapshot = CarPlayGlance.Snapshot(),
     val music: ClusterDashboardMusic = ClusterDashboardMusic(),
     val vehicle: OemClusterVehicleState = OemClusterVehicleState(),
+    val standalone: Boolean = false,
 ) {
     // Vehicle state belongs to the car, so clearing a phone session must retain it.
-    fun current(): ClusterDashboardState = if (guidance.connected) this
+    fun current(): ClusterDashboardState = if (guidance.connected || standalone) this
         else ClusterDashboardState(vehicle = vehicle)
 
     fun progress(): Float? {
@@ -51,8 +52,8 @@ internal class ClusterDashboardView(
     private val style: ClusterStyle = AirPlayPersistence.loadClusterStyle(context),
     private val mapAspect: Float = style.mapAspect,
     private val readState: () -> ClusterDashboardState = {
-        ClusterDashboardState(CarPlayGlance.snapshot(), CarPlayMediaKeys.dashboardMusic(),
-            HongqiClusterVehicleData.snapshot())
+        ClusterDashboardState(ClusterInstrumentData.guidance(context), ClusterInstrumentData.music(context),
+            HongqiClusterVehicleData.snapshot(), standalone = AirPlayPersistence.loadClusterOnlyMode(context))
     },
     private val readNavigationCrop: () -> Int = { ClusterMapCropSettings.load(context) },
     private val externalNavigation: (() -> com.shilapi.xcertplay.hud.ClusterTurnGuidance?)? = null,
@@ -126,6 +127,9 @@ internal class ClusterDashboardView(
         }
         mapViewport.addView(mapSurface, LayoutParams(-1, -1))
         mapViewport.addView(copiedMap, LayoutParams(-1, -1))
+        if (AirPlayPersistence.loadClusterOnlyMode(context)) {
+            mapViewport.addView(ClusterScreenCopyView(context, style), LayoutParams(-1, -1))
+        }
         addView(mapViewport, LayoutParams(1, 1))
         addView(waiting, LayoutParams(1, 1))
         externalTurn?.let { addView(it, LayoutParams(1, 1)) }
@@ -196,7 +200,7 @@ internal class ClusterDashboardView(
         externalTurn?.setNightMode(night)
         externalTurn?.visibility = if (guidance != null) VISIBLE else GONE
         // Copied video is already a usable map, even before navigation metadata arrives.
-        waiting.visibility = if (copiedMap.visibility == VISIBLE || guidance != null ||
+        waiting.visibility = if (AirPlayPersistence.loadClusterOnlyMode(context) || copiedMap.visibility == VISIBLE || guidance != null ||
             (streamActive && state.guidance.connected)) GONE else VISIBLE
         waiting.invalidate()
     }
@@ -232,8 +236,7 @@ internal class ClusterDashboardView(
         subscriptions.forEach { it() }
         subscriptions = if (ticking) listOf(
             HongqiClusterVehicleData.subscribe(context, ::scheduleRefresh),
-            CarPlayGlance.subscribe { scheduleRefresh() },
-            CarPlayMediaKeys.subscribeDashboard(::scheduleRefresh),
+            ClusterInstrumentData.subscribe(context, ::scheduleRefresh),
             ClusterMapCropSettings.subscribe(context, ::scheduleRefresh),
         ) else emptyList()
         if (ticking) refresh.run()

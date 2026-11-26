@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.shilapi.xcertplay.airplay.AirPlaySession
+import com.shilapi.xcertplay.airplay.AirPlayIdentity
+import com.shilapi.xcertplay.airplay.PairingStore
 import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.CarPlayMediaEngine
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
@@ -15,6 +17,7 @@ import com.shilapi.xcertplay.hud.Hs5HeadUnit
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import java.util.concurrent.atomic.AtomicBoolean
@@ -28,24 +31,33 @@ internal object Hs5BootSession {
     @Volatile private var preparing = false
     fun isPreparing(): Boolean = preparing
 
-    fun schedule(context: Context) {
+    private data class Prepared(
+        val profile: Hs5BootProfileCache.Profile,
+        val identity: AirPlayIdentity,
+        val runtime: CarPlayRuntimeConfig,
+        val pairings: PairingStore,
+    )
+
+    fun schedule(context: Context, phoneWake: Boolean = false) {
         val app = context.applicationContext
-        if (!eligible(app) || CarPlayBackgroundSession.hasSession() || !scheduled.compareAndSet(false, true)) return
+        if (!eligible(app, phoneWake) || CarPlayBackgroundSession.hasSession() || !scheduled.compareAndSet(false, true)) return
         val ticket = generation.get()
         preparing = true
+        record("prepare source=${if (phoneWake) "selected_phone_acl" else "boot"}")
         Thread({
             val prepared = runCatching {
                 val profile = Hs5BootProfileCache.load(app) ?: return@runCatching null
                 DiPlayBootstrap.ensure(app, AirPlayPersistence.loadMfiTarget(app))
                 val identity = AirPlayPersistence.loadIdentity(app)
                 if (profile.config.deviceId != DiPlayBootstrap.deviceId(identity)) return@runCatching null
-                Triple(profile, identity, CarPlayRuntimeConfigFactory.create(app, identity))
+                Prepared(profile, identity, CarPlayRuntimeConfigFactory.create(app, identity),
+                    AirPlayPersistence.loadPairings(app) { id, key -> AirPlayPersistence.savePairing(app, id, key) })
             }.onFailure { record("prepare failed type=${it.javaClass.simpleName}") }.getOrNull()
             main.post {
                 preparing = false
                 if (prepared == null) { if (generation.get() == ticket) scheduled.set(false); record("skip=display_profile_unavailable; first UI connection will cache it"); return@post }
-                if (generation.get() != ticket || !eligible(app) || CarPlayBackgroundSession.hasSession()) return@post
-                val (profile, identity, runtime) = prepared
+                if (generation.get() != ticket || !eligible(app, phoneWake) || CarPlayBackgroundSession.hasSession()) return@post
+                val (profile, identity, runtime, pairings) = prepared
                 var renderer: AndroidMediaSink? = null
                 var controller: CarPlayController? = null
                 try {
@@ -69,7 +81,7 @@ internal object Hs5BootSession {
                         onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
                         callEchoCancellation = AirPlayPersistence.loadCallEchoCancellation(app),
                         callVoiceFilter = AirPlayPersistence.loadCallVoiceFilter(app),
-                        videoPacingDelayMillis = if (AirPlayPersistence.loadSmoothVideo(app)) smoothVideoDelayMillis(fps) else 0,
+                        videoPacingDelayMillis = 0,
                         mainVideoFrameRate = fps,
                         vendorLowLatencyDecoder = AirPlayPersistence.loadLowLatencyDecoder(app),
                         mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(app),
@@ -111,7 +123,7 @@ internal object Hs5BootSession {
                     }
                     val next = CarPlayController(
                         context = app, config = runtime, airPlayConfig = profile.config, identity = identity,
-                        pairings = AirPlayPersistence.loadPairings(app) { id, key -> AirPlayPersistence.savePairing(app, id, key) },
+                        pairings = pairings,
                         listener = listener,
                         media = CarPlayMediaEngine(nextSink, microphoneEnabled = profile.config.microphone),
                         reportStatus = { status ->
@@ -135,12 +147,14 @@ internal object Hs5BootSession {
                     CarPlayBackgroundSession.store(next, nextSink, profile.width, profile.height, this, profile.display) { completion ->
                         main.post { stop(app, next, nextSink, completion) }
                     }
-                    CarPlayMediaKeys.attach(app, next)
-                    if (profile.config.videoInCar) CarPlayVideo.attach(app, next)
                     ContextCompat.startForegroundService(app, Intent(app, DiPlaySessionService::class.java))
+                    // Register safety policy before start; OEM media/steering setup is not a
+                    // prerequisite for MFi discovery and can run while its worker is busy.
+                    if (profile.config.videoInCar) CarPlayVideo.attach(app, next)
                     CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.CONTROLLER_STARTED)
                     record("controller started before UI display=${profile.display.width}x${profile.display.height}")
                     next.start()
+                    CarPlayMediaKeys.attach(app, next)
                     main.postDelayed({
                         if (owns(next) && !CarPlayBackgroundSession.active) {
                             record("startup deadline reached before UI adoption")
@@ -165,10 +179,12 @@ internal object Hs5BootSession {
         scheduled.set(true)
     }
 
-    private fun eligible(context: Context): Boolean =
-        DiPlayPreferences.phoneLinkMode(context) == DiPlayPreferences.PhoneLinkMode.CARPLAY && Hs5HeadUnit.isHeadUnit(context) &&
+    private fun eligible(context: Context, phoneWake: Boolean): Boolean =
+        !AirPlayPersistence.loadClusterOnlyMode(context) &&
+        Hs5HeadUnit.isHeadUnit(context) &&
         !ConnectionProgressUiState.disconnected() && !HongqiScreenStatus.screenOff &&
-        AirPlayPersistence.loadAutoStartOnBoot(context) && DiPlayPreferences.autoConnect(context) &&
+        (if (phoneWake) DiPlayPreferences.connectOnPhoneBluetooth(context)
+            else AirPlayPersistence.loadAutoStartOnBoot(context)) && DiPlayPreferences.autoConnect(context) &&
         DiPlayPreferences.autoConnectWireless(context) && !DiPlayPreferences.phoneAddress(context).isNullOrBlank() &&
         AirPlayPersistence.loadWirelessHotspotMode(context) != WirelessHotspotMode.MANUAL &&
         context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

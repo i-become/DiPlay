@@ -70,6 +70,7 @@ internal object Hs5BootProfileCache {
             }
             val profile = ObjectInputStream(bytes.inputStream()).use { it.readObject() as Profile }
             profile.takeIf { it.stamp == stamp(context) && it.width > 0 && it.height > 0 &&
+                (!Hs5HeadUnit.isHeadUnit(context) || profile.width == 1920 && profile.height == 720) &&
                 it.config.main.widthPixels == it.display.width && it.config.main.heightPixels == it.display.height }
         }.getOrNull()
     }
@@ -79,7 +80,15 @@ internal object Hs5BootProfileCache {
         // during normal use. None changes the display offer or invalidates this boot profile.
         val ignored = setOf("debug_logs_enabled", "session_log_recording_enabled", "diagnostic_report_directory",
             "carplay_night_mode", "carplay_night_start_minute", "carplay_night_end_minute", "app_appearance",
-            "ambient_lux_threshold", "ambient_delay_seconds", "auto_start_on_boot")
+            "ambient_lux_threshold", "ambient_delay_seconds", "auto_start_on_boot",
+            // Local overlay appearance does not change the negotiated CarPlay canvas.
+            // Do not exclude cluster stream size, scale, markers or enabled state here.
+            "cluster_turn_card_theme", "cluster_turn_card_opacity_percent",
+            "cluster_small_window_card_theme", "cluster_small_window_card_opacity_percent",
+            "cluster_turn_card_overlay_position", "cluster_turn_card_overlay_size",
+            "cluster_turn_card_overlay_size_percent", "cluster_turn_card_overlay_x_percent",
+            "cluster_turn_card_overlay_y_percent", "cluster_small_window_card_size",
+            "cluster_small_window_card_x", "cluster_small_window_card_y")
         val values = buildString {
             append(Build.FINGERPRINT)
             append(context.checkSelfPermission(Manifest.permission.RECORD_AUDIO))

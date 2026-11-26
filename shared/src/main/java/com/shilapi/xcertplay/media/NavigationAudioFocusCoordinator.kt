@@ -9,12 +9,8 @@ import android.os.SystemClock
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
 import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 
-/**
- * Matches Hongqi's OEM Carlink focus request so its audio policy can select navigation volume:
- * navigation usage with GAIN_TRANSIENT_MAY_DUCK for the TTS stream.
- * Hold that focus only through actual PCM playback, never for an idle AirPlay audio connection.
- */
-internal class NavigationAudioFocusCoordinator(
+/** Requests HS5 navigation audio focus during spoken guidance playback. */
+internal class Hs5NavigationAudioFocus(
     context: Context?,
     private val enabled: Boolean,
     private val report: (String) -> Unit = {},
@@ -44,7 +40,7 @@ internal class NavigationAudioFocusCoordinator(
         }
     }
 
-    /** Select the navigation focus before AudioTrack starts rendering the first PCM frames. */
+    /** Requests HS5 navigation audio focus during spoken guidance playback. */
     @Synchronized
     fun prepare(token: NavigationPlaybackTracker.Token, stream: Int?, bufferedMillis: Long) {
         if (!enabled || closed || token.closed) return

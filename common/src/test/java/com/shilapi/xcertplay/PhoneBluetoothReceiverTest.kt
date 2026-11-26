@@ -26,6 +26,7 @@ class PhoneBluetoothReceiverTest {
         app.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE).edit().clear().commit()
         app.getSharedPreferences("diplay_phone_wake_diagnostics", Context.MODE_PRIVATE).edit().clear().commit()
         CarPlayBackgroundSession.clear()
+        ConnectionProgressUiState.reset()
         // Saved in lowercase on purpose: the receiver must match the (always uppercase) device
         // address case-insensitively; Robolectric refuses to build a lowercase remote device.
         DiPlayPreferences.savePhone(app, selected.lowercase(), "iPhone")
@@ -54,5 +55,24 @@ class PhoneBluetoothReceiverTest {
         assertEquals(com.shilapi.xcertplay.newui.NewUiActivity::class.java.name, launches.single().component?.className)
         assertTrue(launches.single().getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false))
         assertTrue(PhoneWakeDiagnostics.report(app).contains("result=startActivity-returned"))
+    }
+
+    @Test fun selectedPhoneCannotWakeTheUiAfterManualDisconnectOrInClusterOnlyMode() {
+        val launches = mutableListOf<Intent>()
+        val context = object : ContextWrapper(app) {
+            override fun startActivity(intent: Intent) { launches += intent }
+        }
+        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        ConnectionProgressUiState.markDisconnected()
+        PhoneBluetoothReceiver().onReceive(context, event(selected))
+        assertTrue(launches.isEmpty())
+        ConnectionProgressUiState.reset()
+        AirPlayPersistence.saveClusterOnlyMode(app, true)
+        try {
+            PhoneBluetoothReceiver().onReceive(context, event(selected))
+            assertTrue(launches.isEmpty())
+        } finally {
+            AirPlayPersistence.saveClusterOnlyMode(app, false)
+        }
     }
 }

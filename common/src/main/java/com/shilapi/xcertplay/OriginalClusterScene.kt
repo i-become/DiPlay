@@ -53,6 +53,8 @@ internal class OriginalClusterScene(context: Context, private val preview: Boole
             setImageBitmap(com.shilapi.xcertplay.newui.display.ClusterStylePreview.create(context, ClusterStyle.ORIGINAL))
         }, LayoutParams(-1, -1))
         map.addView(copied, LayoutParams(-1, -1))
+        if (!preview && AirPlayPersistence.loadClusterOnlyMode(context))
+            map.addView(ClusterScreenCopyView(context, ClusterStyle.ORIGINAL), LayoutParams(-1, -1))
         layerHost.addView(map, LayoutParams(-1, -1))
         componentViews.values.forEach { layerHost.addView(it, LayoutParams(-1, -1)) }
         addView(layerHost, LayoutParams(-1, -1)); addView(overlay, LayoutParams(-1, -1))

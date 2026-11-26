@@ -19,6 +19,22 @@ class BluetoothStartupReadinessTest {
         assertEquals(1_100L, now)
     }
 
+    @Test fun slowHongqiColdBootRadioCanBecomeReadyWithinBootBudget() {
+        val timeout = com.shilapi.xcertplay.network.WirelessStartupPolicy.HONGQI_BOOT_BLUETOOTH_READY_MILLIS
+        assertTrue(
+            awaitBluetoothStartup(
+                state = { if (now < 26_500L) STATE_OFF else if (now < 26_700L) STATE_TURNING_ON else STATE_ON },
+                allowBootWait = true,
+                cancelled = { false },
+                nowMillis = { now },
+                pause = { now += it },
+                timeoutMillis = timeout,
+            ),
+        )
+        assertTrue(now >= 26_700L)
+        assertTrue(now < timeout)
+    }
+
     @Test fun anOffRadioOutsideBootIsNotWaitedForOrEnabled() {
         assertFalse(await(boot = false) { STATE_OFF })
         assertEquals(0L, now)

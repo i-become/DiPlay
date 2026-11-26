@@ -9,7 +9,15 @@ internal object UpdateReleaseLookup {
         userAgent: String,
         openConnection: (URL) -> URLConnection = { it.openConnection() },
     ): UpdateRelease? {
-        val release = try {
+        return latestPublished(userAgent, openConnection)
+            ?.takeIf { UpdateVersion.isNewer(it.tagName, installedVersion) }
+    }
+
+    fun latestPublished(
+        userAgent: String,
+        openConnection: (URL) -> URLConnection = { it.openConnection() },
+    ): UpdateRelease? {
+        return try {
             fetch(UpdateClient.RELEASES_URL, userAgent, openConnection)
         } catch (primaryFailure: Exception) {
             try {
@@ -18,8 +26,7 @@ internal object UpdateReleaseLookup {
                 primaryFailure.addSuppressed(fallbackFailure)
                 throw primaryFailure
             }
-        } ?: return null
-        return release.takeIf { UpdateVersion.isNewer(it.tagName, installedVersion) }
+        }
     }
 
     private fun fetch(

@@ -20,7 +20,7 @@ class LocalMfiAuthenticationClient private constructor(
     private val privateKey: PrivateKey,
     private val certificate: ByteArray,
     private val onSignature: (Int) -> Unit,
-    private val signDigest: (PrivateKey, ByteArray) -> ByteArray = { _, _ -> error("Use the protected runtime identity loader") },
+    private val signDigest: (PrivateKey, ByteArray) -> ByteArray = { _, _ -> error("Use loadRuntimeIdentity or loadWithSigner") },
 ) : MfiAuthenticator {
     override fun protocolMajor(): Int = 3
 
@@ -75,11 +75,14 @@ class LocalMfiAuthenticationClient private constructor(
         }
 
         /** Runtime connection path; source-only identity validation stays usable in host tests. */
-        fun loadProtected(context: android.content.Context, directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
+        fun loadRuntimeIdentity(directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
             val identity = load(directory, onSignature)
-            val app = context.applicationContext
             return LocalMfiAuthenticationClient(identity.privateKey, identity.certificate, onSignature) { key, digest ->
-                com.shilapi.xcertplay.security.NativeIntegrity.sign(app, key, digest)
+                Signature.getInstance("NONEwithECDSA").run {
+                    initSign(key)
+                    update(digest)
+                    sign()
+                }
             }
         }
 

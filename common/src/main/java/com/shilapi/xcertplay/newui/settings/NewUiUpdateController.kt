@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.update.UpdateApkExport
+import com.shilapi.xcertplay.update.UpdateArchive
 import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.update.UpdateCatalog
 import com.shilapi.xcertplay.update.UpdateChecksums
@@ -14,12 +15,15 @@ import com.shilapi.xcertplay.update.UpdateClient
 import com.shilapi.xcertplay.update.UpdateDiagnostics
 import com.shilapi.xcertplay.update.UpdateRelease
 import com.shilapi.xcertplay.update.UpdateReleaseLookup
+import com.shilapi.xcertplay.update.UpdateVersion
 import com.shilapi.xcertplay.update.UpdateInstaller
 import java.io.File
 import java.io.IOException
 
 internal class NewUiUpdateController(
     private val activity: ComponentActivity,
+    private val lookup: (String, String) -> UpdateRelease? = { _, agent -> UpdateReleaseLookup.latestPublished(agent) },
+    private val download: (String, File, (Long, Long?) -> Unit) -> Unit = UpdateClient::download,
     private val onStateChanged: () -> Unit,
 ) {
     var uiState = NewUiUpdateUiState()
@@ -32,11 +36,16 @@ internal class NewUiUpdateController(
     private var installResultRevision = 0L
 
     fun checkForUpdates() {
-        if (uiState.installPreparing) return
+        if (uiState.installPreparing || uiState.stage in setOf(NewUiUpdateStage.CHECKING,
+                NewUiUpdateStage.DOWNLOADING, NewUiUpdateStage.VERIFYING)) return
         diagnostic("check-clicked")
-        uiState = uiState.copy(stage = NewUiUpdateStage.CHECKING, message = null, progress = null)
+        uiState = uiState.copy(stage = NewUiUpdateStage.CHECKING, message = null, progress = null,
+            releaseTag = null, releaseTitle = null, releaseDescription = null)
         onStateChanged()
         val gen = ++generation
+        release = null
+        updateFile = null
+        verifiedDigest = null
         Thread({
             val outcome = runCatching { latestRelease() }
             activity.runOnUiThread {
@@ -44,20 +53,26 @@ internal class NewUiUpdateController(
                 outcome.fold(
                     { found ->
                         UpdateAvailability.recordAttempt(activity, System.currentTimeMillis())
-                        diagnostic("check-completed updateAvailable=${found != null}")
-                        if (found == null) {
+                        val newer = found != null && UpdateVersion.isNewer(found.tagName, installedVersion())
+                        diagnostic("check-completed updateAvailable=$newer tag=${found?.tagName ?: "none"}")
+                        if (!newer) {
                             UpdateAvailability.clear(activity)
                             uiState = NewUiUpdateUiState(
                                 stage = NewUiUpdateStage.IDLE,
-                                message = activity.getString(R.string.update_up_to_date),
+                                message = activity.getString(if (found == null) R.string.new_ui_update_no_release else R.string.update_up_to_date),
+                                releaseTag = found?.tagName,
+                                releaseTitle = found?.title?.takeIf { it.isNotBlank() },
+                                releaseDescription = found?.description?.takeIf { it.isNotBlank() },
                             )
                             release = null
                         } else {
-                            UpdateAvailability.save(activity, found)
+                            UpdateAvailability.save(activity, found!!)
                             release = found
                             uiState = NewUiUpdateUiState(
                                 stage = NewUiUpdateStage.AVAILABLE,
                                 releaseTag = found.tagName,
+                                releaseTitle = found.title.takeIf { it.isNotBlank() },
+                                releaseDescription = found.description.takeIf { it.isNotBlank() },
                             )
                         }
                         onStateChanged()
@@ -77,11 +92,18 @@ internal class NewUiUpdateController(
     }
 
     fun bindCachedRelease(cached: UpdateRelease?) {
-        if (cached != null) release = cached
+        if (cached != null && uiState == NewUiUpdateUiState() && release == null) {
+            release = cached
+            uiState = NewUiUpdateUiState(stage = NewUiUpdateStage.AVAILABLE, releaseTag = cached.tagName,
+                releaseTitle = cached.title.takeIf { it.isNotBlank() },
+                releaseDescription = cached.description.takeIf { it.isNotBlank() })
+            onStateChanged()
+        }
     }
 
     fun downloadUpdate() {
-        if (uiState.installPreparing) return
+        if (uiState.installPreparing || uiState.stage in setOf(NewUiUpdateStage.CHECKING,
+                NewUiUpdateStage.DOWNLOADING, NewUiUpdateStage.VERIFYING)) return
         if (release == null) {
             release = UpdateAvailability.available(activity, installedVersion())
         }
@@ -89,7 +111,9 @@ internal class NewUiUpdateController(
             diagnostic("download-unavailable reason=no-release")
             return
         }
-        diagnostic("download-started")
+        // Pin both attachments to the release the user chose; never reselect latest mid-download.
+        val selected = release!!
+        diagnostic("download-started tag=${selected.tagName} apk=${selected.apkName}")
         updateFile = null
         verifiedDigest = null
         uiState = uiState.copy(
@@ -97,18 +121,24 @@ internal class NewUiUpdateController(
             message = null,
             progress = null,
             savedPath = null,
+            releaseTag = selected.tagName,
         )
         onStateChanged()
         val gen = ++generation
         Thread({
             val directory = File(activity.cacheDir, "update/${java.util.UUID.randomUUID()}")
             val outcome = runCatching {
-                val latest = latestRelease() ?: throw IOException(activity.getString(R.string.update_up_to_date))
+                val latest = selected
                 val checksumsFile = File(directory, UpdateCatalog.CHECKSUMS_FILE)
-                UpdateClient.download(latest.checksumsUrl, checksumsFile) { _, _ -> }
+                download(latest.checksumsUrl, checksumsFile) { _, _ -> }
+                val expected = UpdateChecksums.read(checksumsFile)
+                if (!expected.containsKey(latest.apkName)) {
+                    diagnostic("verification-failed reason=checksum-entry-missing tag=${latest.tagName}")
+                    throw IOException("发布校验文件缺少 ${latest.apkName} 的 SHA-256，请检查发布附件")
+                }
                 val apkFile = File(directory, latest.apkName)
-                UpdateClient.download(latest.apkUrl, apkFile) { written, total ->
-                    val percent = total?.takeIf { it > 0 }?.let { (written * 100 / it).toInt() } ?: return@download
+                download(latest.apkUrl, apkFile) progress@{ written, total ->
+                    val percent = total?.takeIf { it > 0 }?.let { (written * 100 / it).toInt() } ?: return@progress
                     if (percent != uiState.progress) {
                         activity.runOnUiThread {
                             if (gen == generation && !activity.isFinishing && !activity.isDestroyed) {
@@ -125,13 +155,12 @@ internal class NewUiUpdateController(
                     }
                 }
                 diagnostic("download-completed bytes=${apkFile.length()} verification-started")
-                val expected = UpdateChecksums.parse(checksumsFile.readText())
                 val actual = UpdateChecksums.sha256Hex(apkFile)
                 if (!UpdateChecksums.matches(expected, latest.apkName, actual)) {
                     diagnostic("verification-failed reason=checksum-mismatch")
-                    throw IOException("Checksum mismatch for ${latest.apkName}")
+                    throw IOException("安装包 SHA-256 校验不一致，请重新下载；若仍失败，请检查发布附件是否与校验文件匹配")
                 }
-                release = latest
+                UpdateArchive.verify(activity.applicationContext, apkFile, latest)
                 diagnostic("verification-passed")
                 apkFile to actual
             }.onFailure { directory.deleteRecursively() }
@@ -150,6 +179,8 @@ internal class NewUiUpdateController(
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.READY,
                             releaseTag = release?.tagName,
+                            releaseTitle = release?.title?.takeIf { it.isNotBlank() },
+                            releaseDescription = release?.description?.takeIf { it.isNotBlank() },
                             savedPath = saved?.path,
                         )
                         onStateChanged()
@@ -160,6 +191,9 @@ internal class NewUiUpdateController(
                         uiState = NewUiUpdateUiState(
                             stage = NewUiUpdateStage.FAILED,
                             message = failure.message ?: activity.getString(R.string.update_failed),
+                            releaseTag = selected.tagName,
+                            releaseTitle = selected.title.takeIf { it.isNotBlank() },
+                            releaseDescription = selected.description.takeIf { it.isNotBlank() },
                         )
                         onStateChanged()
                     },
@@ -232,7 +266,7 @@ internal class NewUiUpdateController(
     private fun diagnostic(event: String) = DiagnosticLogging.record { UpdateDiagnostics.record(activity.applicationContext, event) }
 
     private fun latestRelease(): UpdateRelease? =
-        UpdateReleaseLookup.latest(installedVersion(), "DiPlay/${installedVersion()}")
+        lookup(installedVersion(), "DiPlay/${installedVersion()}")
 
     private fun installedVersion(): String =
         activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: "0.1.0-beta.1"

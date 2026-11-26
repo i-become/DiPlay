@@ -261,7 +261,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var videoView: View? = null
     private var fallbackVideoView: SurfaceView? = null
     private var fallbackVideoBounds: CarPlaySurfaceBounds? = null
-    // Smooth video (a setting): SurfaceView output with frames released at the iPhone's frame time.
+    // Smooth-video output uses SurfaceView, while decoded frames are still released immediately.
     private var smoothVideo = false
     // Direct video output (a setting): SurfaceView output with frames shown as soon as they are decoded.
     private var directVideoOutput = false
@@ -611,7 +611,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     currentSurfaceTexture = texture
                 }
             }
-            DiagnosticLogging.record { appendLog(if (existing === surface) "Texture surface reused" else "Texture surface created") }
+            DiagnosticLogging.record { appendLog(
+                "${if (existing === surface) "Texture surface reused" else "Texture surface created"} size=${width}x$height",
+            ) }
             attachSurface(surface)
             updateVideoLayout(width, height)
             scheduleDisplaySize(width, height)
@@ -638,7 +640,10 @@ class CarPlayHostActivity : ComponentActivity() {
             if (isDestroyed || holder !== fallbackVideoView?.holder) return
             val surface = holder.surface
             videoSurfaceOwner.replace(surface, releaseOnDetach = false)
-            DiagnosticLogging.record { appendLog("SurfaceView video surface created valid=${surface.isValid}") }
+            val frame = holder.surfaceFrame
+            DiagnosticLogging.record { appendLog(
+                "SurfaceView video surface created valid=${surface.isValid} size=${frame.width()}x${frame.height()}",
+            ) }
             attachSurface(surface)
             // A still CarPlay screen sends no frames, so ask for one instead of showing the parked gap.
             if (smoothVideo) sink?.refreshPicture(SCREEN_TYPE_MAIN)
@@ -662,12 +667,21 @@ class CarPlayHostActivity : ComponentActivity() {
                 .map { owner -> owner.beginSurfaceDetach(surface, parkMain = smoothVideo && owner === live) }
             val confirmed = detaches.map { it.await() }.all { it }
             videoSurfaceOwner.clear(surface)
-            DiagnosticLogging.record { appendLog("SurfaceView video surface destroyed detachConfirmed=$confirmed") }
+            DiagnosticLogging.record { appendLog(
+                "SurfaceView video surface destroyed size=${holder.surfaceFrame.width()}x${holder.surfaceFrame.height()} " +
+                    "detachConfirmed=$confirmed",
+            ) }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) {
+            startActivity(Intent(this, com.shilapi.xcertplay.newui.NewUiActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            finish()
+            return
+        }
         // The OEM can deliver an old boot Activity launch after a headless session has ended.
         // Explicit Connect clears this process-local flag before starting a new host.
         if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this) &&
@@ -695,7 +709,9 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         CarPlayHostSettingsBridge.register(this)
         readNewUiLaunchMode(intent)
-        if (newUiConnectionHub && !intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
+        val bootAutoStart = intent.getBooleanExtra(EXTRA_BOOT_AUTO_START, false)
+        if (newUiConnectionHub && !bootAutoStart &&
+            !intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
             setTheme(R.style.Theme_Xcertplay_ConnectionHub)
         }
         restoreBootForeground = savedInstanceState == null &&
@@ -715,6 +731,10 @@ class CarPlayHostActivity : ComponentActivity() {
         airPlayIdentity = AirPlayPersistence.loadIdentity(this)
         loadPersistedSettings()
         locationPermissionAvailable = hasFineLocationPermission()
+        // Apply the OEM fullscreen window mode before attaching video views. On cold boot the
+        // connection-hub theme is translucent; measuring its first frame before fullscreen
+        // insets are applied can leave the CarPlay surface fitted inside the OEM app pane.
+        applyFullscreenMode()
         val connectBeforeUi = !CarPlayBackgroundSession.hasSession() &&
             com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)
         if (connectBeforeUi) {
@@ -723,7 +743,6 @@ class CarPlayHostActivity : ComponentActivity() {
             setContentView(buildContentView())
             CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_UI_ATTACHED)
         }
-        applyFullscreenMode()
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
@@ -763,35 +782,25 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun prepareConnectionBeforeUi() {
         preparingConnectionBeforeUi = true
-        val remembered = startupDisplayConfiguration()?.let { AirPlayPersistence.loadStartupDisplay(this, it) }
-        if (remembered != null) {
-            DiagnosticLogging.record { appendLog("Startup: using remembered window ${remembered.first}x${remembered.second}; no layout wait") }
-            applyDisplaySize(DisplaySize(remembered.first, remembered.second))
-            mainHandler.post { attachStartupUi() }
-            return
-        }
-        // Measure the real host window once, without constructing video/menu views first.
-        val probe = FrameLayout(this)
-        probe.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
-            override fun onLayoutChange(v: View, l: Int, t: Int, r: Int, b: Int,
-                oldL: Int, oldT: Int, oldR: Int, oldB: Int) {
-                if (r <= l || b <= t) return
-                probe.removeOnLayoutChangeListener(this)
-                val size = DisplaySize(r - l, b - t)
-                mainHandler.post {
-                    if (isDestroyed || isFinishing || shuttingDown.get()) return@post
-                    applyDisplaySize(size)
-                    attachStartupUi()
-                }
-            }
-        })
-        setContentView(probe)
+        // HS5's CarPlay canvas is fixed at 1920x720. Start with that known size instead of
+        // waiting for the OEM window/layout pass; the host UI is attached immediately below.
+        setContentView(buildContentView())
+        CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.HOST_UI_ATTACHED)
+        applyInitialWindowSize(HS5_CARPLAY_DISPLAY_SIZE)
+        mainHandler.post { attachStartupUi() }
+    }
+
+    private fun applyInitialWindowSize(size: DisplaySize) {
+        // The HS5 initial canvas is known, so discard any first-layout debounce and start now.
+        mainHandler.removeCallbacks(applyDisplaySize)
+        pendingDisplaySize = null
+        applyDisplaySize(size)
     }
 
     private fun attachStartupUi() {
         if (!preparingConnectionBeforeUi || isDestroyed || isFinishing || shuttingDown.get()) return
         maybeStartCarPlay()
-        setContentView(buildContentView())
+        if (videoView == null) setContentView(buildContentView())
         applyFullscreenMode()
         syncWaitingRevealWithSink()
         preparingConnectionBeforeUi = false
@@ -823,11 +832,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun readNewUiLaunchMode(intent: Intent) {
         val wantsProjection = intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)
-        newUiConnectionHub = when {
-            wantsProjection && CarPlayBackgroundSession.active -> false
-            wantsProjection -> true
-            else -> true
-        }
+        // An explicit projection launch (including cold boot) must remain a projection host
+        // while the session is still being established. The previous active-session check
+        // incorrectly classified the boot Activity as a connection hub until CarPlay became
+        // active, so the video surface and projection visibility followed different branches.
+        newUiConnectionHub = !wantsProjection
     }
 
     private fun returnToNewUiConnectionHub() {
@@ -859,7 +868,8 @@ class CarPlayHostActivity : ComponentActivity() {
             nightSchedule,
         )
         gestureFingerCount = AirPlayPersistence.loadSettingsGestureFingers(this)
-        displayScalePercent = AirPlayPersistence.loadDisplayScalePercent(this)
+        displayScalePercent = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) 100
+            else AirPlayPersistence.loadDisplayScalePercent(this)
         displayScaleTenths = CarPlayDisplayScale.sanitize((displayScalePercent + 5) / 10)
         // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
         uiScalePercent = CarPlayUiScale.DEFAULT
@@ -886,7 +896,10 @@ class CarPlayHostActivity : ComponentActivity() {
         rightHandDrive = AirPlayPersistence.loadRightHandDrive(this)
         hideTopBar = AirPlayPersistence.loadHideTopBar(this)
         hideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
-        harmanFullscreenEnabled = AirPlayPersistence.loadHarmanFullscreen(this)
+        harmanFullscreenEnabled = AirPlayPersistence.loadHarmanFullscreen(
+            this,
+            defaultEnabled = com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this),
+        )
         safeAreaDrawOutside = AirPlayPersistence.loadSafeAreaDrawOutside(this)
         mainDisplayDisableSafeArea = AirPlayPersistence.loadMainDisplayDisableSafeArea(this)
         locationPermissionAvailable = hasFineLocationPermission()
@@ -1165,7 +1178,8 @@ class CarPlayHostActivity : ComponentActivity() {
         AppAppearanceRuntime.publishHost(this, darkMode)
         refreshAppAppearance()
         if (!menuOpen) {
-            displayScalePercent = AirPlayPersistence.loadDisplayScalePercent(this)
+            displayScalePercent = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) 100
+                else AirPlayPersistence.loadDisplayScalePercent(this)
             displayScaleTenths = CarPlayDisplayScale.sanitize((displayScalePercent + 5) / 10)
             updateResolutionMenu()
         }
@@ -1201,7 +1215,10 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!menuOpen) {
             val savedHideTopBar = AirPlayPersistence.loadHideTopBar(this)
             val savedHideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
-            val savedHarmanFullscreen = AirPlayPersistence.loadHarmanFullscreen(this)
+            val savedHarmanFullscreen = AirPlayPersistence.loadHarmanFullscreen(
+                this,
+                defaultEnabled = com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this),
+            )
             systemBarsChanged = hideTopBar != savedHideTopBar ||
                 hideBottomBar != savedHideBottomBar ||
                 harmanFullscreenEnabled != savedHarmanFullscreen
@@ -1363,7 +1380,7 @@ class CarPlayHostActivity : ComponentActivity() {
         clusterPresentation = null
         clusterSurface?.let { sink?.clearSurface(SCREEN_TYPE_ALT, it) }
         clusterSurface = null
-        Hs5ClusterActivityOutput.close("cluster map off or session ended")
+        Hs5ClusterActivityOutput.close("cluster map off or session ended", hs5ClusterHost)
         presentations.forEach { runCatching { it.dismiss() } }
         com.shilapi.xcertplay.hud.Hs5NavigationOutputs.setClusterMapShown(false)
         controller?.setDashboardMapOutputVisible(false)
@@ -2788,6 +2805,11 @@ class CarPlayHostActivity : ComponentActivity() {
             displayScalePercent = percent
             displayScaleTenths = CarPlayDisplayScale.sanitize((percent + 5) / 10)
             updateResolutionMenu()
+        }
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) {
+            resolutionControl.seekBar.isEnabled = false
+            resolutionControl.seekBar.alpha = 0.45f
+            resolutionControl.valueTextView.text = "1920 × 720"
         }
         val resolutionValue = resolutionControl.valueTextView
         content.addView(
@@ -4298,7 +4320,8 @@ class CarPlayHostActivity : ComponentActivity() {
     ).container
 
     private fun updateResolutionMenu() {
-        resolutionValueView?.text = "${displayScalePercent}%"
+        resolutionValueView?.text = if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) "1920 × 720"
+            else "${displayScalePercent}%"
         val native = activeDisplaySize ?: currentActivitySize()
         val resolution = if (native == null) {
             getString(R.string.handshake_resolution_waiting_for_display)
@@ -4807,7 +4830,8 @@ class CarPlayHostActivity : ComponentActivity() {
             callEchoCancellation = AirPlayPersistence.loadCallEchoCancellation(this),
             callVoiceFilter = AirPlayPersistence.loadCallVoiceFilter(this),
             // Only a SurfaceView honours release timestamps; smooth video always selects one.
-            videoPacingDelayMillis = if (smoothVideo) smoothVideoDelayMillis(fps) else 0,
+            // Keep decoder output immediate; no artificial frame queue is added to CarPlay.
+            videoPacingDelayMillis = 0,
             mainVideoFrameRate = fps,
             vendorLowLatencyDecoder = AirPlayPersistence.loadLowLatencyDecoder(this),
             mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(this),
@@ -5052,7 +5076,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // The sink's pacing is fixed when it is built; a session from before a Smooth video change (for
         // example one whose reconnect stopped at a prerequisite) is stopped instead of adopted. Callers
         // retry, and the next start matches this view.
-        if (!backgroundSessionMatchesView(snapshot.sink.videoPacingEnabled, smoothVideo)) {
+        if (!backgroundSessionMatchesView(snapshot.sink.videoPacingEnabled, viewSmoothVideo = false)) {
             DiagnosticLogging.record { appendLog("Background session smooth video=${snapshot.sink.videoPacingEnabled} differs from this view; " +
                 "stopping it instead of adopting it") }
             CarPlayBackgroundSession.stop { mainHandler.post { if (!isDestroyed) maybeStartCarPlay() } }
@@ -5132,6 +5156,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun startCarPlay(size: DisplaySize) {
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) return
         if (HongqiScreenStatus.screenOff) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
@@ -5324,6 +5349,24 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun applyDisplaySize(size: DisplaySize) {
         if (shuttingDown.get()) return
+        if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this) && !isMultiWindowActive()) {
+            // HS5's negotiated CarPlay canvas is a known firmware contract. The host surface can
+            // briefly report 1280x720 while the OEM launcher restores the full 1920x720 window;
+            // treating that transient viewport as a new display size tears down a live session.
+            val fixedSize = HS5_CARPLAY_DISPLAY_SIZE
+            rememberStartupDisplay(fixedSize)
+            activeDisplaySize = fixedSize
+            recordDetectedMaximum(fixedSize)
+            updateResolutionMenu()
+            if (size != fixedSize) {
+                val message = "HS5 viewport event ignored; fixed CarPlay canvas=${fixedSize.width}x${fixedSize.height}"
+                DiagnosticLogging.record { appendLog(message) }
+                DiagnosticLogging.logcat { Log.i(TAG, message) }
+            }
+            videoView?.let { updateVideoLayout(it.width, it.height) }
+            maybeStartCarPlay()
+            return
+        }
         rememberStartupDisplay(size)
         val display = sessionDisplay
         if (display != null && applyViewArea(size, display)) return
@@ -5501,6 +5544,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun maybeStartCarPlay() {
+        if (AirPlayPersistence.loadClusterOnlyMode(this)) return
         if (HongqiScreenStatus.screenOff) return
         if (shuttingDown.get() || startupRetryStopped) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
@@ -5892,9 +5936,9 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         root.addView(viewport, index, texture.layoutParams)
-        DiagnosticLogging.record { appendLog(if (smoothVideo) {
-            "Using SurfaceView video output: smooth video, frames shown at the iPhone's frame time + a delay " +
-                "starting at ${smoothVideoDelayMillis(fps)} ms; picture adjustments unavailable"
+        DiagnosticLogging.record { appendLog(if (smoothVideo && !directVideoOutput) {
+            "Using SurfaceView video output: decoded frames shown immediately without added pacing delay; " +
+                "picture adjustments unavailable"
         } else if (directVideoOutput) {
             "Using SurfaceView video output: direct video output, frames shown as soon as they are decoded; " +
                 "picture adjustments unavailable"
@@ -6127,8 +6171,18 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun applyClusterMapFromGesture(show: Boolean) {
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return
         if (!clusterMapHorizontalGestureEnabled()) return
+        setClusterMapVisible(show, "gesture")
+    }
+
+    internal fun showFlyScreenFromWheel(): Boolean {
+        if (isFinishing || isDestroyed || !AirPlayPersistence.loadClusterMapEnabled(this)) return false
+        setClusterMapVisible(true, "wheel previous long press")
+        return true
+    }
+
+    private fun setClusterMapVisible(show: Boolean, reason: String) {
         if (clusterFlyScreenVisible == show) {
-            DiagnosticLogging.record { appendLog("Cluster map gesture visible=$show (unchanged)") }
+            DiagnosticLogging.record { appendLog("Cluster map $reason visible=$show (unchanged)") }
             return
         }
         clusterFlyScreenVisible = show
@@ -6138,13 +6192,13 @@ class CarPlayHostActivity : ComponentActivity() {
             ensureClusterPresentation()
             nudgeClusterStreamDelivery()
         } else if (Hs5ClusterActivityOutput.isOpen()) {
-            closeHs5ClusterWindow("gesture")
+            closeHs5ClusterWindow(reason)
         }
         currentSurface?.takeIf { it.isValid }?.let(::routeVideoSurfaces)
         updateClusterMapShown()
         syncClusterPresentationStreamState()
-        DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "cluster map gesture visible=$show") }
-        DiagnosticLogging.record { appendLog("Cluster map gesture visible=$show") }
+        DiagnosticLogging.logcat { Log.i(ClusterMapPresentation.TAG, "cluster map $reason visible=$show") }
+        DiagnosticLogging.record { appendLog("Cluster map $reason visible=$show") }
     }
 
     private fun refreshClusterStreamRoutingAfterToggle() {
@@ -6442,11 +6496,24 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun applyFullscreenMode() {
         val multiWindow = isMultiWindowActive()
-        if (harmanFullscreenEnabled) {
+        // HS5 runs CarPlay as a 1920x720 full-screen canvas. The OEM may otherwise keep the
+        // Activity in its 1280px app pane, which letterboxes the correctly negotiated stream to
+        // 1280x480 and leaves the factory left panel visible. This flag is required on HS5 even
+        // when an older saved preference explicitly disabled the experimental generic option.
+        val hs5FullScreenRequired = !multiWindow &&
+            com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)
+        if (harmanFullscreenEnabled || hs5FullScreenRequired) {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             // The OEM-specific bit must be written last: the standard insets controller does not preserve it.
             HarmanFullscreenCompat.apply(window)
+            if (hs5FullScreenRequired) {
+                val fixedCanvas = HS5_CARPLAY_DISPLAY_SIZE
+                window.setLayout(fixedCanvas.width, fixedCanvas.height)
+            }
             harmanFullscreenApplied = true
+            if (hs5FullScreenRequired) {
+                DiagnosticLogging.record { appendLog("HS5 fullscreen window fixed=${HS5_CARPLAY_DISPLAY_SIZE.width}x${HS5_CARPLAY_DISPLAY_SIZE.height}") }
+            }
             return
         }
         if (harmanFullscreenApplied) {
@@ -6508,9 +6575,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private companion object {
-        /** Hongqi wordmark on the CarPlay waiting screen ([R.drawable.hongqi_carplay_waiting_logo], ~916×541). */
-        const val WAITING_BRAND_LOGO_WIDTH_DP = 147
-        const val WAITING_BRAND_LOGO_HEIGHT_DP = 87
+        val HS5_CARPLAY_DISPLAY_SIZE = DisplaySize(1920, 720)
         const val CLUSTER_SMALL_WINDOW_ON = 1
         const val CLUSTER_SMALL_WINDOW_AUTO = 2
         const val SIDE_PANEL_REFRESH_MILLIS = 5_000L

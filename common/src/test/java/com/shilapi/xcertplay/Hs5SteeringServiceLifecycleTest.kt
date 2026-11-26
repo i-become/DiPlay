@@ -9,6 +9,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
 import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
@@ -45,7 +46,9 @@ class Hs5SteeringServiceLifecycleTest {
     private val handler = Handler(Looper.getMainLooper())
     private val component = ComponentName(QisiSteeringServiceClient.PACKAGE, QisiSteeringServiceClient.SERVICE)
     private val controller = mock(CarPlayController::class.java)
+    private val audio = mock(AudioManager::class.java)
     private val host = mock(CarPlayHostActivity::class.java)
+    private var standalone: CarPlayHostSettingsBridge.StandaloneCluster? = null
     private var shown = true
     private var bindAccepted = true
     private var deliverConnection = true
@@ -71,6 +74,8 @@ class Hs5SteeringServiceLifecycleTest {
         override fun handleMessage(msg: Message) { fawMessages += Message.obtain(msg) }
     })
     private val context: Context = object : ContextWrapper(app) {
+        override fun getSystemService(name: String): Any? =
+            if (name == Context.AUDIO_SERVICE) audio else super.getSystemService(name)
         override fun getApplicationContext(): Context = this
         override fun bindService(intent: Intent, conn: ServiceConnection, flags: Int): Boolean {
             if (intent.component == FawSteeringServiceClient.COMPONENT) {
@@ -178,6 +183,7 @@ class Hs5SteeringServiceLifecycleTest {
 
     @Before fun setUp() {
         DiagnosticLogging.setEnabled(false)
+        AirPlayPersistence.saveClusterMapEnabled(context, false)
         shadowOf(app.packageManager).installPackage(PackageInfo().apply { packageName = QisiSteeringServiceClient.PACKAGE })
         `when`(controller.activeAirPlaySessionToken()).thenReturn(Any())
         `when`(host.applicationContext).thenReturn(context)
@@ -197,6 +203,8 @@ class Hs5SteeringServiceLifecycleTest {
     }
 
     @After fun tearDown() {
+        standalone?.let { CarPlayHostSettingsBridge.unregisterStandalone(context, it) }
+        AirPlayPersistence.saveClusterOnlyMode(context, false)
         CarPlayMediaKeys::class.java.getDeclaredField("controller").apply { isAccessible = true }.set(null, null)
         Hs5SteeringKeys.detach(controller)
         CarPlayHostSettingsBridge.unregister(host)
@@ -207,6 +215,52 @@ class Hs5SteeringServiceLifecycleTest {
     private fun start() {
         Hs5SteeringKeys.attach(context, controller)
         drain()
+    }
+
+    @Test fun standaloneUsesQisiExitCallbackAndPreviousLongPressWithoutCarPlay() {
+        CarPlayHostSettingsBridge.unregister(host)
+        AirPlayPersistence.saveClusterOnlyMode(context, true)
+        AirPlayPersistence.saveClusterMapEnabled(context, true)
+        shown = true
+        var opens = 0
+        val target = object : CarPlayHostSettingsBridge.StandaloneCluster {
+            override fun enabled() = AirPlayPersistence.loadClusterOnlyMode(context)
+            override fun shown() = shown
+            override fun show(): Boolean { opens++; shown = true; Hs5SteeringKeys.applySettings(context); return true }
+            override fun close(reason: String): Boolean { closes++; shown = false; Hs5SteeringKeys.applySettings(context); return true }
+            override fun settingsChanged() = Unit
+        }
+        standalone = target
+        CarPlayHostSettingsBridge.registerStandalone(context, target)
+        drain()
+        assertArrayEquals(intArrayOf(KeyEvent.KEYCODE_MEDIA_PREVIOUS), registrations.last())
+        assertEquals(0, focusRequests)
+
+        // This is the same callback target registered with QisiClusterMapSession. No BACK
+        // hard-key registration is made; Qisi's HardKeyQuit event closes only runtime output.
+        assertTrue(target.close("Qisi full-screen navigation exit"))
+        assertFalse(shown)
+        assertTrue(AirPlayPersistence.loadClusterMapEnabled(context))
+        assertArrayEquals(intArrayOf(KeyEvent.KEYCODE_MEDIA_PREVIOUS), registrations.last())
+
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        drain()
+        assertEquals(1, opens)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        drain()
+        assertEquals(2, opens)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        drain()
+        verify(audio).dispatchMediaKeyEvent(argThat { it.action == KeyEvent.ACTION_DOWN && it.keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS })
+        verify(audio).dispatchMediaKeyEvent(argThat { it.action == KeyEvent.ACTION_UP && it.keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS })
+        AirPlayPersistence.saveClusterMapEnabled(context, false)
+        Hs5SteeringKeys.applySettings(context)
+        drain()
+        assertNull(listener)
+        verifyNoInteractions(controller)
     }
 
     @Test fun rightLongPressTogglesOnceAndShortPressStillSkips() {
@@ -227,30 +281,69 @@ class Hs5SteeringServiceLifecycleTest {
         verify(controller, times(1)).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.NEXT)
     }
 
-    @Test fun carlinkFactoryLongNextTogglesOnceAndShortClickHasAMatchingRelease() {
-        val bridge = mock(com.shilapi.xcertplay.carlink.CarlinkBridge::class.java)
+    @Test fun previousLongPressShowsOnceWithoutSkippingAndShortPressStillSkips() {
+        AirPlayPersistence.saveClusterMapEnabled(context, true)
+        AirPlayPersistence.saveClusterMapHorizontalGestureEnabled(context, false)
         AirPlayPersistence.saveCarPlayWheelMedia(context, true)
-        com.shilapi.xcertplay.media.CarPlayTelephonyAudio.clear()
-        try {
-            Hs5SteeringKeys.attachCarlink(context, bridge)
-            drain()
-            val callback = listener!!
-            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
-            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 1)
-            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 2)
-            drain()
-            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN)
-            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP)
-            verify(bridge, never()).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN)
-            sendKey(callback, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
-            drain()
-            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN)
-            verify(bridge, times(1)).sendKey(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_UP)
-        } finally {
-            Hs5SteeringKeys.detachCarlink(bridge)
-            drain()
-            Hs5SteeringKeys.detach(null)
-        }
+        CarPlayMediaKeys::class.java.getDeclaredField("controller").apply { isAccessible = true }.set(null, controller)
+        start()
+        val callback = listener!!
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        drain()
+        verify(host, times(1)).showFlyScreenFromWheel()
+        verify(controller, never()).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.PREVIOUS)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        drain()
+        verify(controller, times(1)).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.PREVIOUS)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        drain()
+        verify(host, times(2)).showFlyScreenFromWheel()
+    }
+
+    @Test fun mapDisabledDoesNotOpenFlyScreenOnPreviousLongPress() {
+        AirPlayPersistence.saveCarPlayWheelMedia(context, true)
+        start()
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        sendKey(listener!!, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        drain()
+        verify(host, never()).showFlyScreenFromWheel()
+    }
+
+    @Test fun queuedLongPressHonorsMapSettingAndDiscardedListenerCannotReopen() {
+        AirPlayPersistence.saveClusterMapEnabled(context, true)
+        start()
+        val previous = listener!!
+        sendKey(previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        AirPlayPersistence.saveClusterMapEnabled(context, false)
+        Hs5SteeringKeys.applySettings(context)
+        drain()
+        verify(host, never()).showFlyScreenFromWheel()
+        sendKey(previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        sendKey(previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        drain()
+        verify(host, never()).showFlyScreenFromWheel()
+    }
+
+    @Test fun previousShortcutPreservesSystemShortPressInBluetoothMode() {
+        AirPlayPersistence.saveClusterMapEnabled(context, true)
+        AirPlayPersistence.saveCarBluetoothAudio(context, true)
+        start()
+        val callback = listener!!
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        drain()
+        val events = org.mockito.ArgumentCaptor.forClass(KeyEvent::class.java)
+        verify(audio, times(2)).dispatchMediaKeyEvent(events.capture())
+        assertEquals(listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP), events.allValues.map { it.action })
+        assertTrue(events.allValues.all { it.keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS })
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        sendKey(callback, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2)
+        drain()
+        verify(host, times(1)).showFlyScreenFromWheel()
+        verify(audio, times(2)).dispatchMediaKeyEvent(any(KeyEvent::class.java))
+        verify(controller, never()).sendMediaButton(com.shilapi.xcertplay.airplay.CarPlayMediaButton.PREVIOUS)
     }
 
     private fun drain() {
@@ -526,7 +619,7 @@ class Hs5SteeringServiceLifecycleTest {
         assertEquals(1, focusReleases)
     }
 
-    @Test fun rejectedCarPlayFocusFallsBackToOemCarlinkFocusBeforeHandlingBack() {
+    @Test fun rejectedCarPlayFocusFallsBackToOemFocusBeforeHandlingBack() {
         focusResults[37] = 0
         start()
         assertEquals(listOf(37, 38), focusTypes)
@@ -609,7 +702,7 @@ class Hs5SteeringServiceLifecycleTest {
         verify(controller).requestSiri()
     }
 
-    @Test fun siriSwitchIgnoresLegacyHongqiDoubleMappingForCarLinkVoiceCode() {
+    @Test fun siriSwitchIgnoresLegacyHongqiDoubleMappingForVoiceCode() {
         configureVoice(VoiceAssistantKeyTarget.SIRI)
         start()
         repeat(2) {

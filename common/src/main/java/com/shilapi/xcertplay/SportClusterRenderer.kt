@@ -42,7 +42,8 @@ internal object SportClusterGeometry {
     const val DIAL_X = 1024f
     const val DIAL_Y = 358f
     // Lower the top rim below the OEM mode label, retaining bottom icon clearance.
-    const val CONTENT_SCALE = .96f
+    // Keep the upper rim anchored while using the clear space beneath the lower vehicle icons.
+    const val CONTENT_SCALE = .99f
     const val CONTENT_TOP = 24f
     fun scale(width: Int, height: Int) = min(width.coerceAtLeast(0) / WIDTH, height.coerceAtLeast(0) / HEIGHT) * CONTENT_SCALE
     fun horizontalScale(width: Int, height: Int) = scale(width, height) / CONTENT_SCALE
@@ -235,13 +236,18 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
         guidanceCard.draw(canvas, nav)
         val value = navigationSummary(nav)
         if (value.isEmpty()) return
-        reset(muted); paint.textSize = 23f
-        val fitted = TextUtils.ellipsize(value, paint, 488f, TextUtils.TruncateAt.END).toString()
-        val width = paint.measureText(fitted) + 32f
-        val height = paint.descent() - paint.ascent() + 12f
+        val lines = navigationSummaryLines(nav)
+        val textSize = if (lines.size > 1) 20f else 23f
+        reset(muted); paint.textSize = textSize
+        val width = lines.maxOf { paint.measureText(it) } + 32f
+        val lineHeight = paint.descent() - paint.ascent()
+        val height = lineHeight * lines.size + 12f
         val bounds = RectF(1698f - width / 2, 624f - height, 1698f + width / 2, 624f)
         reset(Color.argb(240, 3, 15, 22)); canvas.drawRoundRect(bounds, 12f, 12f, paint)
-        text(canvas, fitted, bounds.left + 16f, bounds.top + 6f - paint.ascent(), 23f, width - 32f, muted)
+        lines.forEachIndexed { index, line ->
+            text(canvas, line, bounds.left + 16f,
+                bounds.top + 6f - paint.ascent() + lineHeight * index, textSize, width - 32f, muted)
+        }
     }
 
     internal fun navigationSummary(nav: com.shilapi.xcertplay.glance.CarPlayGlance.Snapshot): String {
@@ -264,6 +270,33 @@ internal class SportClusterRenderer(private val context: Context) : ClusterInstr
             context.getString(R.string.original_cluster_kilometers, kilometers)
         }
         return listOfNotNull(arrival, duration, distance).joinToString("   ")
+    }
+
+    /** Gives the destination its own line so a long name cannot hide distance, duration, or ETA. */
+    internal fun navigationSummaryLines(nav: com.shilapi.xcertplay.glance.CarPlayGlance.Snapshot): List<String> {
+        val summary = navigationSummary(nav)
+        val parts = summary.split(" · ").filter(String::isNotBlank)
+        val destination = parts.firstOrNull { it.startsWith("目的地 ") }
+        if (destination == null) {
+            reset(); paint.textSize = 23f
+            return listOf(TextUtils.ellipsize(summary, paint, 488f, TextUtils.TruncateAt.END).toString())
+        }
+        val destinationIndex = parts.indexOf(destination)
+        val details = parts.filterIndexed { index, _ -> index != destinationIndex }
+        val orderedDetails = details.sortedBy { part ->
+            when {
+                part.startsWith("距离 ") -> 0
+                part.startsWith("用时 ") -> 1
+                part.startsWith("到达 ") -> 2
+                else -> 3
+            }
+        }.joinToString("   ")
+        val maxWidth = 620f
+        reset(); paint.textSize = 20f
+        val fittedDestination = TextUtils.ellipsize(destination, paint, maxWidth, TextUtils.TruncateAt.END).toString()
+        if (orderedDetails.isBlank()) return listOf(fittedDestination)
+        return listOf(fittedDestination,
+            TextUtils.ellipsize(orderedDetails, paint, maxWidth, TextUtils.TruncateAt.END).toString())
     }
 
     private fun tires(canvas: Canvas, vehicle: OemClusterVehicleState) {

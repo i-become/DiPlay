@@ -75,4 +75,18 @@ class Hs5ClusterActivityOutputTest {
         assertTrue(stale.isFinishing)
         assertTrue(closed.isEmpty())
     }
+
+    @Test fun aPreviousSessionCannotCloseTheStandaloneOwnersWindow() {
+        val (_, launch) = openWindow()
+        val window = Robolectric.buildActivity(Hs5ClusterActivity::class.java, launch).setup().get()
+        val oldHost = object : Hs5ClusterActivityOutput.Host {
+            override fun onClusterWindowSurface(surface: Surface?) = Unit
+            override fun onClusterWindowClosed(reason: String) = Unit
+        }
+        Hs5ClusterActivityOutput.close("old CarPlay teardown", oldHost)
+        assertFalse(window.isFinishing)
+        assertTrue(Hs5ClusterActivityOutput.isOpen())
+        Hs5ClusterActivityOutput.close("current owner", host)
+        assertTrue(window.isFinishing)
+    }
 }

@@ -17,10 +17,6 @@ class BootReceiver : BroadcastReceiver() {
         if (!launchEnabled) return
 
         val pending = goAsync()
-        try {
-            DiPlayBootStartup.launchUi(app)
-        } finally {
-            pending.finish()
-        }
+        DiPlayBootStartup.launchUi(app, onComplete = pending::finish)
     }
 }

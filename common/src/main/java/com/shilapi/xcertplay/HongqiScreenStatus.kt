@@ -69,7 +69,6 @@ internal object HongqiScreenStatus {
                 screenOff = true
                 ConnectionProgressUiState.markDisconnected()
                 CarPlayHostSettingsBridge.closeFlyScreen("head unit screen/power off status=$status")
-                com.shilapi.xcertplay.carlink.CarlinkBridge.stopIfStarted()
                 CarPlayBackgroundSession.stop()
             }
             null -> Unit

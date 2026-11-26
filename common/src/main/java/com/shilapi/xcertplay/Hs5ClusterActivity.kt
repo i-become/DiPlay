@@ -87,10 +87,15 @@ class Hs5ClusterActivity : Activity() {
     }
 
     override fun onStop() {
-        originalScene?.setSceneVisible(false)
-        foreground.close()
-        // Another window covering the cluster means the head unit took the fly screen back.
-        if (!isFinishing) Hs5ClusterActivityOutput.closedOutside(this, "covered on cluster")
+        val standalone = AirPlayPersistence.loadClusterOnlyMode(this)
+        if (!standalone) {
+            originalScene?.setSceneVisible(false)
+            foreground.close()
+            // In connected CarPlay mode, another window covering the cluster means the head unit
+            // took the fly screen back. Standalone mode keeps its independent overlay alive while
+            // the centre display returns to the vehicle home screen.
+            if (!isFinishing) Hs5ClusterActivityOutput.closedOutside(this, "covered on cluster")
+        }
         super.onStop()
     }
 
@@ -213,7 +218,8 @@ internal object Hs5ClusterActivityOutput {
     }
 
     /** DiPlay closes the window itself; the host already stopped drawing into its surface. */
-    fun close(reason: String) {
+    fun close(reason: String, owner: Host? = null) {
+        if (owner != null && host.get() !== owner) return
         if (token == null && activity.get() == null) return
         val window = activity.get()
         record("close ($reason)")

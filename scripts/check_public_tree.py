@@ -17,7 +17,6 @@ for name in filter(None, names):
         continue
     if ('.private' in path.relative_to(root).parts or 'offline-mfi' in path.relative_to(root).parts
             or path.suffix.lower() in blocked_suffixes or name.startswith(blocked_prefixes)
-            or name in {'common/libs/icar-sdk-stubs.jar', 'mobile/libs/icar-sdk-corrected.dex'}
             or path.name in {'libovmsink.so', 'libusbio.so'}
             or path.name == 'local.properties'
             or ('signing' in path.name.lower() and path.suffix == '.properties')):

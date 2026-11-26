@@ -22,7 +22,7 @@ internal object VoiceAssistantKeyController {
     fun onFactoryVoiceKeyDown(context: Context, keyCode: Int, receivedAt: Long) {
         applySettings(context)
         if (!enabled) return
-        // Some firmwares emit both SPEECH and SDS_CAR_LINK for the same physical press.
+        // Some firmwares emit two aliases for the same physical voice-key press.
         if (lastFactoryCode != null && lastFactoryCode != keyCode &&
             receivedAt - lastFactoryTime in 0..80L) {
             Hs5SteeringKeys.recordEvent { "voice alias duplicate key=$keyCode" }
