@@ -18,7 +18,16 @@ internal class FirstTcpWatchdog(
     private var firstAcceptNanos: Long? = null
     private var success = false
     private var recoveries = 0
+    private var associationRecoverySent = false
+    private var lastAssociationObservationNanos: Long? = null
     private var cancelTimer: (() -> Unit)? = null
+
+    private companion object {
+        const val RECOVERY_INTERVAL_MILLIS = 6_000L
+        const val MAX_RECOVERIES = 4
+        const val ASSOCIATION_OBSERVATION_INTERVAL_MILLIS = 1_000L
+        const val ASSOCIATION_OBSERVATION_GRACE_MILLIS = 2_000L
+    }
 
     @Synchronized fun startSessionSent(sentAtNanos: Long) {
         if (terminated || firstStartNanos != null) return
@@ -39,26 +48,34 @@ internal class FirstTcpWatchdog(
         return true
     }
 
-    /** Only sample association briefly before the first timed recovery; never after real TCP. */
+    /** Sample P2P association at most once a second while waiting for the first TCP connection. */
     @Synchronized fun shouldObserveAssociation(): Boolean {
         val ageMillis = recoveryAgeMillis() ?: return false
-        return recoveries == 0 && ageMillis in 2_000L until 6_000L
+        if (ageMillis < ASSOCIATION_OBSERVATION_GRACE_MILLIS || recoveries >= MAX_RECOVERIES) return false
+        val now = nowNanos()
+        val previous = lastAssociationObservationNanos
+        if (previous != null && now - previous < ASSOCIATION_OBSERVATION_INTERVAL_MILLIS * 1_000_000L) return false
+        lastAssociationObservationNanos = now
+        return true
     }
 
     /** Called only by the authenticated control loop; retries never extend the hard deadline. */
     @Synchronized fun takeRecoveryRequest(clientAssociated: Boolean = false): Boolean {
         val ageMillis = recoveryAgeMillis() ?: return false
-        val earlyAssociation = recoveries == 0 && clientAssociated && ageMillis >= 2_000
-        if (!earlyAssociation && ageMillis < (recoveries + 1) * 6_000L) return false
+        if (recoveries >= MAX_RECOVERIES) return false
+        val associationRecovery = clientAssociated && !associationRecoverySent &&
+            ageMillis >= ASSOCIATION_OBSERVATION_GRACE_MILLIS
+        if (!associationRecovery && ageMillis < (recoveries + 1) * RECOVERY_INTERVAL_MILLIS) return false
+        if (associationRecovery) associationRecoverySent = true
         recoveries++
         log("discovery recovery attempt=$recoveries startRequestAgeMs=$ageMillis " +
-            "reason=${if (earlyAssociation) "client_associated" else "timer"}")
+            "reason=${if (associationRecovery) "client_associated" else "timer"}")
         return true
     }
 
     private fun recoveryAgeMillis(): Long? {
         val started = firstStartNanos ?: return null
-        if (terminated || success || firstAcceptNanos != null || recoveries >= 2) return null
+        if (terminated || success || firstAcceptNanos != null || recoveries >= MAX_RECOVERIES) return null
         val ageMillis = (nowNanos() - started) / 1_000_000
         return ageMillis.takeIf { it < timeoutMillis }
     }

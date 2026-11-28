@@ -38,7 +38,7 @@ internal object Hs5BootSession {
         val pairings: PairingStore,
     )
 
-    fun schedule(context: Context, phoneWake: Boolean = false) {
+    fun schedule(context: Context, phoneWake: Boolean = false, fallbackToHost: Boolean = false) {
         val app = context.applicationContext
         if (!eligible(app, phoneWake) || CarPlayBackgroundSession.hasSession() || !scheduled.compareAndSet(false, true)) return
         val ticket = generation.get()
@@ -55,7 +55,14 @@ internal object Hs5BootSession {
             }.onFailure { record("prepare failed type=${it.javaClass.simpleName}") }.getOrNull()
             main.post {
                 preparing = false
-                if (prepared == null) { if (generation.get() == ticket) scheduled.set(false); record("skip=display_profile_unavailable; first UI connection will cache it"); return@post }
+                if (prepared == null) {
+                    if (generation.get() == ticket) scheduled.set(false)
+                    record("skip=display_profile_unavailable; first UI connection will cache it")
+                    if (fallbackToHost && generation.get() == ticket && eligible(app, phoneWake)) {
+                        DiPlayLauncher.startAutomaticConnection(app, fromBoot = true)
+                    }
+                    return@post
+                }
                 if (generation.get() != ticket || !eligible(app, phoneWake) || CarPlayBackgroundSession.hasSession()) return@post
                 val (profile, identity, runtime, pairings) = prepared
                 var renderer: AndroidMediaSink? = null
@@ -98,6 +105,10 @@ internal object Hs5BootSession {
                                 ConnectionProgressUiState.advance(CarPlayConnectionProgress.STEP_COUNT)
                                 CarPlayStartupDiagnostics.mark(CarPlayStartupDiagnostics.Phase.SESSION_ACTIVE)
                                 record("session active before UI")
+                                // The OEM may accept the boot UI launch without displaying it.
+                                // The phone is already connected at this point, so promote the
+                                // projection host directly instead of waiting for home UI polling.
+                                DiPlayLauncher.openCarPlayProjection(app, fromBootSession = true)
                             }
                         }
                         override fun onSessionEnded(session: AirPlaySession) {
@@ -177,6 +188,11 @@ internal object Hs5BootSession {
     fun cancelPending() {
         generation.incrementAndGet()
         scheduled.set(true)
+    }
+
+    /** Reopens the one-shot boot preconnect gate after the OEM reports power restored. */
+    fun allowPowerRestoreRestart() {
+        scheduled.set(false)
     }
 
     private fun eligible(context: Context, phoneWake: Boolean): Boolean =

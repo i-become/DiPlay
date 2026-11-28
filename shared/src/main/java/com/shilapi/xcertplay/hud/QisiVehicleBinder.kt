@@ -24,7 +24,6 @@ internal object QisiVehicleBinder {
 
     const val HUD_SET_ICON = 5
     const val HUD_SET_ROUNDABOUT = 6
-    const val HUD_SET_NEXT_CROSS_DISTANCE = 7
     const val HUD_SET_NEXT_CROSS_RANGE = 9
     const val HUD_SET_INTERSECTION = 24
     const val HUD_SET_LEFT_LANE_LINE = 33
@@ -169,16 +168,6 @@ internal object QisiVehicleBinder {
             distance < 1_000 -> intArrayOf(1, distance)
             distance < 10_000 -> intArrayOf(2, distance / 100)
             else -> intArrayOf(3, distance / 1_000)
-        }
-    }
-
-    /** HUD's parallel next-cross field is shown at the same precision as its unit/value pair. */
-    fun hudNextCrossDistanceMeters(meters: Int): Int {
-        val distance = meters.coerceAtLeast(0)
-        return when {
-            distance < 1_000 -> distance
-            distance < 10_000 -> distance / 100 * 100
-            else -> distance / 1_000 * 1_000
         }
     }
 

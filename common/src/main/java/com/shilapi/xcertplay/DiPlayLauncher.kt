@@ -83,12 +83,15 @@ internal object DiPlayLauncher {
         intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
             !intent.hasExtra(EXTRA_PAGE)
 
-    fun openCarPlayProjection(context: Context) {
+    fun openCarPlayProjection(context: Context, fromBootSession: Boolean = false) {
         if (AirPlayPersistence.loadClusterOnlyMode(context)) return
+        val flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION or
+            Intent.FLAG_ACTIVITY_SINGLE_TOP or if (fromBootSession) Intent.FLAG_ACTIVITY_NEW_TASK else 0
         context.startActivity(
             Intent(context, CarPlayHostActivity::class.java)
                 .putExtra(EXTRA_ENTER_CARPLAY_PROJECTION, true)
-                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                .putExtra(EXTRA_BOOT_AUTO_START, fromBootSession)
+                .addFlags(flags),
         )
         (context as? Activity)?.overridePendingTransition(0, 0)
     }

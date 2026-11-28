@@ -30,7 +30,8 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         val maxWidth = if (sport) 385f else 461f
         val showLanes = lanes.fits(nav.lanes, maxWidth - 24f)
         val maneuver = nav.maneuverType
-        if (maneuver == null && !showLanes) return
+        val showTurn = maneuver != null || nav.directionIcon != null
+        if (!showTurn && !showLanes) return
         val road = nav.road.trim()
         val distance = if (nav.distanceMeters < 1000) context.getString(R.string.cluster_dashboard_meters, nav.distanceMeters)
             else context.getString(R.string.cluster_dashboard_kilometers, nav.distanceMeters / 1000.0)
@@ -38,14 +39,14 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         val roadSize = if (sport) 23f else 22f
         val arrowSize = if (sport) 67f else 73f
         val textWidth = max(measure(distance, distanceSize), measure(road, roadSize))
-        val turnWidth = if (maneuver != null) 24f + arrowSize + 12f + textWidth else 0f
+        val turnWidth = if (showTurn) 24f + arrowSize + 12f + textWidth else 0f
         val laneWidth = if (showLanes) nav.lanes.size * 56f + 24f else 0f
         val width = min(maxWidth, max(turnWidth, laneWidth))
         val distanceHeight = fontHeight(distanceSize)
         val roadHeight = if (road.isNotEmpty()) fontHeight(roadSize) + 2f else 0f
-        val turnHeight = if (maneuver != null) max(arrowSize, distanceHeight + roadHeight) + 12f else 0f
-        val laneTop = turnHeight + if (showLanes && maneuver != null) 2f else 0f
-        val height = turnHeight + if (showLanes) 56f + if (maneuver != null) 2f else 0f else 0f
+        val turnHeight = if (showTurn) max(arrowSize, distanceHeight + roadHeight) + 12f else 0f
+        val laneTop = turnHeight + if (showLanes && showTurn) 2f else 0f
+        val height = turnHeight + if (showLanes) 56f + if (showTurn) 2f else 0f else 0f
         val left = if (sport) 1366f else 997.5f - width / 2
         val top = if (sport) 72f else 112f
         val bounds = RectF(left, top, left + width, top + height)
@@ -55,14 +56,16 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
         paint.style = Paint.Style.STROKE; paint.strokeWidth = if (sport) 1f else 1.4f
         paint.color = if (sport) Color.rgb(43, 58, 72) else Color.rgb(83, 128, 183)
         canvas.drawRoundRect(bounds, 12f, 12f, paint)
-        if (maneuver != null) {
+        if (showTurn) {
             val arrowLeft = bounds.left + 12f
             val arrowTop = top + (turnHeight - arrowSize) / 2
-            if (!phoneIcon.draw(canvas, nav.directionIcon, RectF(arrowLeft, arrowTop, arrowLeft + arrowSize, arrowTop + arrowSize)))
-            context.getDrawable(NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide))?.mutate()?.let {
-                it.setTint(white)
-                it.setBounds(arrowLeft.toInt(), arrowTop.toInt(), (arrowLeft + arrowSize).toInt(), (arrowTop + arrowSize).toInt())
-                it.draw(canvas)
+            val iconDrawn = phoneIcon.draw(canvas, nav.directionIcon, RectF(arrowLeft, arrowTop, arrowLeft + arrowSize, arrowTop + arrowSize))
+            if (!iconDrawn && maneuver != null) {
+                context.getDrawable(NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide))?.mutate()?.let {
+                    it.setTint(white)
+                    it.setBounds(arrowLeft.toInt(), arrowTop.toInt(), (arrowLeft + arrowSize).toInt(), (arrowTop + arrowSize).toInt())
+                    it.draw(canvas)
+                }
             }
             val textX = arrowLeft + arrowSize + 12f
             val textTop = top + (turnHeight - distanceHeight - roadHeight) / 2
@@ -72,7 +75,7 @@ internal class ClusterGuidanceCard(private val context: Context, private val spo
                 textTop + distanceHeight + 2f - ascent(roadSize), roadSize, bounds.right - 12f - textX, white)
         }
         if (showLanes) {
-            if (maneuver != null) {
+            if (showTurn) {
                 paint.color = if (sport) Color.rgb(42, 54, 65) else Color.rgb(42, 74, 102)
                 paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f
                 canvas.drawLine(bounds.left + 12f, top + turnHeight + 1f, bounds.right - 12f, top + turnHeight + 1f, paint)

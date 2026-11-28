@@ -1,6 +1,9 @@
 <resources>
     <string name="new_ui_cluster_only_title">软件仅作为仪表</string>
     <string name="new_ui_cluster_only_sub">不进行手机互联，独立显示仪表与选定的中控区域。</string>
+    <string name="new_ui_cluster_data_source">仪表数据源</string>
+    <string name="new_ui_cluster_data_source_vehicle">车机</string>
+    <string name="new_ui_cluster_data_source_carlife">CarLife</string>
     <string name="new_ui_phone_protocol">协议</string>
     <string name="existing_wifi_title">现有 Wi-Fi / 同一局域网</string>
     <string name="existing_wifi_description">使用已有路由器或随身 Wi-Fi。让 iPhone 和车机保持连接同一网络，并通过它上网。</string>

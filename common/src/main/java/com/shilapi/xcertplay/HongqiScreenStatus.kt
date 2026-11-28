@@ -23,6 +23,7 @@ internal object HongqiScreenStatus {
     private var app: Context? = null
     private var connection: Connection? = null
     private var attempt = 0
+    private var reconnectAfterPowerRestore = false
     @Volatile var screenOff = false
         private set
     private var raw: Int? = null
@@ -64,15 +65,41 @@ internal object HongqiScreenStatus {
         raw = status
         record("status=$status")
         when (offState(status)) {
-            false -> screenOff = false
+            false -> {
+                val restored = screenOff
+                screenOff = false
+                if (restored) resumeAutomaticConnectionAfterPowerRestore()
+            }
             true -> {
                 screenOff = true
+                reconnectAfterPowerRestore = shouldReconnectAfterPowerRestore()
                 ConnectionProgressUiState.markDisconnected()
                 CarPlayHostSettingsBridge.closeFlyScreen("head unit screen/power off status=$status")
-                CarPlayBackgroundSession.stop()
+                CarPlayBackgroundSession.stop {
+                    main.post { resumeAutomaticConnectionAfterPowerRestore() }
+                }
             }
             null -> Unit
         }
+    }
+
+    private fun shouldReconnectAfterPowerRestore(): Boolean {
+        val context = app ?: return false
+        return !AirPlayPersistence.loadClusterOnlyMode(context) &&
+            AirPlayPersistence.loadAutoStartOnBoot(context) && DiPlayPreferences.autoConnect(context) &&
+            DiPlayPreferences.autoConnectWireless(context) && !DiPlayPreferences.phoneAddress(context).isNullOrBlank()
+    }
+
+    private fun resumeAutomaticConnectionAfterPowerRestore() {
+        val context = app ?: return
+        if (!reconnectAfterPowerRestore || screenOff || CarPlayBackgroundSession.hasSession()) return
+        reconnectAfterPowerRestore = false
+        // Power-off marks the connection as deliberately disconnected to stop retries while the
+        // head unit sleeps. Clear that temporary gate only for the matching power-on transition.
+        ConnectionProgressUiState.reset()
+        Hs5BootSession.allowPowerRestoreRestart()
+        Hs5BootSession.schedule(context, fallbackToHost = true)
+        record("automatic CarPlay restart scheduled after power restore")
     }
 
     /** Legacy PowerController ABI: SCREEN_OFF=2, POWER_OFF=3, ACC_OFF=4.

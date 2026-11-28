@@ -56,8 +56,18 @@ internal class VideoDecodeQueue(
 
     @Synchronized fun offer(job: VideoJob) {
         if (job is VideoJob.Frame) {
-            val frames = jobs.filterIsInstance<VideoJob.Frame>()
-            if (frames.size >= maxFrames || frames.sumOf { it.nalus.size.toLong() } + job.nalus.size > maxBytes) {
+            // Avoid allocating a filtered List and then traversing it again on every video
+            // packet. The queue is normally shallow; one pass gives the exact same overflow
+            // decision without per-frame garbage during startup bursts.
+            var pendingFrames = 0
+            var pendingBytes = 0L
+            for (pending in jobs) {
+                if (pending is VideoJob.Frame) {
+                    pendingFrames++
+                    pendingBytes += pending.nalus.size
+                }
+            }
+            if (pendingFrames >= maxFrames || pendingBytes + job.nalus.size > maxBytes) {
                 discardFrames()
                 jobs.offer(VideoJob.Resync)
             }

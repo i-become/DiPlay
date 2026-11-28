@@ -9,6 +9,7 @@ import com.shilapi.xcertplay.CarPlayHostSettingsBridge
 import com.shilapi.xcertplay.CarPlayNightMode
 import com.shilapi.xcertplay.ClusterStyle
 import com.shilapi.xcertplay.ClusterDashboardView
+import com.shilapi.xcertplay.ClusterInstrumentData
 import com.shilapi.xcertplay.hud.Hs5OutputSettings
 import com.shilapi.xcertplay.host.R
 
@@ -26,6 +27,7 @@ data class NewUiDisplayState(
     val clusterHorizontalGestureEnabled: Boolean,
     val carPlayNightMode: CarPlayNightMode,
     val clusterStyle: ClusterStyle = ClusterStyle.ORIGINAL,
+    val clusterOnlyDataSource: AirPlayPersistence.ClusterOnlyDataSource = AirPlayPersistence.ClusterOnlyDataSource.VEHICLE,
     val clusterManagerAvailable: Boolean = false,
     val carPlaySize: CarPlaySize = CarPlaySize.DEFAULT,
     val iconSizeReconnectNeeded: Boolean = false,
@@ -66,6 +68,7 @@ internal object NewUiDisplayStateReader {
             carPlaySize = AirPlayPersistence.loadCarPlaySize(context),
             iconSizeReconnectNeeded = iconSizeNeedsReconnect(context),
             clusterStyle = AirPlayPersistence.loadClusterStyle(context),
+            clusterOnlyDataSource = AirPlayPersistence.loadClusterOnlyDataSource(context),
             clusterManagerAvailable = ClusterDashboardView.supported(context),
             smoothVideoEnabled = AirPlayPersistence.loadSmoothVideo(context),
             directVideoOutputEnabled = AirPlayPersistence.loadDirectVideoOutput(context),
@@ -166,6 +169,12 @@ internal object NewUiDisplayActions {
         }
         CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
         com.shilapi.xcertplay.Hs5SteeringKeys.applySettings(context)
+    }
+
+    fun saveClusterOnlyDataSource(context: Context, source: AirPlayPersistence.ClusterOnlyDataSource) {
+        AirPlayPersistence.saveClusterOnlyDataSource(context, source)
+        ClusterInstrumentData.dataSourceChanged(context)
+        CarPlayHostSettingsBridge.notifyClusterMapSettingsChanged()
     }
 
     fun saveClusterNavMarker(context: Context, xPercent: Int, yPercent: Int) {

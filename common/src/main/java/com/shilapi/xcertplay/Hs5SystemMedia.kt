@@ -474,17 +474,71 @@ internal object Hs5SystemMediaColumns {
 
 /** One source decision shared by all three instruments, independent of their visual style. */
 internal object ClusterInstrumentData {
-    fun music(context: Context) = if (AirPlayPersistence.loadClusterOnlyMode(context))
-        Hs5SystemMedia.snapshot() else CarPlayMediaKeys.dashboardMusic()
-    fun guidance(context: Context) = if (AirPlayPersistence.loadClusterOnlyMode(context))
-        Hs5SystemMedia.guidanceSnapshot()
-        else com.shilapi.xcertplay.glance.CarPlayGlance.snapshot()
-    fun subscribe(context: Context, changed: () -> Unit): () -> Unit =
-        if (AirPlayPersistence.loadClusterOnlyMode(context)) Hs5SystemMedia.subscribe(context, changed)
-        else {
+    private val standaloneObservers = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
+    private var standaloneStop: (() -> Unit)? = null
+    private var activeStandaloneSource: AirPlayPersistence.ClusterOnlyDataSource? = null
+    private var standaloneContext: Context? = null
+
+    fun music(context: Context) = when {
+        !AirPlayPersistence.loadClusterOnlyMode(context) -> CarPlayMediaKeys.dashboardMusic()
+        AirPlayPersistence.loadClusterOnlyDataSource(context) == AirPlayPersistence.ClusterOnlyDataSource.CARLIFE ->
+            CarLifeInstrumentData.snapshot().music
+        else -> Hs5SystemMedia.snapshot()
+    }
+
+    fun guidance(context: Context) = when {
+        !AirPlayPersistence.loadClusterOnlyMode(context) -> com.shilapi.xcertplay.glance.CarPlayGlance.snapshot()
+        AirPlayPersistence.loadClusterOnlyDataSource(context) == AirPlayPersistence.ClusterOnlyDataSource.CARLIFE ->
+            CarLifeInstrumentData.snapshot().guidance
+        else -> Hs5SystemMedia.guidanceSnapshot()
+    }
+
+    @Synchronized fun subscribe(context: Context, changed: () -> Unit): () -> Unit {
+        if (!AirPlayPersistence.loadClusterOnlyMode(context)) {
             val navigation = com.shilapi.xcertplay.glance.CarPlayGlance.subscribe { changed() }
             val music = CarPlayMediaKeys.subscribeDashboard(changed)
-            val unsubscribe: () -> Unit = { navigation(); music() }
-            unsubscribe
+            return { navigation(); music() }
         }
+        standaloneObservers.add(changed)
+        standaloneContext = context.applicationContext
+        startStandaloneSourceIfNeeded(context.applicationContext)
+        return {
+            synchronized(this) {
+                standaloneObservers.remove(changed)
+                if (standaloneObservers.isEmpty()) {
+                    standaloneStop?.invoke()
+                    standaloneStop = null
+                    activeStandaloneSource = null
+                    standaloneContext = null
+                }
+            }
+        }
+    }
+
+    /** Switches only the source used by standalone instrument mode; CarPlay subscriptions stay intact. */
+    @Synchronized fun dataSourceChanged(context: Context) {
+        if (!AirPlayPersistence.loadClusterOnlyMode(context)) return
+        standaloneContext = context.applicationContext
+        val next = AirPlayPersistence.loadClusterOnlyDataSource(context)
+        if (next == activeStandaloneSource) return
+        standaloneStop?.invoke()
+        standaloneStop = null
+        activeStandaloneSource = null
+        startStandaloneSourceIfNeeded(context.applicationContext)
+        standaloneObservers.forEach { runCatching(it) }
+    }
+
+    private fun startStandaloneSourceIfNeeded(context: Context) {
+        if (standaloneStop != null) return
+        val source = AirPlayPersistence.loadClusterOnlyDataSource(context)
+        activeStandaloneSource = source
+        standaloneStop = when (source) {
+            AirPlayPersistence.ClusterOnlyDataSource.VEHICLE -> Hs5SystemMedia.subscribe(context) {
+                standaloneObservers.forEach { runCatching(it) }
+            }
+            AirPlayPersistence.ClusterOnlyDataSource.CARLIFE -> CarLifeInstrumentData.subscribe(context) {
+                standaloneObservers.forEach { runCatching(it) }
+            }
+        }
+    }
 }

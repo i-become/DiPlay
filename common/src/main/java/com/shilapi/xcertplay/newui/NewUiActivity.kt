@@ -512,6 +512,10 @@ open class NewUiActivity : ComponentActivity() {
                             NewUiDisplaySubpage.MAIN -> NewUiDisplayScreen(
                                 state = displayState,
                                 clusterOnlyMode = clusterOnlyMode,
+                                onClusterOnlyDataSourceChanged = { source ->
+                                    NewUiDisplayActions.saveClusterOnlyDataSource(activity, source)
+                                    refreshAll()
+                                },
                                 onClusterOnlyModeChanged = { enabled ->
                                     AirPlayPersistence.saveClusterOnlyMode(activity, enabled)
                                     clusterOnlyMode = enabled
@@ -963,13 +967,20 @@ open class NewUiActivity : ComponentActivity() {
         syncClusterOnlyOutput()
         recoverStoppedClusterCapture()
         snapshot = NewUiConnectionSnapshotReader.read(this, connectionActions.setupError)
-        if (
-            !carPlayWasActive &&
-            carPlayNowActive &&
-            destination == NewUiDestination.CONNECTION &&
-            connectionSubpage == NewUiConnectionSubpage.MAIN
-        ) {
-            DiPlayLauncher.openCarPlayProjection(this)
+        if (!carPlayWasActive && carPlayNowActive) {
+            val bootSessionOwnsConnection = CarPlayBackgroundSession.isOwner(Hs5BootSession)
+            CarPlayStartupDiagnostics.capture(
+                "home-ui observed CarPlay active bootSession=$bootSessionOwnsConnection " +
+                    "destination=$destination subpage=$connectionSubpage",
+            )
+            // A cold-boot connection is intentionally established before its UI. Once that
+            // session becomes active, always hand the display to CarPlay; a restored settings
+            // page or connection subpage must not consume the one-shot transition and leave the
+            // phone connected behind the vehicle home screen.
+            if (bootSessionOwnsConnection) {
+                CarPlayStartupDiagnostics.capture("home-ui launching projection for active boot session")
+                DiPlayLauncher.openCarPlayProjection(this)
+            }
         }
         carPlayWasActive = carPlayNowActive
         topBarStatus = NewUiTopBarStatusReader.read(this)

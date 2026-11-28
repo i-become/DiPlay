@@ -931,6 +931,19 @@ object AirPlayPersistence {
             .putBoolean(KEY_CLUSTER_ONLY, enabled).apply()
     }
 
+    enum class ClusterOnlyDataSource { VEHICLE, CARLIFE }
+
+    fun loadClusterOnlyDataSource(context: Context): ClusterOnlyDataSource =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("cluster_only_data_source", ClusterOnlyDataSource.VEHICLE.name)
+            ?.let { runCatching { ClusterOnlyDataSource.valueOf(it) }.getOrNull() }
+            ?: ClusterOnlyDataSource.VEHICLE
+
+    fun saveClusterOnlyDataSource(context: Context, source: ClusterOnlyDataSource) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("cluster_only_data_source", source.name).apply()
+    }
+
     /** When true, 仪表飞屏 turns on again each time CarPlay connects (unless cluster map is off). */
     fun loadClusterFlyScreenDefaultOnConnect(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

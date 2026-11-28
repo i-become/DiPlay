@@ -1034,6 +1034,9 @@
     <string name="new_ui_cluster_only_title">Instrument display only</string>
     <string name="new_ui_phone_protocol">Protocol</string>
     <string name="new_ui_cluster_only_sub">Do not connect to a phone; display instruments and the selected centre-screen region independently.</string>
+    <string name="new_ui_cluster_data_source">Instrument data source</string>
+    <string name="new_ui_cluster_data_source_vehicle">Vehicle</string>
+    <string name="new_ui_cluster_data_source_carlife">CarLife</string>
     <string name="new_ui_display_cluster_gesture">Three-finger swipe cluster</string>
     <string name="new_ui_display_cluster_gesture_sub">Switch the cluster map with a three-finger horizontal swipe.</string>
     <string name="new_ui_display_nav_marker">Navigation marker position</string>

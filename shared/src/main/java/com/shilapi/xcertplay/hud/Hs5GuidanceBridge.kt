@@ -206,18 +206,14 @@ internal object Hs5GuidanceBridge {
 
     /** Send route fields whose HS5 payload semantics are known. */
     private fun sendHudMetadataLocked(hud: IBinder, frame: Hs5GuidanceFrame, force: Boolean) {
-        // The HUD's compact distance switches to tenths of a kilometre above 1 km. Keep the
-        // parallel raw-distance field at that same display precision instead of churning meters
-        // that cannot change the shown number.
-        val nextCrossDistance = QisiVehicleBinder.hudNextCrossDistanceMeters(frame.distanceMeters)
         val remainingMeters = frame.routeRemainingMeters.coerceAtLeast(0)
         val remainingSeconds = frame.routeRemainingSeconds.coerceAtLeast(0)
         val laneValues = hs5LaneValues(frame)
         sendHudIntsIfChangedLocked(hud, QisiVehicleBinder.HUD_SET_NAV_STATUS, intArrayOf(1), force,
         )
-        sendHudIntsIfChangedLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_DISTANCE,
-            intArrayOf(nextCrossDistance), force,
-        )
+        // The arrow distance is sent once through HUD_SET_DISTANCE with its unit selector above.
+        // Sending the same maneuver through the legacy integer-only field can override the compact
+        // value on firmware revisions that consume both fields, especially after the km unit switch.
         // The iAP2 route payload has one distance, but no distance range. Keep the range
         // explicitly empty instead of treating the distance as a made-up range.
         sendHudIntsIfChangedLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_RANGE,
@@ -346,9 +342,6 @@ internal object Hs5GuidanceBridge {
                         intArrayOf(0),
                     )
                     sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NAV_STATUS,
-                        intArrayOf(0),
-                    )
-                    sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_DISTANCE,
                         intArrayOf(0),
                     )
                     sendHudIntsLocked(hud, QisiVehicleBinder.HUD_SET_NEXT_CROSS_RANGE,

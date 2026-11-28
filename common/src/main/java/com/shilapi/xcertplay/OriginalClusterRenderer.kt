@@ -49,7 +49,7 @@ internal class OriginalClusterRenderer(private val context: Context) {
                 OriginalClusterComponent.TIRES -> tires(canvas, bounds, vehicle)
                 OriginalClusterComponent.DRIVING -> driving(canvas, bounds, vehicle)
                 OriginalClusterComponent.TURN -> if (nav.connected && nav.navigating &&
-                    (nav.maneuverType != null || lanes.fits(nav.lanes, bounds.width() - 30))) turn(canvas, bounds, nav)
+                    (nav.maneuverType != null || nav.directionIcon != null || lanes.fits(nav.lanes, bounds.width() - 30))) turn(canvas, bounds, nav)
                 OriginalClusterComponent.TIME -> if (nav.connected && nav.navigating &&
                     (nav.arrivalEpochSeconds != null || nav.remainingSeconds != null || nav.routeSummary.isNotBlank())) time(canvas, bounds, nav)
                 OriginalClusterComponent.MUSIC -> music(canvas, bounds, musicState, layout.musicStyle)
@@ -120,18 +120,20 @@ internal class OriginalClusterRenderer(private val context: Context) {
         val contentHeight = if (maneuver != null) r.height() else 74f
         val card = RectF(r.left, r.top, r.right, r.top + contentHeight)
         panel(canvas, card, TURN_SURFACE, if (maneuver != null) 44f else 30f, card = true)
-        if (maneuver != null) {
-            val icon = NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide)
-            val straight = icon == R.drawable.ic_maneuver_straight
-            val resource = if (straight) R.drawable.ic_original_cluster_straight else icon
+        if (maneuver != null || nav.directionIcon != null) {
             val iconTop = if (showLanes) 20 else 36
-            if (!phoneIcon.draw(canvas, nav.directionIcon,
-                    RectF(r.left + 42, r.top + iconTop, r.left + 120, r.top + iconTop + 82)))
-            arrows.getOrPut(resource) { requireNotNull(context.getDrawable(resource)).mutate().apply { setTint(Color.WHITE) } }.let {
-                val left = if (straight) 58 else 42
-                val right = if (straight) 102 else 120
-                val top = if (showLanes) 20 else 36
-                it.setBounds((r.left + left).toInt(), (r.top + top).toInt(), (r.left + right).toInt(), (r.top + top + 82).toInt()); it.draw(canvas)
+            val iconBounds = RectF(r.left + 42, r.top + iconTop, r.left + 120, r.top + iconTop + 82)
+            val iconDrawn = phoneIcon.draw(canvas, nav.directionIcon, iconBounds)
+            if (!iconDrawn && maneuver != null) {
+                val icon = NavigationWidgetUpdater.arrow(maneuver, nav.drivingSide)
+                val straight = icon == R.drawable.ic_maneuver_straight
+                val resource = if (straight) R.drawable.ic_original_cluster_straight else icon
+                arrows.getOrPut(resource) { requireNotNull(context.getDrawable(resource)).mutate().apply { setTint(Color.WHITE) } }.let {
+                    val left = if (straight) 58 else 42
+                    val right = if (straight) 102 else 120
+                    val top = if (showLanes) 20 else 36
+                    it.setBounds((r.left + left).toInt(), (r.top + top).toInt(), (r.left + right).toInt(), (r.top + top + 82).toInt()); it.draw(canvas)
+                }
             }
             val distance = nav.distanceMeters?.let { if (it >= 1000) context.getString(R.string.original_cluster_kilometers,
                 NumberFormat.getNumberInstance(Locale.getDefault()).apply { maximumFractionDigits = 1; isGroupingUsed = false }.format(it / 1000.0))

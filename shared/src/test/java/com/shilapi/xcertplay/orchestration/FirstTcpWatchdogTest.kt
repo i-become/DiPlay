@@ -124,7 +124,7 @@ class FirstTcpWatchdogTest {
         }
     }
 
-    @Test fun recoveryOccursAtSixAndTwelveSecondsAndDoesNotExtendDeadline() {
+    @Test fun recoveryContinuesUntilTcpOrBoundedAttemptLimitWithoutExtendingDeadline() {
         val watch = watchdog()
         assertFalse(watch.takeRecoveryRequest())
         watch.startSessionSent(0)
@@ -137,6 +137,14 @@ class FirstTcpWatchdogTest {
         now = 11_999
         assertFalse(watch.takeRecoveryRequest())
         now = 12_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 17_999
+        assertFalse(watch.takeRecoveryRequest())
+        now = 18_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 23_999
+        assertFalse(watch.takeRecoveryRequest())
+        now = 24_000
         assertTrue(watch.takeRecoveryRequest())
         now = 29_999
         assertFalse(watch.takeRecoveryRequest())
@@ -175,7 +183,7 @@ class FirstTcpWatchdogTest {
         assertTrue(watch.takeRecoveryRequest())
     }
 
-    @Test fun associatedClientCanAdvanceOnlyTheFirstRecoveryAfterTheInitialGrace() {
+    @Test fun associationCanAdvanceTheFirstRecoveryAndIsUsedOnlyOnce() {
         val watch = watchdog()
         watch.startSessionSent(0)
         now = 1_999
@@ -184,18 +192,34 @@ class FirstTcpWatchdogTest {
         now = 2_000
         assertTrue(watch.shouldObserveAssociation())
         assertTrue(watch.takeRecoveryRequest(clientAssociated = true))
-        assertFalse(watch.shouldObserveAssociation())
+        assertFalse(watch.shouldObserveAssociation()) // Association samples are rate limited.
         assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
         now = 6_000
         assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
         now = 12_000
         assertTrue(watch.takeRecoveryRequest())
         now = 20_000
-        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        assertTrue(watch.takeRecoveryRequest(clientAssociated = true))
         assertEquals(30_000L, deadline)
         now = 30_000
         timer!!()
         assertEquals(1, failures)
+    }
+
+    @Test fun lateAssociationTriggersPromptRecoveryAfterEarlierTimerRetries() {
+        val watch = watchdog()
+        watch.startSessionSent(0)
+        now = 6_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 12_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 18_000
+        assertTrue(watch.takeRecoveryRequest())
+        now = 20_000
+        assertTrue(watch.shouldObserveAssociation())
+        assertTrue(watch.takeRecoveryRequest(clientAssociated = true))
+        assertFalse(watch.takeRecoveryRequest(clientAssociated = true))
+        assertEquals(30_000L, deadline)
     }
 
     @Test fun unknownAssociationKeepsSixSecondFallbackAndSamplingStopsAtItsDeadline() {

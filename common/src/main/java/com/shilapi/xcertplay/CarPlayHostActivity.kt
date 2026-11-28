@@ -261,6 +261,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var videoView: View? = null
     private var fallbackVideoView: SurfaceView? = null
     private var fallbackVideoBounds: CarPlaySurfaceBounds? = null
+    private var lastHs5ViewportRecoverySize: DisplaySize? = null
     // Smooth-video output uses SurfaceView, while decoded frames are still released immediately.
     private var smoothVideo = false
     // Direct video output (a setting): SurfaceView output with frames shown as soon as they are decoded.
@@ -598,6 +599,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private val textureListener = object : TextureView.SurfaceTextureListener {
         override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+            enforceHs5VideoViewport(width, height, "texture-available")
             val existing = currentSurface
             val surface = if (
                 existing != null &&
@@ -620,6 +622,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
         override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+            enforceHs5VideoViewport(width, height, "texture-size-changed")
             updateVideoLayout(width, height)
             scheduleDisplaySize(width, height)
         }
@@ -638,11 +641,19 @@ class CarPlayHostActivity : ComponentActivity() {
     private val fallbackSurfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
             if (isDestroyed || holder !== fallbackVideoView?.holder) return
+            if (isFixedHs5Canvas()) {
+                val fixed = HS5_CARPLAY_DISPLAY_SIZE
+                // SurfaceView's buffer size otherwise follows the OEM's transient 1280x480 app pane
+                // even while the Activity window and root remain at 1920x720.
+                holder.setFixedSize(fixed.width, fixed.height)
+            }
             val surface = holder.surface
             videoSurfaceOwner.replace(surface, releaseOnDetach = false)
             val frame = holder.surfaceFrame
+            enforceHs5VideoViewport(frame.width(), frame.height(), "surface-created")
             DiagnosticLogging.record { appendLog(
-                "SurfaceView video surface created valid=${surface.isValid} size=${frame.width()}x${frame.height()}",
+                "SurfaceView video surface created valid=${surface.isValid} size=${frame.width()}x${frame.height()} " +
+                    "${videoViewportDiagnostics()}",
             ) }
             attachSurface(surface)
             // A still CarPlay screen sends no frames, so ask for one instead of showing the parked gap.
@@ -652,12 +663,17 @@ class CarPlayHostActivity : ComponentActivity() {
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             if (holder !== fallbackVideoView?.holder) return
+            enforceHs5VideoViewport(width, height, "surface-changed")
+            DiagnosticLogging.record { appendLog(
+                "SurfaceView video surface changed size=${width}x$height ${videoViewportDiagnostics()}",
+            ) }
             // Holder dimensions describe the fitted video, not the host window/CarPlay canvas.
             videoView?.let { updateVideoLayout(it.width, it.height) }
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
             val surface = holder.surface
+            val frame = holder.surfaceFrame
             // The SurfaceHolder contract: nothing may render to the surface once this returns. Every decoder
             // is asked at once, then waited for against one deadline; each confirms once it has moved,
             // parked or released its codec, and closing decoders count once their workers exit. With
@@ -668,8 +684,8 @@ class CarPlayHostActivity : ComponentActivity() {
             val confirmed = detaches.map { it.await() }.all { it }
             videoSurfaceOwner.clear(surface)
             DiagnosticLogging.record { appendLog(
-                "SurfaceView video surface destroyed size=${holder.surfaceFrame.width()}x${holder.surfaceFrame.height()} " +
-                    "detachConfirmed=$confirmed",
+                "SurfaceView video surface destroyed size=${frame.width()}x${frame.height()} " +
+                    "detachConfirmed=$confirmed ${videoViewportDiagnostics()}",
             ) }
         }
     }
@@ -1058,6 +1074,8 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (intent.getBooleanExtra(DiPlayLauncher.EXTRA_ENTER_CARPLAY_PROJECTION, false)) {
             updateDebugOverlays()
+            applyFullscreenMode()
+            videoView?.requestLayout()
         }
         if (intent.getBooleanExtra(EXTRA_BOOT_AUTO_START, false)) {
             restoreBootForeground = true
@@ -1154,6 +1172,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Re-assert the fixed HS5 window before Android/OEM relays the video Surface. Applying
+        // fullscreen at the end of resume let the first resumed Surface inherit the 1280x480 app pane.
+        applyFullscreenMode()
+        videoView?.requestLayout()
+        lastHs5ViewportRecoverySize = null
         applySessionLogRecordingPreference()
         hostUiPaused = false
         Hs5SteeringKeys.hostResumed(this)
@@ -1227,8 +1250,10 @@ class CarPlayHostActivity : ComponentActivity() {
             harmanFullscreenEnabled = savedHarmanFullscreen
         }
         maybeStartCarPlay()
-        applyFullscreenMode()
-        if (systemBarsChanged) refreshDisplaySizeAfterLayout()
+        if (systemBarsChanged) {
+            applyFullscreenMode()
+            refreshDisplaySizeAfterLayout()
+        }
         videoView?.post {
             val view = videoView ?: return@post
             if (view.width > 0 && view.height > 0) {
@@ -1839,6 +1864,16 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun buildContentView(): View {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         contentRoot = root
+        val fixedHs5Canvas = isFixedHs5Canvas()
+        val videoLayout = if (fixedHs5Canvas) {
+            FrameLayout.LayoutParams(
+                HS5_CARPLAY_DISPLAY_SIZE.width,
+                HS5_CARPLAY_DISPLAY_SIZE.height,
+                Gravity.TOP or Gravity.LEFT,
+            )
+        } else {
+            FrameLayout.LayoutParams(-1, -1)
+        }
         val video = TextureView(this).apply {
             isOpaque = false
             surfaceTextureListener = textureListener
@@ -1848,8 +1883,8 @@ class CarPlayHostActivity : ComponentActivity() {
             isClickable = true
             setOnTouchListener { view, event -> onHostTouch(view, event) }
         }
-        root.addView(video, FrameLayout.LayoutParams(-1, -1))
-        root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
+        root.addView(video, videoLayout)
+        root.addView(gestureLayer, FrameLayout.LayoutParams(videoLayout))
         com.shilapi.xcertplay.newui.NewUiShellBackgroundViews.install(this, root)
         if (com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) {
             waitingRevealOverlay = FrameLayout(this).also {
@@ -4877,6 +4912,16 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     if (menuOpen) return@runOnUiThread
                     DiagnosticLogging.record { appendLog("AirPlay session active") }
+                    // Manual connections are established by this Activity while the new UI
+                    // remains on top as the connection hub. Once the phone reports an active
+                    // session, promote this same host to the projection immediately; otherwise
+                    // the session can be live behind the home page until the user taps CarPlay
+                    // again. The boot-session path performs the equivalent handoff from
+                    // Hs5BootSession, so keep this specific to a visible connection hub.
+                    if (newUiConnectionHub) {
+                        CarPlayStartupDiagnostics.capture("connection-hub launching projection for active session")
+                        DiPlayLauncher.openCarPlayProjection(this@CarPlayHostActivity)
+                    }
                     maybeRestoreBootForeground("session active")
                     if (AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) {
                         ensureClusterPresentation()
@@ -5327,6 +5372,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun scheduleDisplaySize(width: Int, height: Int) {
         if (width <= 0 || height <= 0 || shuttingDown.get()) return
+        enforceHs5VideoViewport(width, height, "display-size")
         val size = DisplaySize(width, height)
         if (size == pendingDisplaySize) return
         mainHandler.removeCallbacks(applyDisplaySize)
@@ -5344,6 +5390,43 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun isMultiWindowActive(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode
+    }
+
+    private fun isFixedHs5Canvas(): Boolean =
+        !isMultiWindowActive() && com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)
+
+    /**
+     * The HS5 launcher can re-parent/re-size the resumed activity to its 1280x480 app pane after
+     * initially restoring the full-screen window. Keep the negotiated 1920x720 CarPlay canvas,
+     * and re-assert the OEM full-screen window as soon as a real video viewport reports that pane.
+     * This only changes the host window; it does not restart or pace the CarPlay video pipeline.
+     */
+    private fun enforceHs5VideoViewport(width: Int, height: Int, source: String) {
+        if (width <= 0 || height <= 0 || isMultiWindowActive() ||
+            !com.shilapi.xcertplay.hud.Hs5HeadUnit.isHeadUnit(this)) return
+        val fixed = HS5_CARPLAY_DISPLAY_SIZE
+        if (width == fixed.width && height == fixed.height) return
+        val reportedSize = DisplaySize(width, height)
+        // requestLayout can itself produce alternating layout callbacks (pane, full canvas, pane).
+        // Make one recovery attempt per bad size while this activity is resumed to avoid a relayout loop.
+        if (lastHs5ViewportRecoverySize == reportedSize) return
+        lastHs5ViewportRecoverySize = reportedSize
+        val message = "HS5 non-fullscreen video viewport source=$source size=${width}x$height " +
+            "expected=${fixed.width}x${fixed.height}; reapplying fullscreen ${videoViewportDiagnostics()}"
+        DiagnosticLogging.record { appendLog(message) }
+        DiagnosticLogging.logcat { Log.w(TAG, message) }
+        applyFullscreenMode()
+        window.decorView.requestLayout()
+        videoView?.parent?.requestLayout()
+    }
+
+    private fun videoViewportDiagnostics(): String {
+        val viewport = videoView
+        val root = window.decorView
+        val params = window.attributes
+        return "viewport=${viewport?.width ?: 0}x${viewport?.height ?: 0} " +
+            "root=${root.width}x${root.height} window=${params.width}x${params.height} " +
+            "multiWindow=${isMultiWindowActive()}"
     }
 
 
@@ -5515,7 +5598,11 @@ class CarPlayHostActivity : ComponentActivity() {
         val content = contentRect(viewWidth, viewHeight)
         val fallback = fallbackVideoView
         if (fallback != null) {
-            val bounds = CarPlaySurfaceBounds.from(content)
+            val bounds = if (isFixedHs5Canvas()) {
+                CarPlaySurfaceBounds(0, 0, HS5_CARPLAY_DISPLAY_SIZE.width, HS5_CARPLAY_DISPLAY_SIZE.height)
+            } else {
+                CarPlaySurfaceBounds.from(content)
+            }
             if (fallbackVideoBounds != bounds) {
                 fallbackVideoBounds = bounds
                 fallback.layoutParams = FrameLayout.LayoutParams(bounds.width, bounds.height,
@@ -5525,6 +5612,15 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             }
         } else {
+            if (isFixedHs5Canvas()) {
+                val fixed = HS5_CARPLAY_DISPLAY_SIZE
+                val params = view.layoutParams
+                if (params.width != fixed.width || params.height != fixed.height) {
+                    params.width = fixed.width
+                    params.height = fixed.height
+                    view.layoutParams = params
+                }
+            }
             (view as? TextureView)?.setTransform(Matrix().apply {
                 setScale(content.width / viewWidth, content.height / viewHeight)
                 postTranslate(content.left, content.top)
@@ -5915,6 +6011,16 @@ class CarPlayHostActivity : ComponentActivity() {
         val index = root.indexOfChild(texture)
         val viewport = FrameLayout(this).apply { clipChildren = true }
         val surfaceView = SurfaceView(this)
+        val fixedHs5Canvas = isFixedHs5Canvas()
+        val viewportLayoutParams = if (fixedHs5Canvas) {
+            FrameLayout.LayoutParams(
+                HS5_CARPLAY_DISPLAY_SIZE.width,
+                HS5_CARPLAY_DISPLAY_SIZE.height,
+                Gravity.TOP or Gravity.LEFT,
+            )
+        } else {
+            FrameLayout.LayoutParams(texture.layoutParams)
+        }
         pictureBinding?.close()
         pictureBinding = null
         // Detach our wrapper before removing its TextureView; a late destruction callback
@@ -5926,7 +6032,16 @@ class CarPlayHostActivity : ComponentActivity() {
         videoView = viewport
         fallbackVideoView = surfaceView
         surfaceView.holder.addCallback(fallbackSurfaceCallback)
-        viewport.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
+        val surfaceLayoutParams = if (fixedHs5Canvas) {
+            FrameLayout.LayoutParams(
+                HS5_CARPLAY_DISPLAY_SIZE.width,
+                HS5_CARPLAY_DISPLAY_SIZE.height,
+                Gravity.TOP or Gravity.LEFT,
+            )
+        } else {
+            FrameLayout.LayoutParams(-1, -1)
+        }
+        viewport.addView(surfaceView, surfaceLayoutParams)
         viewport.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             val width = right - left
             val height = bottom - top
@@ -5935,7 +6050,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 scheduleDisplaySize(width, height)
             }
         }
-        root.addView(viewport, index, texture.layoutParams)
+        root.addView(viewport, index, viewportLayoutParams)
         DiagnosticLogging.record { appendLog(if (smoothVideo && !directVideoOutput) {
             "Using SurfaceView video output: decoded frames shown immediately without added pacing delay; " +
                 "picture adjustments unavailable"

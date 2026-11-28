@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.newui.NewUiColors
 import com.shilapi.xcertplay.newui.NewUiCompactToggleRow
@@ -29,6 +30,7 @@ import com.shilapi.xcertplay.newui.NewUiTypography
 import com.shilapi.xcertplay.localizedLabel
 import com.shilapi.xcertplay.newui.NewUiAccentActionButton
 import com.shilapi.xcertplay.newui.NewUiLayout
+import com.shilapi.xcertplay.newui.NewUiSurfaces
 
 @Composable
 fun NewUiDisplayScreen(
@@ -48,6 +50,7 @@ fun NewUiDisplayScreen(
     onNightModeSelected: (Int) -> Unit,
     clusterOnlyMode: Boolean = false,
     onClusterOnlyModeChanged: (Boolean) -> Unit = {},
+    onClusterOnlyDataSourceChanged: (AirPlayPersistence.ClusterOnlyDataSource) -> Unit = {},
     onPickIconSize: () -> Unit = {},
     onReconnect: () -> Unit = {},
 ) {
@@ -100,6 +103,9 @@ fun NewUiDisplayScreen(
                     subtitle = stringResource(R.string.new_ui_cluster_only_sub),
                     checked = clusterOnlyMode, onCheckedChange = onClusterOnlyModeChanged,
                 )
+                if (clusterOnlyMode) {
+                    ClusterOnlyDataSourceRow(state.clusterOnlyDataSource, onClusterOnlyDataSourceChanged)
+                }
                 // Style selection and static previews are available without vehicle hardware.
                 NewUiCompactValueRow(
                     title = stringResource(R.string.settings_cluster_manager),
@@ -151,6 +157,50 @@ fun NewUiDisplayScreen(
                 onClick = onReconnect,
                 modifier = Modifier.padding(top = NewUiLayout.MainGap),
             )
+        }
+    }
+}
+
+@Composable
+private fun ClusterOnlyDataSourceRow(
+    selected: AirPlayPersistence.ClusterOnlyDataSource,
+    onSelect: (AirPlayPersistence.ClusterOnlyDataSource) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+        Text(
+            stringResource(R.string.new_ui_cluster_data_source),
+            style = NewUiTypography.CompactSettingTitle,
+            color = NewUiColors.TextPrimary,
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                AirPlayPersistence.ClusterOnlyDataSource.VEHICLE to R.string.new_ui_cluster_data_source_vehicle,
+                AirPlayPersistence.ClusterOnlyDataSource.CARLIFE to R.string.new_ui_cluster_data_source_carlife,
+            ).forEach { (source, labelRes) ->
+                val shape = RoundedCornerShape(9.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .then(
+                            if (source == selected) Modifier
+                                .background(NewUiSurfaces.segmentSelectedBrush(), shape)
+                                .border(1.dp, NewUiSurfaces.hairlineBorder, shape)
+                            else Modifier
+                                .background(NewUiSurfaces.pillGlassBrush(), shape)
+                                .border(1.dp, NewUiSurfaces.glassBorderSoft, shape),
+                        )
+                        .clickable { onSelect(source) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(labelRes),
+                        style = NewUiTypography.ActionSubtitle,
+                        color = if (source == selected) NewUiColors.TextPrimary else NewUiColors.TextSecondary,
+                    )
+                }
+            }
         }
     }
 }
